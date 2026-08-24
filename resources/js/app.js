@@ -1,0 +1,104 @@
+import { installBrowserApi } from './core/browser-api.js';
+import { bootAttachmentAutoUpload } from './components/attachment-auto-upload.js';
+import { bootFileDropzones } from './components/file-dropzones.js';
+import { resetInlineEditState } from './components/inline-edit.js';
+import { bootMasterColors } from './components/master-colors.js';
+import { bootLivewireMentionHooks, bootMentionInputs, observeMentionInputs } from './components/mentions.js';
+import {
+    bootLivewireRichTextHooks,
+    bootRichTextEditors,
+    bootRichTextImageViewer,
+    observeRichTextEditors,
+    scheduleRichTextRefresh,
+} from './components/rich-text.js';
+import { bindNavigationLifecycle } from './core/navigation.js';
+import { bootRealtimeClient } from './core/realtime.js';
+import { bootSessionRecovery } from './core/session-recovery.js';
+import { bootSessionSafety } from './core/session-safety.js';
+import { bootShell } from './core/shell.js';
+import { syncBrowserTimezone } from './core/timezone.js';
+import { bootLivewireNotificationEvents, bootNotifications, syncUnreadCount } from './features/notifications.js';
+import { bootRealtimeTelemetry } from './features/realtime-telemetry.js';
+import { bootRouteFeatures } from './features/route-loader.js';
+import { bootWorkspaceRefresh, subscribeWorkspace } from './features/workspace-refresh.js';
+
+installBrowserApi();
+
+const bootShared = () => {
+    syncBrowserTimezone();
+    bootShell();
+
+    const realtime = bootRealtimeClient();
+    bootNotifications(realtime);
+    bootRealtimeTelemetry(realtime);
+    bootWorkspaceRefresh(realtime);
+
+    bootSessionSafety();
+    bootSessionRecovery();
+    bootRichTextEditors();
+    observeRichTextEditors();
+    bootLivewireRichTextHooks();
+    bootRichTextImageViewer();
+    bootMentionInputs();
+    observeMentionInputs();
+    bootLivewireMentionHooks();
+    bootFileDropzones();
+    bootAttachmentAutoUpload();
+    bootMasterColors();
+    bootRouteFeatures();
+};
+
+const bootLivewire = () => {
+    bootSessionRecovery();
+    bootLivewireNotificationEvents();
+    bootLivewireRichTextHooks();
+    bootLivewireMentionHooks();
+    bootMasterColors();
+
+    const realtime = bootRealtimeClient();
+    bootNotifications(realtime);
+    bootRealtimeTelemetry(realtime);
+    subscribeWorkspace(realtime);
+};
+
+bindNavigationLifecycle({
+    boot: bootShared,
+    livewireInit: () => {
+        bootRichTextEditors();
+        observeRichTextEditors();
+        bootRichTextImageViewer();
+        bootMentionInputs();
+        observeMentionInputs();
+        bootLivewire();
+        bootRouteFeatures();
+    },
+    navigating: (event) => {
+        resetInlineEditState();
+        event.detail?.onSwap?.(() => {
+            scheduleRichTextRefresh();
+            observeRichTextEditors();
+            bootRichTextImageViewer();
+        });
+    },
+    navigated: () => {
+        scheduleRichTextRefresh();
+        observeRichTextEditors();
+        bootRichTextImageViewer();
+        syncBrowserTimezone();
+        bootShell();
+        bootLivewire();
+        bootMentionInputs();
+        observeMentionInputs();
+        bootFileDropzones();
+        bootAttachmentAutoUpload();
+        bootMasterColors();
+        bootRouteFeatures();
+    },
+    loaded: () => {
+        const realtime = bootRealtimeClient();
+        bootNotifications(realtime);
+        bootLivewireNotificationEvents();
+        bootWorkspaceRefresh(realtime);
+        syncUnreadCount();
+    },
+});

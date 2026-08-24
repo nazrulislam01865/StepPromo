@@ -1,0 +1,7 @@
+/**
+ * FlowTrack modular authenticated theme package composition root.
+ * Loaded after application/feature CSS so the theme owns static visual values.
+ */
+@import './core.css';
+@import './components/sidebar.css';
+@import './components/management-dashboard.css';

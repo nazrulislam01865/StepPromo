@@ -1,0 +1,315 @@
+<?php
+
+namespace App\Livewire\Jobs;
+
+use App\Livewire\Jobs\Concerns\ManagesOrderCreation;
+use App\Livewire\Jobs\Concerns\ManagesCreateOrderProducts;
+use App\Livewire\Jobs\Concerns\ManagesOrderNavigation;
+use App\Livewire\Jobs\Concerns\ManagesOrderFinance;
+use App\Livewire\Jobs\Concerns\ManagesOrderInquiryLink;
+use App\Livewire\Jobs\Concerns\ManagesOrderWorkflow;
+use App\Livewire\Jobs\Concerns\ManagesOrderDetail;
+use App\Livewire\Jobs\Concerns\ManagesOrderProducts;
+use App\Livewire\Jobs\Concerns\ManagesOrderTasks;
+use App\Livewire\Jobs\Concerns\ManagesOrderDocuments;
+use App\Livewire\Jobs\Concerns\ManagesOrderTaskResources;
+use App\Livewire\Jobs\Concerns\ManagesOrderActivity;
+use App\Livewire\Jobs\Concerns\BuildsOrderPageData;
+
+use App\Livewire\Concerns\HandlesInlineEdits;
+use App\Livewire\Concerns\UsesPagePlaceholder;
+use App\Livewire\Concerns\RefreshesFromWorkspace;
+
+use App\Models\Task;
+use App\Services\AccessControlService;
+use App\Services\ClientService;
+use App\Services\TaskService;
+use Livewire\Component;
+use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
+use Livewire\WithFileUploads;
+use Livewire\WithPagination;
+
+class Index extends Component
+{
+    use ManagesOrderCreation;
+    use ManagesCreateOrderProducts;
+    use ManagesOrderNavigation;
+    use ManagesOrderFinance;
+    use ManagesOrderInquiryLink;
+    use ManagesOrderWorkflow;
+    use ManagesOrderDetail;
+    use ManagesOrderProducts;
+    use ManagesOrderTasks;
+    use ManagesOrderDocuments;
+    use ManagesOrderTaskResources;
+    use ManagesOrderActivity;
+    use BuildsOrderPageData;
+
+    use RefreshesFromWorkspace;
+    use UsesPagePlaceholder;
+    use HandlesInlineEdits;
+    use WithPagination, WithFileUploads;
+
+    public string $search = '';
+    public string $phase = '';
+    public string $health = '';
+    public string $client = '';
+    public string $owner = '';
+    public string $assignee = '';
+    public string $delivery = '';
+    public string $invoice = '';
+    public string $priorityFilter = '';
+    public string $jobStatusFilter = '';
+    public string $sort = 'updated_desc';
+    public bool $showMoreFilters = false;
+    public int $perPage = 25;
+    public array $selectedJobIds = [];
+
+    #[Url(as: 'open', history: true)]
+    public ?int $selectedJobId = null;
+
+    #[Url(as: 'task', history: true)]
+    public ?int $selectedTaskId = null;
+
+    #[Url(as: 'comment', history: true)]
+    public ?string $focusComment = null;
+    public bool $taskEditMode = false;
+    public string $detailTab = 'overview';
+    public string $inquirySearch = '';
+    public ?int $selectedLinkInquiryId = null;
+    public bool $showInquiryLinkConfirm = false;
+    public bool $showInquiryUnlinkConfirm = false;
+
+    public bool $showCreateInvoiceModal = false;
+    public string $invoiceType = '';
+    public string $invoiceCurrency = '';
+    public string $invoiceIssueDate = '';
+    public string $invoicePaymentTerms = '';
+    public string $invoiceDueDate = '';
+    public ?int $invoiceBillingContactId = null;
+    public array $invoiceLineItems = [];
+    public string $invoicePurchaseOrderReference = '';
+    public string $invoiceNotes = 'Please include the invoice number with your payment.';
+    public string $invoiceTaxRate = '0';
+    public $invoiceSupportingDocument = null;
+    public bool $invoiceEmailAfterCreation = false;
+
+    public bool $showRecordPaymentModal = false;
+    public ?int $paymentInvoiceId = null;
+    public string $paymentDate = '';
+    public string $paymentMethod = '';
+    public string $paymentAmount = '';
+    public string $paymentReference = '';
+    public string $paymentReceivedAccount = '';
+    public $paymentReceipt = null;
+    public string $paymentNotes = '';
+    public bool $paymentMarkInvoicePaid = true;
+
+    public bool $showCollectionUpdateModal = false;
+    public ?int $collectionOwnerId = null;
+    public string $collectionFollowUpDate = '';
+    public string $collectionNextFollowUpDate = '';
+    public string $collectionNote = '';
+
+    public array $expandedPhaseIds = [];
+    /** Selected historical/current stage shown in the prototype task panel. */
+    public ?int $overviewPhaseId = null;
+    public bool $showOrderWorkflowActionModal = false;
+    public ?int $orderWorkflowActionTaskId = null;
+    public string $orderWorkflowActionComment = '';
+    public string $orderWorkflowActionStep = 'main';
+    /** @var array<string,mixed> */
+    public array $orderWorkflowActionPayload = [];
+    public string $jobTaskSearch = '';
+    public bool $showCreate = false;
+    public bool $createCatalogReady = false;
+    public bool $createAssignmentReady = false;
+    public bool $createWorkflowReady = false;
+    public int $createWorkflowSelectorVersion = 0;
+
+    public string $jobTitle = '';
+    public string $referenceNumber = '';
+    public bool $isRepeatedOrder = false;
+    public string $repeatedOrderNumber = '';
+    public string $priority = 'Medium';
+    public array $productionUrgencyIds = [];
+    public array $shipmentUrgencyIds = [];
+    public ?int $clientId = null;
+    public ?int $workflowId = null;
+    public ?int $workflowPhaseId = null;
+    public ?int $ownerId = null;
+    public ?int $coordinatorId = null;
+    public string $deliveryDate = '';
+    public string $estimatedDeliveryDate = '';
+    public string $description = '';
+    public string $shippingAddress = '';
+    public string $shippingPhoneCountryCode = '';
+    public string $shippingPhone = '';
+    public string $shippingPostalCode = '';
+    public ?int $shippingSourceAddressId = null;
+    public bool $showSavedShippingAddressPicker = false;
+    public array $jobItems = [];
+    public string $createProductSearch = '';
+    public string $createProductCategoryFilter = '';
+    public bool $createProductShowAllResults = false;
+    public bool $showCreateOrderProductModal = false;
+    public bool $showMissingProductSupplierModal = false;
+    public string $missingProductSupplierName = '';
+    public ?int $pendingMissingSupplierProductId = null;
+    public ?int $pendingMissingSupplierRowIndex = null;
+    /** @var array<int,int> Product IDs explicitly allowed without a supplier for this Create Order draft. */
+    public array $createOrderSupplierSkipProductIds = [];
+
+    // Order Details > Add another product flow. Kept separate from Create Order
+    // state so opening the detail picker never mutates the create-order draft.
+    public bool $showAddJobProductForm = false;
+    public string $jobProductSearch = '';
+    public bool $jobProductShowAllResults = false;
+    public ?int $jobProductSelectedId = null;
+    public string $jobProductCategory = '';
+    public string $jobProductQuantity = '1';
+    public string $jobProductUnitPrice = '0.00';
+    public ?int $jobProductSupplierId = null;
+    public string $jobProductSupplierLabel = '';
+    public bool $jobProductSupplierLocked = false;
+
+    // Order Details > prototype product editor. The modal mirrors the supplied
+    // prototype while keeping persistence and validation in the backend.
+    public bool $showEditOrderProductModal = false;
+    public ?int $editOrderProductItemId = null;
+    public string $editOrderProductName = '';
+    public string $editOrderProductCode = '';
+    public ?int $editOrderProductSupplierId = null;
+    public string $editOrderProductSupplierLabel = '';
+    public string $editOrderProductQuantity = '1';
+    public string $editOrderProductUnitPrice = '0.00';
+    public string $editOrderProductNotes = '';
+    public string $newProductCode = '';
+    public ?int $newProductCategoryId = null;
+    public string $newProductCategorySearch = '';
+    public string $newProductCategoryName = '';
+    public string $newProductName = '';
+    public ?int $newProductSupplierId = null;
+    public $newProductImage = null;
+    public array $jobAttachments = [];
+    public array $jobDocumentUploads = [];
+    public $jobRequiredDocumentUpload = null;
+    public ?int $jobDocumentTaskId = null;
+    public ?int $existingDocumentId = null;
+    public bool $showDocumentPicker = false;
+    public ?int $lastJobDocumentUploadId = null;
+    public ?int $lastJobDocumentTaskId = null;
+
+    public string $taskStatus = 'Ready';
+    public ?int $taskAssigneeId = null;
+    public int $taskProgress = 0;
+    public bool $taskAttention = false;
+    public string $taskAttentionReason = '';
+    public string $taskComment = '';
+    public string $newChecklistItem = '';
+    public string $taskActivityTab = 'all';
+    public int $taskActivityPage = 1;
+    public string $jobComment = '';
+    public string $jobActivityTab = 'all';
+    public int $jobActivityPage = 1;
+    public bool $showOrderAttentionModal = false;
+    public string $orderAttentionReason = '';
+    public bool $showOrderCancelModal = false;
+    public string $orderCancellationReason = '';
+    public int $activityPerPage = 30;
+    public array $taskDocumentUploads = [];
+    /** Per-task temporary uploads used by the compact Order Overview taskflow. */
+    public array $overviewTaskUploads = [];
+    public bool $showOverviewTaskDocumentModal = false;
+    public ?int $overviewTaskDocumentModalTaskId = null;
+    public string $overviewTaskDocumentSource = 'upload';
+    public $overviewTaskDocumentUpload = null;
+    public ?int $overviewTaskExistingDocumentId = null;
+    public string $overviewTaskDocumentNote = '';
+    public ?int $overviewTaskLinkFormTaskId = null;
+    public string $overviewTaskLinkUrl = '';
+    public ?int $taskExistingDocumentId = null;
+    public bool $showTaskDocumentPicker = false;
+    public bool $showAddOrderTaskForm = false;
+    public string $newOrderTaskName = '';
+    public string $newOrderTaskDescription = '';
+    public ?int $newOrderTaskPhaseId = null;
+    public ?int $newOrderTaskAssigneeId = null;
+    public string $newOrderTaskDueDate = '';
+
+    public function mount(): void
+    {
+        $this->search = (string) request('search', '');
+        $this->selectedJobId = request()->integer('open') ?: null;
+        $this->selectedTaskId = request()->integer('task') ?: null;
+        $requestedComment = trim((string) request('comment', $this->focusComment ?? ''));
+        $this->focusComment = $requestedComment !== '' ? $requestedComment : null;
+        $this->showCreate = request()->boolean('create');
+
+        if ($this->showCreate) {
+            abort_unless(auth()->user()->canModule('jobs', 'create'), 403);
+            $this->selectedJobId = null;
+            $this->selectedTaskId = null;
+            $this->initializeCreateForm(request()->integer('client') ?: null);
+            return;
+        }
+
+        $requestedClientFilter = request()->integer('client');
+        if ($requestedClientFilter) {
+            app(ClientService::class)
+                ->referenceQuery(auth()->user(), 'jobs')
+                ->where('is_active', true)
+                ->findOrFail($requestedClientFilter);
+            $this->client = (string) $requestedClientFilter;
+        }
+
+        if ($this->selectedTaskId) {
+            $this->taskEditMode = true;
+            $task = app(TaskService::class)->visibleQuery(auth()->user())->findOrFail($this->selectedTaskId);
+            $this->selectedJobId = (int) $task->flow_job_id;
+            $this->loadTaskForm($this->selectedTaskId);
+            $this->applyFocusedComment();
+        }
+
+        // A task deep-link is authorized by the task scope above. Do not run
+        // the separate Job scope here as well: roles can legitimately have a
+        // task in scope while the parent Order is outside their Job list scope.
+        // Requiring both scopes caused valid tagged-comment links to 404.
+        if ($this->selectedJobId && !$this->selectedTaskId) {
+            $requestedDetailTab = strtolower(trim((string) request('tab', '')));
+            if ($requestedDetailTab === 'finance') {
+                abort_unless(app(AccessControlService::class)->can(auth()->user(), 'finance', 'view'), 403);
+                $this->detailTab = 'finance';
+            }
+
+            $this->prepareSelectedJob($this->selectedJobId);
+            $this->applyFocusedComment();
+        }
+    }
+
+    #[On('flowtrack-notification')]
+    public function refreshRealtime(): void
+    {
+        // Re-render open Job/Task details when another permitted user updates them.
+    }
+
+    public function render()
+    {
+        $user = auth()->user();
+
+        if ($this->showCreate) {
+            return view('livewire.jobs.index', $this->createPageData($user));
+        }
+
+        if ($this->selectedTaskId) {
+            return view('livewire.jobs.index', $this->taskPageData($user));
+        }
+
+        if ($this->selectedJobId) {
+            return view('livewire.jobs.index', $this->jobPageData($user));
+        }
+
+        return view('livewire.jobs.index', $this->jobsTableData($user));
+    }
+}

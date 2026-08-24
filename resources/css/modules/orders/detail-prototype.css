@@ -1,0 +1,3 @@
+/** Composition-only entry. */
+@import './detail/detail-01.css';
+@import './detail/detail-02.css';

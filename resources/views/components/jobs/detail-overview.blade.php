@@ -1,0 +1,130 @@
+@props([
+    'job',
+    'taskStatuses' => collect(),
+    'users' => collect(),
+    'mentionUsers' => collect(),
+    'priorities' => collect(),
+    'shipmentUrgencyOptions' => collect(),
+    'overviewPhaseId' => null,
+    'orderDetailContext' => [],
+    'products' => collect(),
+    'categories' => collect(),
+    'showAddJobProductForm' => false,
+    'jobProductSearch' => '',
+    'jobProductSearchResults' => collect(),
+    'jobProductResultTotal' => 0,
+    'jobProductSelectedProduct' => null,
+    'jobProductCategory' => '',
+    'jobProductSupplierId' => null,
+    'jobProductSupplierLabel' => '',
+    'jobProductSupplierLocked' => false,
+    'showEditOrderProductModal' => false, 'editOrderProductItemId' => null, 'editOrderProductName' => '', 'editOrderProductCode' => '',
+    'editOrderProductSupplierId' => null, 'editOrderProductSupplierLabel' => '', 'editOrderProductQuantity' => '1',
+    'editOrderProductUnitPrice' => '0.00', 'editOrderProductNotes' => '',
+    'jobTaskSearch' => '',
+    'activityTab' => 'all',
+    'activityPage' => 1,
+    'focusComment' => null,
+    'jobDocumentUploads' => [],
+    'overviewTaskDocumentModalTask' => null,
+    'overviewTaskAvailableDocuments' => collect(),
+    'showOverviewTaskDocumentModal' => false,
+    'overviewTaskDocumentSource' => 'upload',
+    'overviewTaskDocumentUpload' => null,
+    'overviewTaskExistingDocumentId' => null,
+    'overviewTaskLinkFormTaskId' => null,
+    'showAddOrderTaskForm' => false,
+    'newOrderTaskAssigneeId' => null,
+    'showOrderWorkflowActionModal' => false,
+    'orderWorkflowActionTaskId' => null,
+    'orderWorkflowActionStep' => 'main',
+    'orderWorkflowActionPayload' => [],
+])
+@php
+    // Presentation only: all relationships were eager-loaded in JobService.
+    $currentTasks = \App\Support\OrderDetailPresenter::currentTasks($job);
+    $nextTask = \App\Support\OrderDetailPresenter::nextTask($job);
+    $canEditJob = (bool) ($orderDetailContext['canEditJob'] ?? false);
+    $canChangeOwner = (bool) ($orderDetailContext['canChangeOwner'] ?? false);
+@endphp
+<div class="ft-order-prototype-overview">
+    <x-jobs.order-detail.summary :job="$job" :next-task="$nextTask" :current-tasks="$currentTasks" />
+
+    <div class="overview-grid ft-order-overview-grid">
+        <x-jobs.order-detail.overview-card :job="$job" :can-edit-job="$canEditJob" :mention-users="$mentionUsers" />
+        <div class="overview-side ft-order-overview-side">
+            <x-jobs.order-detail.planning
+                :job="$job"
+                :can-edit-job="$canEditJob"
+                :can-change-owner="$canChangeOwner"
+                :shipment-urgency-options="$shipmentUrgencyOptions"
+                :context="$orderDetailContext"
+            />
+            <x-jobs.order-detail.shipping :job="$job" :can-edit-job="$canEditJob" />
+        </div>
+    </div>
+
+    <x-jobs.order-detail.products
+        :job="$job"
+        :context="$orderDetailContext"
+        :show-add-job-product-form="$showAddJobProductForm"
+        :job-product-search="$jobProductSearch"
+        :job-product-search-results="$jobProductSearchResults"
+        :job-product-result-total="$jobProductResultTotal"
+        :job-product-selected-product="$jobProductSelectedProduct"
+        :job-product-category="$jobProductCategory"
+        :job-product-supplier-id="$jobProductSupplierId"
+        :job-product-supplier-label="$jobProductSupplierLabel"
+        :job-product-supplier-locked="$jobProductSupplierLocked"
+        :show-edit-order-product-modal="$showEditOrderProductModal"
+        :edit-order-product-item-id="$editOrderProductItemId"
+        :edit-order-product-name="$editOrderProductName"
+        :edit-order-product-code="$editOrderProductCode"
+        :edit-order-product-supplier-id="$editOrderProductSupplierId"
+        :edit-order-product-supplier-label="$editOrderProductSupplierLabel"
+        :edit-order-product-quantity="$editOrderProductQuantity"
+        :edit-order-product-unit-price="$editOrderProductUnitPrice"
+        :edit-order-product-notes="$editOrderProductNotes"
+    />
+
+    <x-jobs.order-detail.workflow
+        :job="$job"
+        :overview-phase-id="$overviewPhaseId"
+        :task-statuses="$taskStatuses"
+        :context="$orderDetailContext"
+        :overview-task-link-form-task-id="$overviewTaskLinkFormTaskId"
+    />
+
+    <x-jobs.order-detail.attachments :job="$job" :context="$orderDetailContext" :job-document-uploads="$jobDocumentUploads" />
+
+    <x-jobs.order-detail.activity
+        :job="$job"
+        :mention-users="$mentionUsers"
+        :activity-tab="$activityTab"
+        :activity-page="$activityPage"
+        :focus-comment="$focusComment"
+        :can-comment="(bool) ($orderDetailContext['canComment'] ?? false)"
+    />
+
+    @if($showOrderWorkflowActionModal && $orderWorkflowActionTaskId)
+        @php
+            $workflowActionTask = $job->tasks->firstWhere('id', (int) $orderWorkflowActionTaskId);
+            $workflowActionModal = data_get($orderDetailContext, 'taskActionModals.'.(int) $orderWorkflowActionTaskId, []);
+        @endphp
+        @if($workflowActionTask)
+            <x-jobs.order-detail.workflow-action-modal :job="$job" :task="$workflowActionTask" :config="$workflowActionModal" :step="$orderWorkflowActionStep" :payload="$orderWorkflowActionPayload" />
+        @endif
+    @endif
+
+    @if($showOverviewTaskDocumentModal && $overviewTaskDocumentModalTask)
+        <x-jobs.order-detail.document-modal
+            :job="$job"
+            :task="$overviewTaskDocumentModalTask"
+            :available-documents="$overviewTaskAvailableDocuments"
+            :source="$overviewTaskDocumentSource"
+            :upload="$overviewTaskDocumentUpload"
+            :existing-document-id="$overviewTaskExistingDocumentId"
+            :context="$orderDetailContext"
+        />
+    @endif
+</div>
