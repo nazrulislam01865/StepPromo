@@ -17,6 +17,7 @@ use App\Services\DocumentService;
 use App\Services\MasterDataService;
 use App\Services\OrderFinanceService;
 use App\Services\OrderDetailViewService;
+use App\Services\OrderRedoService;
 use App\Services\OrderWorkflowSetupService;
 use App\Services\TaskService;
 use App\Services\WorkspaceSettingsService;
@@ -316,13 +317,25 @@ trait BuildsOrderPageData
 
     private function jobPageData(User $user): array
     {
-        if (! in_array($this->detailTab, ['overview', 'inquiry', 'finance'], true)) {
+        if (! in_array($this->detailTab, ['overview', 'inquiry', 'finance', 'redo'], true)) {
             $this->detailTab = 'overview';
         }
 
         $master = app(MasterDataService::class);
         $orderQuery = app(VisibleOrderQuery::class);
         $selected = $orderQuery->base($user, $this->selectedJobId);
+
+        // The Redo surface exists only after a Redo/discount action has actually
+        // been initiated. Interactive tab clicks are already guarded in
+        // setDetailTab(); this also protects direct URLs such as ?tab=redo.
+        $preloadedRedoContext = null;
+        if ($this->detailTab === 'redo') {
+            $preloadedRedoContext = app(OrderRedoService::class)->context($selected, $user);
+            if (! (bool) ($preloadedRedoContext['hasRedo'] ?? false)) {
+                $this->detailTab = 'overview';
+            }
+        }
+
         $orderQuery->loadTab($selected, $user, $this->detailTab);
 
         if ($this->detailTab === 'overview') {
@@ -331,7 +344,13 @@ trait BuildsOrderPageData
             if (!$selectedPhase || (int) $selectedPhase->sequence > (int) ($selected->phase?->sequence ?? 0)) {
                 $this->overviewPhaseId = (int) $selected->workflow_phase_id;
             }
+        }
 
+        // The prototype keeps the normal Order Activity section underneath the
+        // Redo detail cards. Reuse the same paginated activity loader for both
+        // Overview and Redo so All / Comments / History remain identical and
+        // we do not create a second activity/audit implementation.
+        if (in_array($this->detailTab, ['overview', 'redo'], true)) {
             $orderQuery->loadOverviewActivity(
                 $selected,
                 $this->jobActivityTab,
@@ -424,6 +443,9 @@ trait BuildsOrderPageData
 
         $shipmentUrgencyOptions = $master->active('shipment_urgency');
         $orderDetailContext = app(OrderDetailViewService::class)->build($selected, $user, $shipmentUrgencyOptions);
+        $orderRedoContext = $preloadedRedoContext
+            ?? app(OrderRedoService::class)->context($selected, $user);
+        $orderRedoForm = $this->redoFormState($selected);
 
         return [
             'selectedJob' => $selected,
@@ -433,6 +455,8 @@ trait BuildsOrderPageData
             'priorities' => $this->detailTab === 'overview' ? $master->active('priority') : collect(),
             'shipmentUrgencyOptions' => $shipmentUrgencyOptions,
             'orderDetailContext' => $orderDetailContext,
+            'orderRedoContext' => $orderRedoContext,
+            'orderRedoForm' => $orderRedoForm,
             'overviewPhaseId' => $this->overviewPhaseId,
             // Product/category options on Job Details are loaded remotely only
             // when an inline dropdown opens, avoiding full catalog payloads.

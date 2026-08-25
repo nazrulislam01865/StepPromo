@@ -14,6 +14,7 @@ use App\Livewire\Jobs\Concerns\ManagesOrderTasks;
 use App\Livewire\Jobs\Concerns\ManagesOrderDocuments;
 use App\Livewire\Jobs\Concerns\ManagesOrderTaskResources;
 use App\Livewire\Jobs\Concerns\ManagesOrderActivity;
+use App\Livewire\Jobs\Concerns\ManagesOrderRedo;
 use App\Livewire\Jobs\Concerns\BuildsOrderPageData;
 
 use App\Livewire\Concerns\HandlesInlineEdits;
@@ -44,6 +45,7 @@ class Index extends Component
     use ManagesOrderDocuments;
     use ManagesOrderTaskResources;
     use ManagesOrderActivity;
+    use ManagesOrderRedo;
     use BuildsOrderPageData;
 
     use RefreshesFromWorkspace;
@@ -281,6 +283,8 @@ class Index extends Component
             if ($requestedDetailTab === 'finance') {
                 abort_unless(app(AccessControlService::class)->can(auth()->user(), 'finance', 'view'), 403);
                 $this->detailTab = 'finance';
+            } elseif ($requestedDetailTab === 'redo') {
+                $this->detailTab = 'redo';
             }
 
             $this->prepareSelectedJob($this->selectedJobId);

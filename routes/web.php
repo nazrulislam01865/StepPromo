@@ -4,6 +4,8 @@ use App\Http\Controllers\AdministrationController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\BoardController;
 use App\Http\Controllers\BulkOrderImportController;
+use App\Http\Controllers\CancelledOrdersController;
+use App\Http\Controllers\CancelledOrdersExportController;
 use App\Http\Controllers\BrandingAssetController;
 use App\Http\Controllers\ClientsController;
 use App\Http\Controllers\ClientLogoController;
@@ -20,6 +22,8 @@ use App\Http\Controllers\MasterDataController;
 use App\Http\Controllers\MyWorkController;
 use App\Http\Controllers\NotificationsController;
 use App\Http\Controllers\OrderWorkflowSetupController;
+use App\Http\Controllers\OrderSummaryReportController;
+use App\Http\Controllers\OrderSummaryExportController;
 use App\Http\Controllers\NotificationOpenController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProfileImageController;
@@ -95,6 +99,8 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/dashboard', DashboardController::class)->middleware('permission:dashboard.view')->name('dashboard');
     Route::get('/team-performance-report', TeamPerformanceReportController::class)->middleware('permission:reports.view')->name('team-performance.report');
+    Route::get('/order-summary-report', OrderSummaryReportController::class)->middleware(['permission:reports.view', 'permission:jobs.view'])->name('order-summary.report');
+    Route::get('/order-summary-report/export', OrderSummaryExportController::class)->middleware(['permission:reports.view', 'permission:reports.export', 'permission:jobs.view'])->name('order-summary.export');
     Route::get('/filter-options/{type}', FilterOptionController::class)->where('type', '[a-z-]+')->name('filter-options.index');
     Route::get('/my-work', MyWorkController::class)->middleware('permission:tasks.view')->name('my-work');
     Route::get('/inquiries', InquiriesController::class)->middleware('permission:inquiries.view')->name('inquiries.index');
@@ -105,6 +111,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/orders/bulk-import/import', [BulkOrderImportController::class, 'import'])->middleware('permission:jobs.create')->name('orders.bulk-import.import');
     Route::get('/orders/bulk-import/template', [BulkOrderImportController::class, 'template'])->middleware('permission:jobs.create')->name('orders.bulk-import.template');
     Route::get('/orders/export', [ListExportController::class, 'orders'])->middleware(['permission:jobs.view', 'permission:reports.export'])->name('orders.export');
+    Route::get('/orders/cancelled', CancelledOrdersController::class)->middleware('permission:jobs.view')->name('orders.cancelled');
+    Route::get('/orders/cancelled/export', CancelledOrdersExportController::class)->middleware(['permission:jobs.view', 'permission:reports.export'])->name('orders.cancelled.export');
     Route::get('/orders', JobsController::class)->middleware('permission:jobs.view')->name('jobs.index');
     Route::get('/jobs', function (\Illuminate\Http\Request $request) {
         return redirect()->route('jobs.index', $request->query());

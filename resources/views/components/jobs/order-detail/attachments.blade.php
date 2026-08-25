@@ -1,7 +1,6 @@
 @props(['job', 'context' => [], 'jobDocumentUploads' => []])
 @php
     $canUpload = (bool) ($context['canUploadDocument'] ?? false);
-    $canViewArchive = (bool) ($context['canViewDocumentArchive'] ?? false);
     $canDelete = (bool) ($context['canDeleteDocument'] ?? false);
     $canExport = (bool) ($context['canExportDocument'] ?? false);
 @endphp
@@ -14,7 +13,6 @@
         @if($canUpload)
             <div class="attachment-drop ft-order-attachment-drop {{ $errors->has('jobDocumentUploads') || $errors->has('jobDocumentUploads.*') ? 'has-error' : '' }}">
                 <label data-file-dropzone data-auto-upload-method="uploadGeneralOrderDocuments" for="orderGeneralAttachment-{{ $job->id }}"><b>⌕ &nbsp; Drop files here or <span>browse</span></b><div class="card-sub">PDF, Office files, JPG, PNG, ZIP, AI, EPS, ESP · Max 20 MB</div><input id="orderGeneralAttachment-{{ $job->id }}" type="file" wire:model="jobDocumentUploads" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.zip,.txt,.csv,.ai,.eps,.esp"></label>
-                @if($canViewArchive)<a class="btn" href="{{ route('documents.index') }}" wire:navigate>Open Documents</a>@endif
             </div>
             @error('jobDocumentUploads')<div class="validation-error ft-order-upload-error">{{ $message }} <button type="button" wire:click="clearJobDocumentUploads">Clear</button></div>@enderror
             @if(count($jobDocumentUploads ?? []))

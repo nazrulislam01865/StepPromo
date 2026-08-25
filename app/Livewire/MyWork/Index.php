@@ -107,6 +107,15 @@ class Index extends Component
         $this->resetPage('workPage');
     }
 
+    public function updatedStatusFilter(): void
+    {
+        // A status selected directly on My Tasks belongs to the Order-task
+        // view. The special Inquiry source is only entered from the Dashboard.
+        $this->sourceFilter = 'orders';
+        $this->clearMetricFilterForToolbar();
+        $this->resetPage('workPage');
+    }
+
     public function setPhaseFilter(string $phase): void
     {
         $phase = trim($phase);
@@ -222,6 +231,10 @@ class Index extends Component
             $result['version'] = (string) $updatedTask->getRawOriginal('updated_at');
             $result['status'] = (string) $updatedTask->status;
             $result['completed'] = BoardLaneResolver::isCompleted($updatedTask->status);
+            // Every role now sees active tasks only. A status change can complete
+            // the current task, unlock the next one or advance the Order phase, so
+            // always refresh the grouped table, including for Admin/Super Admin.
+            $result['refresh'] = true;
             // Keep the counters accurate without launching a second background
             // Livewire request. The optimized aggregate is fast and bounded.
             $this->refreshMetricsSnapshot(true);
@@ -416,6 +429,12 @@ class Index extends Component
         }
 
         $service = app(MyWorkService::class);
+
+        // Required by the workflow-stage cards that remain above the restored
+        // previous table/filter layout. Each card continues to filter the same
+        // My Tasks result set through setPhaseFilter().
+        $taskStages = $service->orderPhaseCards($user);
+
         $page = $service->paginate($user, [
             'search' => $this->search,
             'quick' => $this->quick,
@@ -431,7 +450,8 @@ class Index extends Component
             'workGroups' => $page['groups'],
             'workPaginator' => $page['paginator'],
             'visibleTaskCount' => $page['visibleTaskCount'],
-            'searchNeedsMoreCharacters' => trim($this->search) !== '' && ! app(MyWorkService::class)->searchIsUsable($this->search),
+            'searchNeedsMoreCharacters' => trim($this->search) !== '' && ! $service->searchIsUsable($this->search),
+            'taskStages' => $taskStages,
         ]);
     }
 }

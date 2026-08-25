@@ -188,6 +188,12 @@ trait ManagesOrderDetail
         // workflow snapshots immediately when an older Order is opened.
         app(\App\Services\OrderWorkflowBindingService::class)->syncSingleActiveOrder($id);
 
+        // Artwork files can outlive a generated Task when an older workflow /
+        // Task Pack publish replaced that runtime row. Rebind those historical
+        // files to the current ART_PREPARE_UPLOAD task before detail relations
+        // are hydrated so completed Artwork stages always show their evidence.
+        app(\App\Services\OrderArtworkEvidenceService::class)->repair($id);
+
         // Heal Orders that were left on a completed stage by an older runtime
         // bug (notably Artwork after choosing "No" for Sample/Swatch). The
         // backend checks real blockers before advancing, so simply opening the

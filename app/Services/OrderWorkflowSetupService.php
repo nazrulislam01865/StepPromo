@@ -563,11 +563,41 @@ class OrderWorkflowSetupService
                 }
 
                 $existingItems = $pack->items()->orderBy('sort_order')->orderBy('id')->get()->keyBy('id');
+                $existingItemsByAutomationKey = $existingItems
+                    ->filter(fn ($item) => filled($item->automation_key))
+                    ->keyBy(fn ($item) => trim((string) $item->automation_key));
+                $existingItemsByNormalizedTitle = $existingItems
+                    ->groupBy(fn ($item) => (string) Str::of((string) $item->title)
+                        ->lower()
+                        ->replace('&', ' and ')
+                        ->replaceMatches('/[^a-z0-9]+/', ' ')
+                        ->squish());
                 $keepItemIds = [];
                 foreach (array_values($stage['tasks'] ?? []) as $taskIndex => $taskState) {
+                    $automationKey = (string) (($fixed['tasks'][$taskIndex]['automation_key'] ?? null) ?: ($taskState['automation_key'] ?? ''));
+
+                    // Core Order workflow tasks have a stable automation key.
+                    // Use it as the identity fallback when Livewire state does
+                    // not carry the Task Pack item id. Creating a replacement
+                    // item here used to soft-delete generated Tasks and leave
+                    // their artwork Documents pointing at the retired task id.
                     $itemId = !empty($taskState['id']) && $existingItems->has((int) $taskState['id'])
                         ? (int) $taskState['id']
-                        : null;
+                        : (int) ($existingItemsByAutomationKey->get(trim($automationKey))?->id ?? 0);
+
+                    if ($itemId <= 0) {
+                        $normalizedTitle = (string) Str::of((string) ($taskState['title'] ?? ''))
+                            ->lower()
+                            ->replace('&', ' and ')
+                            ->replaceMatches('/[^a-z0-9]+/', ' ')
+                            ->squish();
+                        $titleMatches = collect($existingItemsByNormalizedTitle->get($normalizedTitle, collect()))->values();
+                        if ($normalizedTitle !== '' && $titleMatches->count() === 1) {
+                            $itemId = (int) $titleMatches->first()->id;
+                        }
+                    }
+
+                    $itemId = $itemId > 0 ? $itemId : null;
                     $documentCategoryId = null;
                     if (!empty($taskState['document_enabled'])) {
                         $documentCategoryId = filled($taskState['document_category_id'] ?? null)
@@ -576,7 +606,7 @@ class OrderWorkflowSetupService
                     }
 
                     $saved = $taskPackService->saveItem($pack, [
-                        'automation_key' => (string) (($fixed['tasks'][$taskIndex]['automation_key'] ?? null) ?: ($taskState['automation_key'] ?? '')),
+                        'automation_key' => $automationKey,
                         'title' => trim((string) ($taskState['title'] ?? 'Task')),
                         'description' => blank($taskState['description'] ?? null) ? null : trim((string) $taskState['description']),
                         'color' => $taskState['color'] ?? '#2563EB',

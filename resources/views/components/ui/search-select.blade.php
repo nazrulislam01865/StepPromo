@@ -19,6 +19,7 @@
     'hideLabel' => false,
     'searchPlaceholder' => null,
     'footerMessage' => null,
+    'showAvatar' => false,
 ])
 @php
     $remote = filled($type);
@@ -107,7 +108,26 @@
         :aria-expanded="open.toString()"
         @disabled($disabled)
     >
-        <span class="ft-search-select__value" x-text="selectedLabel"></span>
+        @if($showAvatar)
+            <span class="ft-search-select__selected-user">
+                <span class="ft-search-select__avatar ft-search-select__avatar--trigger" x-show="selectedValue">
+                    <template x-if="items.find((candidate) => String(candidate?.id) === String(selectedValue))?.avatarUrl">
+                        <img
+                            :src="items.find((candidate) => String(candidate?.id) === String(selectedValue))?.avatarUrl"
+                            :alt="selectedLabel"
+                            loading="lazy"
+                        >
+                    </template>
+                    <span
+                        x-show="!items.find((candidate) => String(candidate?.id) === String(selectedValue))?.avatarUrl"
+                        x-text="selectedLabel ? selectedLabel.trim().charAt(0).toUpperCase() : '?'"
+                    ></span>
+                </span>
+                <span class="ft-search-select__value" x-text="selectedLabel"></span>
+            </span>
+        @else
+            <span class="ft-search-select__value" x-text="selectedLabel"></span>
+        @endif
         <span class="ft-filter-chevron" aria-hidden="true">⌄</span>
     </button>
 
@@ -157,8 +177,27 @@
                     :aria-selected="String(item.id) === String(selectedValue)"
                     x-on:click.stop="@if($remote) select(item) @else choose(String(item.id), item.label) @endif; $dispatch('flowtrack-selection-changed', {property: @js($property), value: String(item.id), label: item.label}); $nextTick(() => Promise.resolve(@if($action) $wire.call(@js($action), @js($property), String(item.id)) @else $wire.set(@js($property), String(item.id)) @endif).catch(() => @if($remote) selectionFailed() @else null @endif))"
                 >
-                    <span x-text="item.label"></span>
-                    <small x-text="item.meta || (String(item.id) === String(selectedValue) ? 'Selected' : '')"></small>
+                    @if($showAvatar)
+                        <span class="ft-search-select__user-option">
+                            <span class="ft-search-select__avatar" aria-hidden="true">
+                                <template x-if="item.avatarUrl">
+                                    <img :src="item.avatarUrl" :alt="item.label" loading="lazy">
+                                </template>
+                                <span
+                                    x-show="!item.avatarUrl"
+                                    x-text="item.label ? item.label.trim().charAt(0).toUpperCase() : '?'"
+                                ></span>
+                            </span>
+                            <span class="ft-search-select__user-copy">
+                                <strong x-text="item.label"></strong>
+                                <small x-show="item.meta" x-text="item.meta"></small>
+                            </span>
+                        </span>
+                        <small class="ft-search-select__selected-mark" x-show="String(item.id) === String(selectedValue)">Selected</small>
+                    @else
+                        <span x-text="item.label"></span>
+                        <small x-text="item.meta || (String(item.id) === String(selectedValue) ? 'Selected' : '')"></small>
+                    @endif
                 </button>
             </template>
         </div>

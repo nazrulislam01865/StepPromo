@@ -25,11 +25,9 @@
         ->filter()
         ->unique()
         ->values();
-    // CHANGE 2026-08-24:
-    // Artwork version history must be shown in ascending order (Version 1 → latest).
-    // Keep a separate latest-document pointer for the status/files cell and badges.
-    // Other task types keep the existing de-duplication behavior for revision
-    // reference files.
+    // Artwork task: only the latest revision belongs in the live Order Details view.
+    // Older artwork versions remain stored and available from document/version history,
+    // but are intentionally hidden from the Artwork stage task row.
     $artworkVersionDocuments = $isArtworkUploadTask
         ? $taskDocuments
             ->sortBy(function ($document) {
@@ -46,7 +44,7 @@
     $latestArtworkDocument = $artworkVersionDocuments->last();
     $latestArtworkDocumentId = (int) ($latestArtworkDocument?->id ?? 0);
     $resourceDocuments = $isArtworkUploadTask
-        ? $artworkVersionDocuments
+        ? collect([$latestArtworkDocument])->filter()->values()
         : $taskDocuments
             ->reject(fn ($document) => $revisionReferenceDocumentIds->contains((int) $document->id))
             ->values();
@@ -148,10 +146,7 @@
             <div class="card-sub">
                 📎 {{ $latestTaskDocument->name }}
                 @if($isArtworkUploadTask)
-                    · Version {{ max(1, (int) $latestTaskDocument->version) }}
-                    @if($taskDocuments->count() > 1)
-                        · {{ $taskDocuments->count() - 1 }} archived
-                    @endif
+                    · Version {{ max(1, (int) $latestTaskDocument->version) }} · Latest
                 @elseif($taskDocuments->count() > 1)
                     +{{ $taskDocuments->count() - 1 }}
                 @endif
@@ -198,13 +193,9 @@
 @if($resourceDocuments->isNotEmpty() || $taskLinks->isNotEmpty())
     <div class="task-resources ft-order-task-resources">
         @foreach($resourceDocuments as $document)
-            @php
-                $isLatestArtworkVersion = $isArtworkUploadTask && (int) $document->id === $latestArtworkDocumentId;
-                $artworkVersionLabel = $isLatestArtworkVersion ? 'Latest' : 'Archived';
-            @endphp
             <div
                 wire:key="order-task-document-{{ $document->id }}"
-                class="ft-order-task-resource-row {{ $isArtworkUploadTask ? ($isLatestArtworkVersion ? 'is-latest-artwork' : 'is-archived-artwork') : '' }}"
+                class="ft-order-task-resource-row {{ $isArtworkUploadTask ? 'is-latest-artwork' : '' }}"
             >
                 <span class="file-icon ft-order-file-icon">{{ strtoupper(pathinfo($document->name, PATHINFO_EXTENSION) ?: 'FILE') }}</span>
                 <span>
@@ -217,13 +208,13 @@
                     <small>
                         {{ $document->uploader?->name ?? 'FlowTrack' }} · {{ \App\Support\UserLocalTime::format($document->created_at, 'M j, Y, g:i A') }}
                         @if($isArtworkUploadTask)
-                            · {{ $artworkVersionLabel }}
+                            · Latest
                         @endif
                     </small>
                 </span>
                 <span class="ft-order-task-resource-actions">
                     @if($isArtworkUploadTask)
-                        <em class="ft-order-artwork-version-state {{ $isLatestArtworkVersion ? 'is-latest' : 'is-archived' }}">{{ $artworkVersionLabel }}</em>
+                        <em class="ft-order-artwork-version-state is-latest">Latest</em>
                     @endif
                     <a href="{{ route('documents.open', $document) }}" target="_blank" rel="noopener">Open</a>
                     @if($canExportDocument)<a href="{{ route('documents.download', $document) }}">Download</a>@endif

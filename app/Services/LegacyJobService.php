@@ -669,7 +669,7 @@ class LegacyJobService
      */
     public function loadVisibleDetailTab(FlowJob $job, User $user, string $tab): FlowJob
     {
-        abort_unless(in_array($tab, ['overview', 'workflow', 'documents', 'inquiry', 'finance'], true), 422);
+        abort_unless(in_array($tab, ['overview', 'workflow', 'documents', 'inquiry', 'finance', 'redo'], true), 422);
 
         if ($tab === 'overview') {
             $relations = [
@@ -737,6 +737,13 @@ class LegacyJobService
                 'sourceInquiry.owner:id,name,profile_image_path',
             ]);
 
+            return $job;
+        }
+
+        if ($tab === 'redo') {
+            // Redo relationship/financial data is loaded by OrderRedoService.
+            // Keep the base Order shell lightweight and leave the original
+            // workflow, invoices and payments untouched.
             return $job;
         }
 
@@ -1424,60 +1431,168 @@ class LegacyJobService
         return $job->refresh();
     }
 
-    public function cancel(FlowJob $job, User $actor, ?string $reason = null, bool $enforcePrototypeStageGate = false): FlowJob
-    {
+    public function cancel(
+        FlowJob $job,
+        User $actor,
+        ?string $reason = null,
+        bool $enforcePrototypeStageGate = false
+    ): FlowJob {
         $this->assertStatusEditable($job, $actor);
-        $reason = trim((string) $reason);
-        abort_if(mb_strlen($reason) > 2000, 422, 'Cancellation reason may not exceed 2000 characters.');
+
+        // Cancellation reasons use the same sanitized rich-text pipeline as
+        // Order comments/descriptions. This keeps pasted images safe, enforces
+        // the 2,000-character text limit without counting HTML/image URLs, and
+        // preserves durable @mention tokens.
+        $reason = app(RichTextService::class)->normalize(
+            $reason,
+            2000,
+            'orderCancellationReason',
+        ) ?? '';
+
+        $mentionIds = app(MentionService::class)
+            ->userIdsFromText($reason);
+
+        $activityDescription = $reason !== ''
+            ? app(RichTextService::class)
+                ->prependText('Order cancelled', $reason)
+            : 'Order cancelled';
 
         if ($enforcePrototypeStageGate) {
             $job->loadMissing('phase');
-            abort_if((int) ($job->phase?->sequence ?? 999) > 4, 422, 'Orders can only be cancelled through the QC stage.');
+
+            abort_if(
+                (int) ($job->phase?->sequence ?? 999) > 4,
+                422,
+                'Orders can only be cancelled through the QC stage.'
+            );
         }
 
-        $cancelled = DB::transaction(function () use ($job, $actor, $reason, $enforcePrototypeStageGate): FlowJob {
-            $locked = FlowJob::query()->whereKey($job->id)->lockForUpdate()->firstOrFail();
-            $locked->loadMissing('phase');
-            if ($enforcePrototypeStageGate) {
-                abort_if((int) ($locked->phase?->sequence ?? 999) > 4, 422, 'Orders can only be cancelled through the QC stage.');
-            }
-            abort_if($locked->completed_at || in_array((string) $locked->status, self::INACTIVE_STATUSES, true), 422, 'This Order can no longer be cancelled.');
+        $cancelled = DB::transaction(
+            function () use (
+                $job,
+                $actor,
+                $reason,
+                $mentionIds,
+                $activityDescription,
+                $enforcePrototypeStageGate
+            ): FlowJob {
+                $locked = FlowJob::query()
+                    ->whereKey($job->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
-            $cancelStatus = app(OrderTaskFlagService::class)->cancelledStatus();
-            $cancelStatusId = app(OrderTaskFlagService::class)->statusRecord($cancelStatus, false)?->id;
-            $locked->tasks()->whereNull('completed_at')->update([
-                'status' => $cancelStatus,
-                'order_task_status_id' => $cancelStatusId,
-                'order_task_flag_id' => null,
-                'needs_attention' => false,
-                'attention_reason' => null,
-            ]);
-            $locked->phaseHistories()->whereNull('completed_at')->update([
-                'status' => 'cancelled',
-                'completed_at' => now(),
-            ]);
-            $locked->update([
-                'status' => 'Cancelled',
-                'order_flag_id' => null,
-                'needs_attention' => false,
-                'attention_requested' => false,
-                'attention_reason' => null,
-                'attention_by' => null,
-                'attention_at' => null,
-                'cancellation_reason' => $reason !== '' ? $reason : null,
-                'cancelled_at' => now(),
-                'cancelled_by' => $actor->id,
-            ]);
-            $locked->activities()->create([
-                'user_id' => $actor->id,
-                'event' => 'job.cancelled',
-                'description' => $reason !== '' ? 'Order cancelled: '.$reason : 'Order cancelled',
-            ]);
+                $locked->loadMissing('phase');
 
-            return $locked->refresh();
-        }, 3);
+                if ($enforcePrototypeStageGate) {
+                    abort_if(
+                        (int) ($locked->phase?->sequence ?? 999) > 4,
+                        422,
+                        'Orders can only be cancelled through the QC stage.'
+                    );
+                }
 
-        app(NotificationService::class)->notifyJobParticipants($cancelled, 'Order cancelled', $cancelled->displayOrderNumber().' · '.$cancelled->title, 'update', $actor);
+                abort_if(
+                    $locked->completed_at
+                    || in_array(
+                        (string) $locked->status,
+                        self::INACTIVE_STATUSES,
+                        true
+                    ),
+                    422,
+                    'This Order can no longer be cancelled.'
+                );
+
+                $cancelStatus = app(
+                    OrderTaskFlagService::class
+                )->cancelledStatus();
+
+                $cancelStatusId = app(
+                    OrderTaskFlagService::class
+                )->statusRecord(
+                    $cancelStatus,
+                    false
+                )?->id;
+
+                $locked->tasks()
+                    ->whereNull('completed_at')
+                    ->update([
+                        'status' => $cancelStatus,
+                        'order_task_status_id' => $cancelStatusId,
+                        'order_task_flag_id' => null,
+                        'needs_attention' => false,
+                        'attention_reason' => null,
+                    ]);
+
+                $locked->phaseHistories()
+                    ->whereNull('completed_at')
+                    ->update([
+                        'status' => 'cancelled',
+                        'completed_at' => now(),
+                    ]);
+
+                $locked->update([
+                    'status' => 'Cancelled',
+                    'order_flag_id' => null,
+                    'needs_attention' => false,
+                    'attention_requested' => false,
+                    'attention_reason' => null,
+                    'attention_by' => null,
+                    'attention_at' => null,
+
+                    'cancellation_reason' =>
+                        $reason !== '' ? $reason : null,
+
+                    'cancelled_at' => now(),
+                    'cancelled_by' => $actor->id,
+                ]);
+
+                $locked->activities()->create([
+                    'user_id' => $actor->id,
+
+                    'event' => 'job.cancelled',
+
+                    'description' => $activityDescription,
+
+                    'meta' => [
+                        'cancellation_reason' => true,
+                        'mention_user_ids' => $mentionIds,
+                    ],
+                ]);
+
+                return $locked->refresh();
+            },
+            3
+        );
+
+        app(NotificationService::class)
+            ->notifyJobParticipants(
+                $cancelled,
+                'Order cancelled',
+                $cancelled->displayOrderNumber()
+                    .' · '
+                    .$cancelled->title,
+                'update',
+                $actor,
+            );
+
+        /*
+        * Explicit @mentions receive the same FlowTrack mention notification
+        * behavior already used by task and Order comments.
+        */
+        if ($mentionIds !== []) {
+            app(NotificationService::class)
+                ->notifyMentionedUsers(
+                    $mentionIds,
+                    $actor->name
+                        .' mentioned you in '
+                        .$cancelled->displayOrderNumber(),
+                    $reason,
+                    $cancelled,
+                    null,
+                    $actor,
+                );
+        }
+
         return $cancelled->refresh();
     }
 

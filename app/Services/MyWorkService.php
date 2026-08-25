@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 
 class MyWorkService
 {
-    public const JOBS_PER_PAGE = 3;
+    public const JOBS_PER_PAGE = 10;
 
     private const INITIAL_TASK_STATUSES = ['not started', 'not start', 'ready', 'to do', 'todo'];
 
@@ -22,20 +22,11 @@ class MyWorkService
     public function paginate(User $user, array $filters, int $perPage = self::JOBS_PER_PAGE, string $pageName = 'workPage'): array
     {
         $access = app(AccessControlService::class);
-        $quick = (string) ($filters['quick'] ?? 'all');
-        $hideCompleted = (bool) ($filters['hide_completed'] ?? false);
-        $statusFilter = trim((string) ($filters['status'] ?? ''));
-        $showCompleted = !$hideCompleted && ($statusFilter !== '' || in_array($quick, ['all', 'createdToday', 'completedThisWeek'], true));
 
-        // Most My Task views are open-task-only. Created Today intentionally
-        // includes every task created today regardless of status, while Completed
-        // This Week must include completed tasks (and completed Orders) by design.
-        $baseTasks = $this->personalTaskQuery(
-            $user,
-            $filters,
-            includeOpenConstraint: !$showCompleted,
-            includeCompletedJobs: $showCompleted,
-        );
+        // My Tasks is strictly an active-work queue. Filters may narrow the
+        // active row set, but they never bring completed, locked, previous-phase
+        // or future-phase tasks back into an Order group.
+        $baseTasks = $this->personalTaskQuery($user, $filters);
         $today = app(WorkspaceSettingsService::class)->localToday()->toDateString();
 
         $grouped = (clone $baseTasks)
@@ -148,6 +139,7 @@ class MyWorkService
                 'title' => (string) $job->title,
                 'client' => (string) ($job->getAttribute('my_work_client_name') ?: 'No client'),
                 'stage' => (string) ($job->getAttribute('my_work_phase_name') ?: $job->getAttribute('my_work_phase_short_name') ?: 'No phase'),
+                'stageColor' => $job->getAttribute('my_work_phase_color'),
                 'health' => (string) ($job->health ?: 'On Track'),
                 'healthTone' => $this->tone((string) ($job->health ?: 'On Track')),
                 'progress' => max(0, min(100, (int) $job->progress)),
@@ -171,19 +163,6 @@ class MyWorkService
      */
     public function metrics(User $user, bool $fresh = false): array
     {
-        $access = app(AccessControlService::class);
-        $administrator = $access->isAdministrator($user);
-
-        if (!$administrator) {
-            $scopes = $access->scopes($user, 'tasks');
-            $usableScopes = array_values(array_diff($scopes, ['none']));
-            if (!$access->can($user, 'tasks', 'view')
-                || $usableScopes === []
-                || ($usableScopes === ['department'] && !$user->department_id)) {
-                return $this->emptyMetrics();
-            }
-        }
-
         $workspace = app(WorkspaceSettingsService::class);
         $today = $workspace->localToday();
         $todayDate = $today->toDateString();
@@ -192,7 +171,6 @@ class MyWorkService
         $weekEndDate = $today->endOfWeek()->toDateString();
         $todayStartUtc = $today->utc();
         $todayEndUtc = $today->endOfDay()->utc();
-        [$weekStartUtc, $weekEndUtc] = $workspace->localWeekUtcBounds();
 
         $taskMentions = DB::table('activities')
             ->selectRaw('subject_id as flow_task_id')
@@ -202,46 +180,25 @@ class MyWorkService
             ->whereJsonLength('meta->mention_user_ids', '>', 0)
             ->groupBy('subject_id');
 
-        // Do not globally remove completed tasks here: Created Today is explicitly
-        // status-agnostic and Completed This Week needs task history. Open-task
-        // conditions are applied inside the aggregate expressions instead.
+        // Drive every My Tasks counter from exactly the same active-only and
+        // permission-aware scope as the table. This keeps assignees, creators,
+        // authorized viewers and administrators aligned with what they can
+        // actually see below the stage cards.
+        $activeVisibleTaskIds = $this->activeVisibleTaskQuery($user)
+            ->reorder()
+            ->select('tasks.id');
+
         $query = DB::table('tasks')
             ->join('flow_jobs as my_work_metric_jobs', 'my_work_metric_jobs.id', '=', 'tasks.flow_job_id')
-            ->join('clients as my_work_metric_clients', 'my_work_metric_clients.id', '=', 'my_work_metric_jobs.client_id')
             ->leftJoinSub($taskMentions, 'my_work_metric_task_mentions', fn ($join) => $join->on('my_work_metric_task_mentions.flow_task_id', '=', 'tasks.id'))
-            ->whereNull('tasks.deleted_at')
-            ->whereNull('my_work_metric_jobs.deleted_at')
-            ->whereNotIn('my_work_metric_jobs.status', JobService::INACTIVE_STATUSES)
-            ->where('my_work_metric_clients.is_active', true);
+            ->whereIn('tasks.id', $activeVisibleTaskIds);
 
-        // Match the same operational responsibility used by personalTaskQuery().
-        if (!$administrator) {
-            $scopes = $access->scopes($user, 'tasks');
-            $canSeeAssigned = $access->can($user, 'tasks', 'view') && (
-                in_array('all_records', $scopes, true)
-                || in_array('own_records', $scopes, true)
-                || in_array('assigned_jobs', $scopes, true)
-                || (in_array('department', $scopes, true) && (bool) $user->department_id)
-            );
-
-            $query->where(function ($personal) use ($user, $canSeeAssigned): void {
-                $personal->where('my_work_metric_jobs.created_by', $user->id);
-                if ($canSeeAssigned) {
-                    $personal->orWhere('tasks.assignee_id', $user->id);
-                }
-            });
-        }
-
-        $initialStatuses = "'".implode("','", self::INITIAL_TASK_STATUSES)."'";
-        $openTask = "tasks.completed_at IS NULL
-            AND LOWER(TRIM(COALESCE(tasks.status, ''))) <> 'completed'
-            AND my_work_metric_jobs.completed_at IS NULL
-            AND LOWER(TRIM(COALESCE(my_work_metric_jobs.status, ''))) <> 'completed'";
-        $notStarted = "COALESCE(tasks.progress, 0) = 0
-            AND LOWER(TRIM(COALESCE(tasks.status, ''))) IN ($initialStatuses)";
-        $inProgress = "(COALESCE(tasks.progress, 0) > 0
-            OR (LOWER(TRIM(COALESCE(tasks.status, ''))) <> ''
-                AND LOWER(TRIM(COALESCE(tasks.status, ''))) NOT IN ($initialStatuses)))";
+        // All rows in this aggregate are active by construction. Retain the
+        // legacy metric keys so dashboard/bookmarked filters continue to work,
+        // but completed-task history is deliberately outside My Tasks.
+        $notStarted = "COALESCE(tasks.progress, 0) = 0";
+        $inProgress = "COALESCE(tasks.progress, 0) > 0
+            OR LOWER(TRIM(COALESCE(tasks.status, ''))) NOT IN ('not start','not started','ready','to do','todo')";
         $needsAttention = "(tasks.needs_attention = 1
             OR tasks.order_task_flag_id IS NOT NULL
             OR tasks.assignee_id IS NULL
@@ -253,20 +210,18 @@ class MyWorkService
             OR LOWER(TRIM(COALESCE(tasks.status, ''))) LIKE '%attention%')";
 
         $row = $query
-            ->selectRaw("SUM(CASE WHEN $openTask THEN 1 ELSE 0 END) AS my_tasks_count")
+            ->selectRaw('COUNT(tasks.id) AS my_tasks_count')
             ->selectRaw('SUM(CASE WHEN tasks.created_at BETWEEN ? AND ? THEN 1 ELSE 0 END) AS created_today_count', [$todayStartUtc, $todayEndUtc])
-            ->selectRaw("SUM(CASE WHEN $openTask AND $notStarted THEN 1 ELSE 0 END) AS not_started_count")
-            ->selectRaw("SUM(CASE WHEN $openTask AND $inProgress THEN 1 ELSE 0 END) AS in_progress_count")
-            ->selectRaw("SUM(CASE WHEN $openTask AND tasks.due_date BETWEEN ? AND ? THEN 1 ELSE 0 END) AS due_this_week_count", [$weekStartDate, $weekEndDate])
-            ->selectRaw('SUM(CASE WHEN tasks.completed_at BETWEEN ? AND ? THEN 1 ELSE 0 END) AS completed_this_week_count', [$weekStartUtc, $weekEndUtc])
-            ->selectRaw("SUM(CASE WHEN $openTask AND $needsAttention THEN 1 ELSE 0 END) AS attention_count", [$todayDate])
-            // Legacy counts remain available for old bookmarked quick-filter URLs
-            // and the Mentions chip; they are no longer displayed as summary cards.
-            ->selectRaw("SUM(CASE WHEN $openTask AND tasks.due_date < ? THEN 1 ELSE 0 END) AS overdue_count", [$todayDate])
-            ->selectRaw("SUM(CASE WHEN $openTask AND tasks.due_date = ? THEN 1 ELSE 0 END) AS today_count", [$todayDate])
-            ->selectRaw("SUM(CASE WHEN $openTask AND tasks.due_date BETWEEN ? AND ? AND LOWER(TRIM(tasks.status)) NOT LIKE 'waiting%' THEN 1 ELSE 0 END) AS upcoming_count", [$tomorrow, $weekEndDate])
-            ->selectRaw("SUM(CASE WHEN $openTask AND LOWER(TRIM(tasks.status)) LIKE 'waiting%' THEN 1 ELSE 0 END) AS waiting_count")
-            ->selectRaw("SUM(CASE WHEN $openTask AND my_work_metric_task_mentions.flow_task_id IS NOT NULL THEN 1 ELSE 0 END) AS mentions_count")
+            ->selectRaw("SUM(CASE WHEN $notStarted THEN 1 ELSE 0 END) AS not_started_count")
+            ->selectRaw("SUM(CASE WHEN ($inProgress) THEN 1 ELSE 0 END) AS in_progress_count")
+            ->selectRaw('SUM(CASE WHEN tasks.due_date BETWEEN ? AND ? THEN 1 ELSE 0 END) AS due_this_week_count', [$weekStartDate, $weekEndDate])
+            ->selectRaw('0 AS completed_this_week_count')
+            ->selectRaw("SUM(CASE WHEN $needsAttention THEN 1 ELSE 0 END) AS attention_count", [$todayDate])
+            ->selectRaw('SUM(CASE WHEN tasks.due_date < ? THEN 1 ELSE 0 END) AS overdue_count', [$todayDate])
+            ->selectRaw('SUM(CASE WHEN tasks.due_date = ? THEN 1 ELSE 0 END) AS today_count', [$todayDate])
+            ->selectRaw("SUM(CASE WHEN tasks.due_date BETWEEN ? AND ? AND LOWER(TRIM(tasks.status)) NOT LIKE 'waiting%' THEN 1 ELSE 0 END) AS upcoming_count", [$tomorrow, $weekEndDate])
+            ->selectRaw("SUM(CASE WHEN LOWER(TRIM(tasks.status)) LIKE 'waiting%' THEN 1 ELSE 0 END) AS waiting_count")
+            ->selectRaw('SUM(CASE WHEN my_work_metric_task_mentions.flow_task_id IS NOT NULL THEN 1 ELSE 0 END) AS mentions_count')
             ->first();
 
         return [
@@ -275,7 +230,7 @@ class MyWorkService
             'notStarted' => (int) ($row?->not_started_count ?? 0),
             'inProgress' => (int) ($row?->in_progress_count ?? 0),
             'dueThisWeek' => (int) ($row?->due_this_week_count ?? 0),
-            'completedThisWeek' => (int) ($row?->completed_this_week_count ?? 0),
+            'completedThisWeek' => 0,
             'attention' => (int) ($row?->attention_count ?? 0),
             'overdue' => (int) ($row?->overdue_count ?? 0),
             'today' => (int) ($row?->today_count ?? 0),
@@ -324,6 +279,62 @@ class MyWorkService
             ->all();
     }
 
+    /**
+     * Reuse the Order-list workflow-stage visual on My Tasks without changing
+     * My Tasks' personal visibility rules. Counts are task counts (not Order
+     * counts) and come from the same open personal task scope as this page.
+     *
+     * @return list<array{id:int,filter_value:string,name:string,short_name:string,sequence:int,color:string,count:int,count_label:string}>
+     */
+    public function orderPhaseCards(User $user): array
+    {
+        $definitions = DB::table('workflow_phases as my_work_card_phases')
+            ->join('workflow_templates as my_work_card_workflows', 'my_work_card_workflows.id', '=', 'my_work_card_phases.workflow_template_id')
+            ->where('my_work_card_workflows.applies_to', 'orders')
+            ->where('my_work_card_workflows.is_active', true)
+            ->where('my_work_card_phases.is_active', true)
+            ->whereNotNull('my_work_card_phases.name')
+            ->where('my_work_card_phases.name', '!=', '')
+            ->orderBy('my_work_card_phases.sequence')
+            ->orderBy('my_work_card_phases.id')
+            ->get([
+                'my_work_card_phases.id',
+                'my_work_card_phases.name',
+                'my_work_card_phases.short_name',
+                'my_work_card_phases.sequence',
+                'my_work_card_phases.color',
+            ])
+            ->unique(fn ($phase) => mb_strtolower(trim((string) $phase->name)))
+            ->values();
+
+        $counts = $this->personalTaskQuery($user, [])
+            ->leftJoin('workflow_phases as my_work_card_task_phases', 'my_work_card_task_phases.id', '=', 'tasks.workflow_phase_id')
+            ->reorder()
+            ->selectRaw("LOWER(TRIM(COALESCE(my_work_card_task_phases.name, ''))) AS stage_key")
+            ->selectRaw('COUNT(tasks.id) AS aggregate')
+            ->groupBy('stage_key')
+            ->pluck('aggregate', 'stage_key')
+            ->map(fn ($count) => (int) $count);
+
+        return $definitions
+            ->map(function ($phase) use ($counts): array {
+                $name = trim((string) $phase->name);
+                $key = mb_strtolower($name);
+
+                return [
+                    'id' => (int) $phase->id,
+                    'filter_value' => $name,
+                    'name' => $name,
+                    'short_name' => trim((string) ($phase->short_name ?: $name)),
+                    'sequence' => (int) $phase->sequence,
+                    'color' => \App\Support\MasterColor::normalize((string) $phase->color) ?: '#2563EB',
+                    'count' => (int) ($counts->get($key, 0)),
+                    'count_label' => 'Open tasks',
+                ];
+            })
+            ->all();
+    }
+
     /** @return list<int> */
     public function orderPhaseSourceIdsForName(string $phaseName): array
     {
@@ -360,62 +371,138 @@ class MyWorkService
 
     public function findPersonalVisibleTask(User $user, int $taskId): Task
     {
-        return $this->personalTaskQuery($user, [], includeOpenConstraint: false)
+        return $this->personalTaskQuery($user, [])
             ->whereKey($taskId)
             ->firstOrFail();
     }
 
     /**
-     * Count the same open task scope used by My Tasks. Administrators see all
-     * visible tasks; other users see tasks assigned to them plus tasks from
-     * Orders they created. Keeping this in one service prevents the sidebar
-     * badge and page results from drifting apart.
+     * Count the same open task scope used by My Tasks. Administrators keep
+     * broad visibility; other users count only the currently active Order task
+     * assigned to them. Keeping this in one service prevents the sidebar badge
+     * and page results from drifting apart.
      */
     public function openTaskCount(User $user): int
     {
-        return $this->personalTaskQuery($user, [])
+        $query = $this->activeVisibleTaskQuery($user);
+
+        return $query
             ->reorder()
             ->count('tasks.id');
+    }
+
+    /**
+     * Return the Orders that belong in My Tasks.
+     *
+     * Administrators keep the broad operational view. For every other user an
+     * Order appears only while the CURRENT workflow task is assigned to that
+     * user. Future assigned tasks stay hidden until sequencing activates them.
+     * Order creation/ownership by itself never puts an Order into My Tasks.
+     */
+    public function personalOpenOrderIdsQuery(User $user): Builder
+    {
+        $query = $this->activeVisibleTaskQuery($user);
+
+        return $query
+            ->reorder()
+            ->select('tasks.flow_job_id')
+            ->distinct();
+    }
+
+    /**
+     * Active Order-task scope used by My Tasks for EVERY role.
+     *
+     * The page is an execution queue, not a task-history screen, so it never
+     * renders sibling/future/completed tasks from the Order. Only tasks in the
+     * Order's current workflow phase that are actually actionable remain.
+     *
+     * Visibility for non-admin users is the union of three allowed paths:
+     * - the active task assignee;
+     * - the Order creator;
+     * - users included by the configured task record-access scope;
+     * - Admin/Super Admin bypass record-scope restrictions, but STILL see only
+     *   the active task rows. They are exempt from the visibility gate, not from
+     *   the active-task-only rule.
+     */
+    public function activeVisibleTaskQuery(User $user): Builder
+    {
+        $blockedStatuses = [
+            '',
+            'not start',
+            'not started',
+            'not ready',
+            'locked',
+            'skipped',
+            'not applicable',
+            'n/a',
+            'completed',
+            'cancelled',
+            'canceled',
+            'waiting for sample approval',
+            'waiting for qc issue resolution',
+        ];
+
+        $placeholders = implode(',', array_fill(0, count($blockedStatuses), '?'));
+
+        $access = app(AccessControlService::class);
+        $query = Task::query();
+
+        // Admin/Super Admin are intentionally exempt from the visibility
+        // participant check. Everyone else can see the active task when they
+        // are the assignee, the Order creator, or the task is included by their
+        // configured record-access scope.
+        if (!$access->isAdministrator($user)) {
+            $visibleByConfiguredAccess = app(TaskService::class)
+                ->visibleQuery($user)
+                ->select('tasks.id');
+
+            $query->where(function (Builder $visibility) use ($user, $visibleByConfiguredAccess): void {
+                $visibility
+                    ->where('tasks.assignee_id', $user->id)
+                    ->orWhereHas('job', fn (Builder $job) => $job->where('created_by', $user->id))
+                    ->orWhereIn('tasks.id', $visibleByConfiguredAccess);
+            });
+        }
+
+        return $query
+            ->whereNull('tasks.completed_at')
+            ->whereHas('job', function (Builder $job): void {
+                $job
+                    ->whereHas('client', fn (Builder $client) => $client->where('is_active', true))
+                    ->whereNotIn('status', JobService::INACTIVE_STATUSES)
+                    ->whereNull('completed_at')
+                    ->whereRaw("LOWER(TRIM(flow_jobs.status)) != 'completed'")
+                    // A task from an earlier/future phase is never active work.
+                    ->whereColumn('flow_jobs.workflow_phase_id', 'tasks.workflow_phase_id');
+            })
+            ->whereRaw(
+                "LOWER(TRIM(COALESCE(tasks.status, ''))) NOT IN ($placeholders)",
+                $blockedStatuses,
+            );
+    }
+
+    /**
+     * Backwards-compatible helper for callers that specifically need the
+     * current active task assigned to the supplied user. My Tasks itself uses
+     * activeVisibleTaskQuery() so creators/authorized viewers also see the
+     * active task while Admin/Super Admin remain unrestricted by assignment.
+     */
+    public function activeAssignedTaskQuery(User $user): Builder
+    {
+        return $this->activeVisibleTaskQuery($user)
+            ->where('tasks.assignee_id', $user->id);
     }
 
     private function personalTaskQuery(
         User $user,
         array $filters,
-        bool $includeOpenConstraint = true,
-        bool $includeCompletedJobs = false,
     ): Builder
     {
-        $access = app(AccessControlService::class);
-        $query = app(TaskService::class)->visibleQuery($user)
-            ->whereHas('job', function (Builder $job) use ($includeCompletedJobs): void {
-                $job
-                    ->whereHas('client', fn (Builder $client) => $client->where('is_active', true))
-                    ->whereNotIn('status', JobService::INACTIVE_STATUSES);
-
-                if (!$includeCompletedJobs) {
-                    $job
-                        ->whereNull('completed_at')
-                        ->whereRaw("LOWER(TRIM(flow_jobs.status)) != 'completed'");
-                }
-            });
-
-        // Keep administrator visibility broad. For non-admin users, My Tasks is
-        // intentionally limited to their own operational responsibility: tasks
-        // assigned to them or any task under an Order they created. Because the
-        // base query comes from TaskService::visibleQuery(), the role matrix and
-        // record-scope rules still remain authoritative.
-        if (!$access->isAdministrator($user)) {
-            $query->where(function (Builder $personal) use ($user): void {
-                $personal
-                    ->where('tasks.assignee_id', $user->id)
-                    ->orWhereHas('job', fn (Builder $job) => $job->where('created_by', $user->id));
-            });
-        }
-
-        if ($includeOpenConstraint) {
-            $query->whereNull('tasks.completed_at')
-                ->whereRaw("LOWER(TRIM(tasks.status)) != 'completed'");
-        }
+        // My Tasks always contains only the currently active task rows.
+        // TaskService::visibleQuery() inside activeVisibleTaskQuery() applies the
+        // assignee / Order-creator / configured-access visibility rules, while
+        // Admin and Super Admin bypass those record-scope checks automatically.
+        $query = $this->activeVisibleTaskQuery($user);
 
         $search = trim((string) ($filters['search'] ?? ''));
         if ($search !== '' && $this->searchIsUsable($search)) {

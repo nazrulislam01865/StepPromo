@@ -19,10 +19,18 @@
     'clientFilterOptions' => collect(),
     'ownerFilterOptions' => collect(),
     'stageAssigneeOptions' => collect(),
+    'stageClientFilterOptions' => collect(),
     'supplierFilterOptions' => collect(),
     'shipmentUrgencyOptions' => collect(),
     'importFilterId' => 0,
     'importFilterLabel' => '',
+    'pageBreadcrumbs' => 'Order / Orders',
+    'pageTitle' => 'Orders',
+    'pageDescription' => 'Manage active orders, see the exact workflow stage, and open the next required action.',
+    'showPageActions' => true,
+    'workflowTitle' => 'Orders by workflow stage',
+    'workflowDescription' => 'Click a stage to filter the orders below on this page.',
+    'inlineListActions' => true,
 ])
 @php
     $sequence = (int) data_get($selectedStage, 'sequence', 0);
@@ -34,21 +42,6 @@
         ->values();
     $formatDate = static fn ($date) => filled($date) ? \Carbon\CarbonImmutable::parse($date)->format('M j, Y') : '—';
     $money = static fn ($value) => '$'.number_format((float) $value, 2);
-    $stageTextColor = static function (?string $color): string {
-        $hex = trim((string) $color);
-
-        if (! preg_match('/^#([0-9a-fA-F]{6})$/', $hex, $matches)) {
-            return '#ffffff';
-        }
-
-        $rgb = $matches[1];
-        $red = hexdec(substr($rgb, 0, 2));
-        $green = hexdec(substr($rgb, 2, 2));
-        $blue = hexdec(substr($rgb, 4, 2));
-        $luminance = (0.299 * $red) + (0.587 * $green) + (0.114 * $blue);
-
-        return $luminance >= 170 ? '#16324f' : '#ffffff';
-    };
     $headers = match ($sequence) {
         1 => ['Order','Client','Product / supplier','Purchase order','Owner / required date','Next action'],
         2 => ['Order','Product / supplier','Artwork','Client / sample','Assignee / due','Next action'],

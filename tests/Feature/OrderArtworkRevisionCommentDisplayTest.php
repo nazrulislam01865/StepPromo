@@ -38,9 +38,11 @@ class OrderArtworkRevisionCommentDisplayTest extends TestCase
         $this->assertStringContainsString('$hasReplacementArtwork', $jobs);
         $this->assertStringContainsString('if ($hasReplacementArtwork)', $jobs);
         $this->assertStringContainsString('· Version {{ max(1, (int) $latestTaskDocument->version) }}', $row);
-        $this->assertStringContainsString("\$artworkVersionDocuments = \$isArtworkUploadTask ? \$taskDocuments->sortByDesc('version')->values() : collect();", $row);
-        $this->assertStringContainsString("\$artworkVersionLabel = \$isLatestArtworkVersion ? 'Latest' : 'Archived';", $row);
+        $this->assertStringContainsString('collect([$latestArtworkDocument])->filter()->values()', $row);
+        $this->assertStringContainsString("class=\"ft-order-task-resource-row {{ \$isArtworkUploadTask ? 'is-latest-artwork' : '' }}\"", $row);
+        $this->assertStringContainsString('· Version {{ max(1, (int) $latestTaskDocument->version) }} · Latest', $row);
         $this->assertStringContainsString('ft-order-artwork-version-state', $row);
+        $this->assertStringNotContainsString("{{ \$taskDocuments->count() - 1 }} archived", $row);
         $this->assertStringContainsString('if (! $isArtworkTask) {', $documents);
         $this->assertStringContainsString("\$query->where('name', \$document->name);", $documents);
         $this->assertStringContainsString('· Version {{ max(1, (int) $referenceDocument->version) }}', $card);

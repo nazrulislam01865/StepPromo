@@ -1,4 +1,4 @@
-@props(['job', 'context' => [], 'shipmentUrgencyOptions' => collect()])
+@props(['job', 'context' => [], 'shipmentUrgencyOptions' => collect(), 'redoContext' => []])
 @php
     $team = collect($context['team'] ?? []);
     $canEditJob = (bool) ($context['canEditJob'] ?? false);
@@ -9,6 +9,16 @@
     $flagReason = trim((string) ($context['flagReason'] ?? ''));
     $isCancelled = strcasecmp((string) $job->status, 'Cancelled') === 0;
     $stageName = $isCancelled ? ($job->phase?->name ?: 'Cancelled') : ($job->phase?->name ?: 'New Order');
+    $hasRedo = (bool) ($redoContext['hasRedo'] ?? false);
+    $isRedoOrder = (bool) ($redoContext['isRedoOrder'] ?? false);
+    $redoOrderCount = (int) ($redoContext['redoOrderCount'] ?? 0);
+
+    // Show this only when an operational Redo Order actually exists.
+    // A discount-only resolution creates a Redo record but no Redo Order,
+    // so it must not be labelled as "Redo initiated".
+    $redoInitiated = $isRedoOrder || $redoOrderCount > 0;
+
+    $canInitiateRedo = (bool) ($redoContext['canInitiate'] ?? false);
 @endphp
 <section class="detail-header ft-order-prototype-header">
     <div class="breadcrumbs ft-order-prototype-breadcrumb">
@@ -32,9 +42,48 @@
             </div>
 
             <div class="pills ft-order-prototype-pills">
+                @if($redoInitiated)
+                    <span
+                        class="pill redo-initiated"
+                        title="A linked Redo Order has been initiated."
+                    >
+                        Redo initiated
+                    </span>
+                @endif
+
                 <span class="pill {{ strtolower((string) $job->health) === 'on track' || blank($job->health) ? 'green' : 'amber' }}">{{ $job->health ?: 'On Track' }}</span>
-                <span class="pill purple" id="stagePill" title="The workflow stage containing the current required task.">New Order</span>
-                @if($isCancelled)<span class="cancelled-badge">⊘ Cancelled</span>@endif
+                <span class="pill purple" id="stagePill" title="The workflow stage containing the current required task.">{{ $stageName }}</span>
+
+                @if($isRedoOrder)
+                    <span class="pill redo">↻ Redo order</span>
+                @endif
+                @if($isCancelled)
+                    <div class="state-banner cancelled show ft-order-state-banner">
+                        <span>⊘</span>
+
+                        <div>
+                            <b>Order cancelled</b>
+
+                            @if($job->cancellation_reason)
+                                <div class="ft-rich-text-content">
+                                    <x-ui.mention-text
+                                        :text="$job->cancellation_reason"
+                                    />
+                                </div>
+                            @else
+                                <p>
+                                    Workflow progression is blocked.
+                                </p>
+                            @endif
+
+                            @if($job->cancelledBy)
+                                <p>
+                                    Cancelled by {{ $job->cancelledBy->name }}
+                                </p>
+                            @endif
+                        </div>
+                    </div>
+                @endif
             </div>
 
             <div class="order-commandbar ft-order-commandbar">
@@ -76,17 +125,23 @@
                 </div>
 
                 <span class="command-spacer"></span>
+                @if($canInitiateRedo)
+                    <button type="button" class="btn redo small" wire:click="openRedoModal" title="Create a controlled redo linked to this order.">↻ Initiate Redo</button>
+                @endif
                 <button type="button" class="btn small flag-btn {{ $flagged ? 'flagged' : '' }}" wire:click="openOrderAttentionReason" @disabled($attentionLocked) title="{{ $flagReason ?: 'Flag this order so it remains visibly marked for attention across every stage.' }}">⚑ {{ $flagged ? 'Flagged' : 'Flag order' }}</button>
                 <button type="button" class="btn danger small" wire:click="openOrderCancelModal" @disabled(!$canCancel) title="{{ $canCancel ? 'Cancel this order. Cancellation is available only through the QC stage.' : 'Cancellation is available only through the QC stage.' }}">⊘ Cancel order</button>
             </div>
         </div>
 
-        <div class="people ft-order-team-stack" title="Team members currently involved in this order">
-            @foreach($team->take(4) as $member)
-                @php($initials = collect(preg_split('/\s+/', trim((string) $member->name)))->filter()->map(fn($part) => mb_strtoupper(mb_substr($part, 0, 1)))->take(2)->implode(''))
-                <i title="{{ $member->name }}">{{ $initials ?: '—' }}</i>
-            @endforeach
-            @if($team->count() > 4)<i>+{{ $team->count() - 4 }}</i>@endif
+        <div class="ft-order-header-side">
+            <div class="people ft-order-team-stack" title="Team members currently involved in this order">
+                @foreach($team->take(4) as $member)
+                    @php($initials = collect(preg_split('/\s+/', trim((string) $member->name)))->filter()->map(fn($part) => mb_strtoupper(mb_substr($part, 0, 1)))->take(2)->implode(''))
+                    <i title="{{ $member->name }}">{{ $initials ?: '—' }}</i>
+                @endforeach
+                @if($team->count() > 4)<i>+{{ $team->count() - 4 }}</i>@endif
+            </div>
+
         </div>
     </div>
 </section>

@@ -65,6 +65,12 @@ final class OrderListQuery
         return $this->prototype->stages($actor);
     }
 
+    /** @return Collection<int,array{id:int,name:string,short_name:string,sequence:int,color:string,count:int}> */
+    public function myTaskStages(User $actor): Collection
+    {
+        return $this->prototype->stages($actor, true);
+    }
+
     public function urgencyOptions(): Collection
     {
         return $this->prototype->urgencyOptions();
@@ -73,6 +79,11 @@ final class OrderListQuery
     public function paginate(User $actor, array $filters, Collection $stages, int $perPage): LengthAwarePaginator
     {
         return $this->prototype->paginate($actor, $filters, $stages, $perPage);
+    }
+
+    public function paginateMyTasks(User $actor, array $filters, Collection $stages, int $perPage): LengthAwarePaginator
+    {
+        return $this->prototype->paginate($actor, $filters, $stages, $perPage, true);
     }
 
     public function rows(LengthAwarePaginator $orders, Collection $urgencies): array

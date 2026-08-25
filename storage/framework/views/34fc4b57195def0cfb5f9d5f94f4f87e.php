@@ -205,56 +205,28 @@
         <input class="ft-mgmt-search" wire:model.live.debounce.300ms="search" type="search" placeholder="Search orders, inquiries or tasks" aria-label="Search dashboard">
     </section>
 
-    <section class="ft-mgmt-kpis" aria-label="Key metrics">
-        <a class="ft-mgmt-kpi tone-blue" href="<?php echo e(route('jobs.index', ['metric' => 'dashboardActive'])); ?>" wire:navigate>
-            <span class="ft-mgmt-kpi-label">Active orders</span>
-            <i class="ft-mgmt-kpi-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 11h18M10 11v2h4v-2"/></svg>
-            </i>
-            <strong class="ft-mgmt-kpi-value"><?php echo e($metrics['activeJobs']); ?></strong>
-            <span class="ft-mgmt-kpi-meta">Across active workflow stages</span>
-        </a>
-        <a class="ft-mgmt-kpi tone-red" href="<?php echo e(route('jobs.index', ['metric' => 'dashboardAttention'])); ?>" wire:navigate>
-            <span class="ft-mgmt-kpi-label">Needs attention</span>
-            <i class="ft-mgmt-kpi-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M5 4v16m0-14h10l-1.5 3L15 12H5"/><path d="M19 6v4"/></svg>
-            </i>
-            <strong class="ft-mgmt-kpi-value"><?php echo e($metrics['needsAttention']); ?></strong>
-            <span class="ft-mgmt-kpi-meta">Risk, delay or blocker</span>
-        </a>
-        <a class="ft-mgmt-kpi tone-amber" href="<?php echo e(route('my-work', ['filter' => 'overdue'])); ?>" wire:navigate>
-            <span class="ft-mgmt-kpi-label">Overdue tasks</span>
-            <i class="ft-mgmt-kpi-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
-            </i>
-            <strong class="ft-mgmt-kpi-value"><?php echo e($metrics['overdueTasks']); ?></strong>
-            <span class="ft-mgmt-kpi-meta">Require immediate update</span>
-        </a>
-        <a class="ft-mgmt-kpi tone-blue" href="<?php echo e(route('inquiries.index', ['metric' => 'dashboardOpen'])); ?>" wire:navigate>
-            <span class="ft-mgmt-kpi-label">Open inquiries</span>
-            <i class="ft-mgmt-kpi-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M12 3v6m-3-3h6"/><path d="M5 3h3m8 0h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2"/></svg>
-            </i>
-            <strong class="ft-mgmt-kpi-value"><?php echo e($metrics['openInquiries']); ?></strong>
-            <span class="ft-mgmt-kpi-meta">Current open inquiry records</span>
-        </a>
-        <a class="ft-mgmt-kpi tone-green" href="<?php echo e(route('clients.index')); ?>" wire:navigate>
-            <span class="ft-mgmt-kpi-label">Active clients</span>
-            <i class="ft-mgmt-kpi-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            </i>
-            <strong class="ft-mgmt-kpi-value"><?php echo e($metrics['activeClients']); ?></strong>
-            <span class="ft-mgmt-kpi-meta">Current active client records</span>
-        </a>
-        <a class="ft-mgmt-kpi tone-blue" href="<?php echo e(route('master-data', ['group' => 'product', 'product_status' => 'active'])); ?>" wire:navigate>
-            <span class="ft-mgmt-kpi-label">Active products</span>
-            <i class="ft-mgmt-kpi-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M12 3 4.5 8.25v7.5L12 21l7.5-5.25v-7.5L12 3Z"/><path d="M4.5 8.25 12 13.5l7.5-5.25"/></svg>
-            </i>
-            <strong class="ft-mgmt-kpi-value"><?php echo e(number_format($metrics['activeProducts'] ?? 0)); ?></strong>
-            <span class="ft-mgmt-kpi-meta">Available in product catalogue</span>
-        </a>
-    </section>
+    <?php if (isset($component)) { $__componentOriginalee5bb7364c37061cbe535f4c41f9060f = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginalee5bb7364c37061cbe535f4c41f9060f = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.orders.workflow-stage-overview','data' => ['stages' => $orderStages,'mode' => 'navigate','showHeader' => false]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('orders.workflow-stage-overview'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['stages' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($orderStages),'mode' => 'navigate','show-header' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(false)]); ?>
+<?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::processComponentKey($component); ?>
+
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginalee5bb7364c37061cbe535f4c41f9060f)): ?>
+<?php $attributes = $__attributesOriginalee5bb7364c37061cbe535f4c41f9060f; ?>
+<?php unset($__attributesOriginalee5bb7364c37061cbe535f4c41f9060f); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginalee5bb7364c37061cbe535f4c41f9060f)): ?>
+<?php $component = $__componentOriginalee5bb7364c37061cbe535f4c41f9060f; ?>
+<?php unset($__componentOriginalee5bb7364c37061cbe535f4c41f9060f); ?>
+<?php endif; ?>
 
 
 

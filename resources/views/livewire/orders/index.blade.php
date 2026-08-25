@@ -20,6 +20,7 @@
         :client-filter-options="$clientFilterOptions"
         :owner-filter-options="$ownerFilterOptions"
         :stage-assignee-options="$stageAssigneeOptions"
+        :stage-client-filter-options="$stageClientFilterOptions"
         :supplier-filter-options="$supplierFilterOptions"
         :shipment-urgency-options="$shipmentUrgencyOptions"
         :import-filter-id="$importBatchId"

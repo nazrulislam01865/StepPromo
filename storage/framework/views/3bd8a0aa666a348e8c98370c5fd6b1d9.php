@@ -22,6 +22,7 @@ $__propNames = \Illuminate\View\ComponentAttributeBag::extractPropNames(([
     'hideLabel' => false,
     'searchPlaceholder' => null,
     'footerMessage' => null,
+    'showAvatar' => false,
 ]));
 
 foreach ($attributes->all() as $__key => $__value) {
@@ -58,6 +59,7 @@ foreach (array_filter(([
     'hideLabel' => false,
     'searchPlaceholder' => null,
     'footerMessage' => null,
+    'showAvatar' => false,
 ]), 'is_string', ARRAY_FILTER_USE_KEY) as $__key => $__value) {
     $$__key = $$__key ?? $__value;
 }
@@ -157,7 +159,26 @@ unset($__defined_vars, $__key, $__value); ?>
         :aria-expanded="open.toString()"
         <?php if($disabled): echo 'disabled'; endif; ?>
     >
-        <span class="ft-search-select__value" x-text="selectedLabel"></span>
+        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($showAvatar): ?>
+            <span class="ft-search-select__selected-user">
+                <span class="ft-search-select__avatar ft-search-select__avatar--trigger" x-show="selectedValue">
+                    <template x-if="items.find((candidate) => String(candidate?.id) === String(selectedValue))?.avatarUrl">
+                        <img
+                            :src="items.find((candidate) => String(candidate?.id) === String(selectedValue))?.avatarUrl"
+                            :alt="selectedLabel"
+                            loading="lazy"
+                        >
+                    </template>
+                    <span
+                        x-show="!items.find((candidate) => String(candidate?.id) === String(selectedValue))?.avatarUrl"
+                        x-text="selectedLabel ? selectedLabel.trim().charAt(0).toUpperCase() : '?'"
+                    ></span>
+                </span>
+                <span class="ft-search-select__value" x-text="selectedLabel"></span>
+            </span>
+        <?php else: ?>
+            <span class="ft-search-select__value" x-text="selectedLabel"></span>
+        <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
         <span class="ft-filter-chevron" aria-hidden="true">⌄</span>
     </button>
 
@@ -207,8 +228,27 @@ unset($__defined_vars, $__key, $__value); ?>
                     :aria-selected="String(item.id) === String(selectedValue)"
                     x-on:click.stop="<?php if($remote): ?> select(item) <?php else: ?> choose(String(item.id), item.label) <?php endif; ?>; $dispatch('flowtrack-selection-changed', {property: <?php echo \Illuminate\Support\Js::from($property)->toHtml() ?>, value: String(item.id), label: item.label}); $nextTick(() => Promise.resolve(<?php if($action): ?> $wire.call(<?php echo \Illuminate\Support\Js::from($action)->toHtml() ?>, <?php echo \Illuminate\Support\Js::from($property)->toHtml() ?>, String(item.id)) <?php else: ?> $wire.set(<?php echo \Illuminate\Support\Js::from($property)->toHtml() ?>, String(item.id)) <?php endif; ?>).catch(() => <?php if($remote): ?> selectionFailed() <?php else: ?> null <?php endif; ?>))"
                 >
-                    <span x-text="item.label"></span>
-                    <small x-text="item.meta || (String(item.id) === String(selectedValue) ? 'Selected' : '')"></small>
+                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($showAvatar): ?>
+                        <span class="ft-search-select__user-option">
+                            <span class="ft-search-select__avatar" aria-hidden="true">
+                                <template x-if="item.avatarUrl">
+                                    <img :src="item.avatarUrl" :alt="item.label" loading="lazy">
+                                </template>
+                                <span
+                                    x-show="!item.avatarUrl"
+                                    x-text="item.label ? item.label.trim().charAt(0).toUpperCase() : '?'"
+                                ></span>
+                            </span>
+                            <span class="ft-search-select__user-copy">
+                                <strong x-text="item.label"></strong>
+                                <small x-show="item.meta" x-text="item.meta"></small>
+                            </span>
+                        </span>
+                        <small class="ft-search-select__selected-mark" x-show="String(item.id) === String(selectedValue)">Selected</small>
+                    <?php else: ?>
+                        <span x-text="item.label"></span>
+                        <small x-text="item.meta || (String(item.id) === String(selectedValue) ? 'Selected' : '')"></small>
+                    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                 </button>
             </template>
         </div>

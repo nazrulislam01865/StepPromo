@@ -9,6 +9,8 @@
     'shipmentUrgencyOptions'=>collect(),
     'overviewPhaseId'=>null,
     'orderDetailContext'=>[],
+    'orderRedoContext'=>[],
+    'orderRedoForm'=>[],
     'products'=>collect(),
     'categories'=>collect(),
     'showAddJobProductForm'=>false,
@@ -100,18 +102,26 @@
 @php
     $manualAttention = (bool) ($job->attention_requested ?? false);
 @endphp
-<div {{ $attributes->class('ft-job-detail-page ft-order-prototype-detail') }}>
+<div
+    {{ $attributes->class('ft-job-detail-page ft-order-prototype-detail') }}
+    x-data="{ redoNotice: '', redoNoticeOpen: false, showRedoNotice(message) { this.redoNotice = message; this.redoNoticeOpen = true; clearTimeout(this.__redoNoticeTimer); this.__redoNoticeTimer = setTimeout(() => this.redoNoticeOpen = false, 2600); } }"
+    x-on:order-redo-notice.window="showRedoNotice($event.detail.message ?? 'Redo update saved.')"
+>
     <x-jobs.order-detail.header
         :job="$job"
         :context="$orderDetailContext"
         :shipment-urgency-options="$shipmentUrgencyOptions"
+        :redo-context="$orderRedoContext"
     />
     <x-jobs.order-detail.tabs
         :job="$job"
         :detail-tab="$detailTab"
         :can-view-finance="$canViewFinance"
         :can-create-finance="$canCreateFinance"
+        :redo-context="$orderRedoContext"
     />
+
+    <x-jobs.order-detail.redo-banner :job="$job" :context="$orderRedoContext" />
 
     @if($detailTab==='overview')
         <x-jobs.detail-overview
@@ -174,10 +184,28 @@
             :can-manage="$canManageInquiryLink"
             :linked-inquiry-can-open="$linkedInquiryCanOpen"
         />
+    @elseif($detailTab==='redo' && (bool) ($orderRedoContext['hasRedo'] ?? false))
+        <x-jobs.order-detail.redo-panel :job="$job" :context="$orderRedoContext" />
+
+        {{--
+            Keep the standard Order Activity feed beneath the Redo cards,
+            matching the approved Redo prototype. This is the same source used
+            on Overview, so comments/history stay in one authoritative audit
+            stream instead of creating a separate Redo-only activity store.
+        --}}
+        <x-jobs.order-detail.activity
+            :job="$job"
+            :mention-users="$mentionUsers"
+            :activity-tab="$activityTab"
+            :activity-page="$activityPage"
+            :focus-comment="$focusComment"
+            :can-comment="(bool) ($orderDetailContext['canComment'] ?? false)"
+        />
     @elseif($detailTab==='finance')
         <x-jobs.finance.detail
             :job="$job"
             :summary="$financeSummary"
+            :redo-context="$orderRedoContext"
             :contacts="$financeContacts ?? collect()"
             :users="$financeUsers ?? collect()"
             :invoice-types="$financeInvoiceTypes ?? collect()"
@@ -217,20 +245,126 @@
     @endif
 
 
+    <x-jobs.order-detail.redo-modal :job="$job" :context="$orderRedoContext" :form="$orderRedoForm" :mention-users="$mentionUsers" />
+
+    <div class="ft-redo-toast" x-cloak x-show="redoNoticeOpen" x-transition x-text="redoNotice" role="status" aria-live="polite"></div>
+
     @if($showOrderCancelModal)
-        <div class="ft-order-modal-backdrop" wire:key="order-cancel-modal" wire:click.self="closeOrderCancelModal">
-            <section class="ft-order-modal" role="dialog" aria-modal="true" aria-labelledby="order-cancel-modal-title">
+        <div
+            class="ft-order-modal-backdrop"
+            wire:key="order-cancel-modal"
+            wire:click.self="closeOrderCancelModal"
+        >
+            <section
+                class="ft-order-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="order-cancel-modal-title"
+                x-data="{ cancelling: false }"
+            >
                 <header>
-                    <div><h2 id="order-cancel-modal-title">Cancel Order</h2><p>{{ $job->displayOrderNumber() }} · cancellation is available through the QC stage.</p></div>
-                    <button type="button" wire:click="closeOrderCancelModal" aria-label="Close">×</button>
+                    <div>
+                        <h2 id="order-cancel-modal-title">Cancel Order</h2>
+
+                        <p>
+                            {{ $job->displayOrderNumber() }}
+                            · cancellation is available through the QC stage.
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        wire:click="closeOrderCancelModal"
+                        aria-label="Close"
+                    >
+                        ×
+                    </button>
                 </header>
-                <div class="ft-order-modal-body">
-                    <div class="ft-order-critical-note"><strong>This stops workflow progression.</strong><span>Open tasks are marked cancelled. Existing documents, products, history, and audit records are retained.</span></div>
-                    <label for="order-cancellation-reason">Cancellation reason *</label>
-                    <textarea id="order-cancellation-reason" wire:model="orderCancellationReason" rows="5" maxlength="2000" placeholder="Explain why this Order is being cancelled..."></textarea>
-                    @error('orderCancellationReason')<p class="validation-error">{{ $message }}</p>@enderror
+
+                <div class="ft-order-modal-body ft-mention-host">
+                    <div class="ft-order-critical-note">
+                        <strong>This stops workflow progression.</strong>
+
+                        <span>
+                            Open tasks are marked cancelled.
+                            Existing documents, products, history,
+                            and audit records are retained.
+                        </span>
+                    </div>
+
+                    <label for="order-cancellation-reason">
+                        Cancellation reason *
+                    </label>
+
+                    <textarea
+                        id="order-cancellation-reason"
+                        x-ref="cancelReason"
+                        class="ft-mention-input"
+                        data-rich-text
+                        wire:model="orderCancellationReason"
+                        rows="5"
+                        autocomplete="off"
+                        data-mention-users="{{ json_encode(
+                            collect($mentionUsers)->values()->all(),
+                            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+                        ) }}"
+                        placeholder="Explain why this Order is being cancelled. Type @ to mention someone, paste text, or paste an image..."
+                    ></textarea>
+
+                    @error('orderCancellationReason')
+                        <p class="validation-error">
+                            {{ $message }}
+                        </p>
+                    @enderror
                 </div>
-                <footer><button type="button" class="secondary" wire:click="closeOrderCancelModal">Keep Order</button><button type="button" class="danger" wire:click="confirmOrderCancellation" wire:loading.attr="disabled" wire:target="confirmOrderCancellation"><span wire:loading.remove wire:target="confirmOrderCancellation">Cancel Order</span><span wire:loading wire:target="confirmOrderCancellation">Cancelling...</span></button></footer>
+
+                <footer>
+                    <button
+                        type="button"
+                        class="secondary"
+                        wire:click="closeOrderCancelModal"
+                        x-bind:disabled="cancelling"
+                    >
+                        Keep Order
+                    </button>
+
+                    <button
+                        type="button"
+                        class="danger"
+                        x-bind:disabled="cancelling"
+                        x-on:click="
+                            if (cancelling) return;
+
+                            cancelling = true;
+
+                            (async () => {
+                                try {
+                                    const input = $refs.cancelReason;
+
+                                    const value =
+                                        input?.__flowtrackRichTextValueAsync
+                                            ? await input.__flowtrackRichTextValueAsync()
+                                            : (input?.value ?? '');
+
+                                    await $wire.confirmOrderCancellation(value);
+                                } finally {
+                                    cancelling = false;
+                                }
+                            })();
+                        "
+                    >
+                        <span x-show="!cancelling">
+                            Cancel Order
+                        </span>
+
+                        <span
+                            x-cloak
+                            x-show="cancelling"
+                        >
+                            Cancelling...
+                        </span>
+                    </button>
+                </footer>
             </section>
         </div>
     @endif

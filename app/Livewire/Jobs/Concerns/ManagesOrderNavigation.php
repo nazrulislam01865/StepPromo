@@ -6,6 +6,7 @@ use App\Actions\Orders\BulkUpdateOrders;
 use App\Queries\Orders\OrderListQuery;
 use App\Queries\Orders\VisibleOrderQuery;
 use App\Services\AccessControlService;
+use App\Services\OrderRedoService;
 
 /**
  * Phase 5 Order UI workflow extracted from the legacy Jobs coordinator.
@@ -123,6 +124,7 @@ trait ManagesOrderNavigation
         $this->closeEditOrderProductModal();
         $this->closeFinanceModals();
         $this->closeOrderWorkflowAction();
+        $this->closeRedoModal();
         $this->prepareSelectedJob($id);
     }
 
@@ -161,6 +163,7 @@ trait ManagesOrderNavigation
         $this->closeOrderAttentionReason();
         $this->closeEditOrderProductModal();
         $this->closeFinanceModals();
+        $this->closeRedoModal();
 
         $this->redirectRoute('jobs.index', navigate: true);
     }
@@ -191,9 +194,18 @@ trait ManagesOrderNavigation
         // The Order Details Documents/Workflow tabs remain intentionally muted.
         // Finance is a separate permission-controlled surface and does not change
         // any of the existing Overview or Inquiry behaviour.
-        abort_unless(in_array($tab, ['overview','inquiry','finance'], true), 422);
+        abort_unless(in_array($tab, ['overview','inquiry','finance','redo'], true), 422);
         if ($tab === 'finance') {
             abort_unless(app(AccessControlService::class)->can(auth()->user(), 'finance', 'view'), 403);
+        }
+        if ($tab === 'redo' && $this->selectedJobId) {
+            $job = app(VisibleOrderQuery::class)->base(auth()->user(), (int) $this->selectedJobId);
+            $context = app(OrderRedoService::class)->context($job, auth()->user());
+            if (!(bool) ($context['hasRedo'] ?? false)) {
+                $this->detailTab = 'overview';
+                $this->dispatch('order-redo-notice', message: 'No redo has been created yet. Use Initiate Redo to begin.');
+                return;
+            }
         }
         $this->detailTab = $tab;
         if ($tab !== 'overview') {
@@ -202,6 +214,7 @@ trait ManagesOrderNavigation
             $this->closeOrderWorkflowAction();
         }
         if ($tab !== 'finance') $this->closeFinanceModals();
+        if ($tab !== 'redo') $this->closeRedoModal();
         $this->resetValidation(['inquiryLink', 'invoiceForm', 'paymentForm', 'collectionForm']);
     }
 

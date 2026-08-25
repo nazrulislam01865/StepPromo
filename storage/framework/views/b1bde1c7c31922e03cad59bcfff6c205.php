@@ -11,6 +11,7 @@
     $orderCreate = $user->canAccess('jobs.create');
     $taskView = $user->canAccess('tasks.view');
     $orderGroupActive = request()->routeIs('jobs.*', 'orders.*', 'all-tasks', 'my-work');
+    $cancelledOrderCount = $orderView ? app(\App\Services\CancelledOrderService::class)->sidebarCount($user) : 0;
 
     $clientView = $user->canAccess('clients.view');
     $clientCreate = $user->canAccess('clients.create');
@@ -49,7 +50,7 @@
     $administrator = app(\App\Services\AccessControlService::class)->isAdministrator($user);
     $settingsGroupActive = request()->routeIs('company.setup', 'administration');
     $reportView = $user->canAccess('reports.view');
-    $reportGroupActive = request()->routeIs('reports', 'team-performance.report');
+    $reportGroupActive = request()->routeIs('reports', 'team-performance.report', 'order-summary.report');
 ?>
 <aside id="sidebar" class="sidebar ft-sidebar-template">
     <a class="brand ft-system-brand" href="<?php echo e(route('dashboard')); ?>" wire:navigate aria-label="Open Dashboard">
@@ -276,6 +277,30 @@
 <?php unset($__componentOriginal230d78629742508075cd03dd9439398e); ?>
 <?php endif; ?>
                     <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                    <!-- <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($orderView): ?>
+                        <?php if (isset($component)) { $__componentOriginal230d78629742508075cd03dd9439398e = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal230d78629742508075cd03dd9439398e = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.nav-link','data' => ['route' => 'orders.cancelled','label' => 'Cancelled Orders','icon' => 'cancelled','badge' => $cancelledOrderCount,'child' => true,'active' => request()->routeIs('orders.cancelled')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.nav-link'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['route' => 'orders.cancelled','label' => 'Cancelled Orders','icon' => 'cancelled','badge' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($cancelledOrderCount),'child' => true,'active' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(request()->routeIs('orders.cancelled'))]); ?>
+<?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::processComponentKey($component); ?>
+
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal230d78629742508075cd03dd9439398e)): ?>
+<?php $attributes = $__attributesOriginal230d78629742508075cd03dd9439398e; ?>
+<?php unset($__attributesOriginal230d78629742508075cd03dd9439398e); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal230d78629742508075cd03dd9439398e)): ?>
+<?php $component = $__componentOriginal230d78629742508075cd03dd9439398e; ?>
+<?php unset($__componentOriginal230d78629742508075cd03dd9439398e); ?>
+<?php endif; ?>
+                    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?> -->
                 </div>
             </details>
         <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
@@ -511,6 +536,30 @@
                     <svg class="ft-sidebar-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m8 10 4 4 4-4"/></svg>
                 </summary>
                 <div class="ft-sidebar-children">
+                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($orderView): ?>
+                        <?php if (isset($component)) { $__componentOriginal230d78629742508075cd03dd9439398e = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal230d78629742508075cd03dd9439398e = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.nav-link','data' => ['route' => 'order-summary.report','label' => 'Order Summary','icon' => 'reports','child' => true,'active' => request()->routeIs('order-summary.report')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.nav-link'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['route' => 'order-summary.report','label' => 'Order Summary','icon' => 'reports','child' => true,'active' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(request()->routeIs('order-summary.report'))]); ?>
+<?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::processComponentKey($component); ?>
+
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal230d78629742508075cd03dd9439398e)): ?>
+<?php $attributes = $__attributesOriginal230d78629742508075cd03dd9439398e; ?>
+<?php unset($__attributesOriginal230d78629742508075cd03dd9439398e); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal230d78629742508075cd03dd9439398e)): ?>
+<?php $component = $__componentOriginal230d78629742508075cd03dd9439398e; ?>
+<?php unset($__componentOriginal230d78629742508075cd03dd9439398e); ?>
+<?php endif; ?>
+                    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                     <?php if (isset($component)) { $__componentOriginal230d78629742508075cd03dd9439398e = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal230d78629742508075cd03dd9439398e = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.nav-link','data' => ['route' => 'reports','label' => 'Inquiry Intelligence','icon' => 'reports','child' => true,'active' => request()->routeIs('reports')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>

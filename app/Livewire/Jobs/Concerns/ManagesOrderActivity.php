@@ -9,6 +9,8 @@ use App\Actions\Orders\SetOrderAttention;
 use App\Queries\Orders\VisibleOrderQuery;
 use App\Services\AccessControlService;
 use App\Services\JobService;
+use App\Services\RichTextService;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Phase 5 Order UI workflow extracted from the legacy Jobs coordinator.
@@ -85,24 +87,48 @@ trait ManagesOrderActivity
         $this->resetValidation('orderCancellationReason');
     }
 
-    public function confirmOrderCancellation(): void
+    public function confirmOrderCancellation(?string $reason = null): void
     {
-        $this->validate([
-            'orderCancellationReason' => ['required', 'string', 'max:2000'],
-        ], [
-            'orderCancellationReason.required' => 'Enter a reason for cancelling this Order.',
-        ]);
+        // The visible editor is contenteditable while this hidden Livewire field
+        // stores FlowTrack's sanitized rich-text payload. Accepting the value as
+        // an optional argument lets the modal wait for pasted image uploads to
+        // finish before submitting the cancellation.
+        if ($reason !== null) {
+            $this->orderCancellationReason = $reason;
+        }
+
+        $normalizedReason = app(RichTextService::class)->normalize(
+            $this->orderCancellationReason,
+            2000, //max 2000 char limit
+            'orderCancellationReason',
+        );
+
+        if ($normalizedReason === null) {
+            throw ValidationException::withMessages([
+                'orderCancellationReason' =>
+                    'Enter a reason for cancelling this Order.',
+            ]);
+        }
+
+        $this->orderCancellationReason = $normalizedReason;
 
         abort_unless($this->selectedJobId, 422);
+
         app(CancelOrder::class)->handle(
             auth()->user(),
             $this->selectedJobId,
-            $this->orderCancellationReason,
+            $normalizedReason,
             true,
         );
+
         $this->closeOrderCancelModal();
+
         $this->jobActivityPage = 1;
-        session()->flash('success', 'Order cancelled. The workflow is now blocked.');
+
+        session()->flash(
+            'success',
+            'Order cancelled. The workflow is now blocked.'
+        );
     }
 
     public function setJobActivityTab(string $tab): void

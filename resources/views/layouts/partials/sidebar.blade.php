@@ -11,6 +11,7 @@
     $orderCreate = $user->canAccess('jobs.create');
     $taskView = $user->canAccess('tasks.view');
     $orderGroupActive = request()->routeIs('jobs.*', 'orders.*', 'all-tasks', 'my-work');
+    $cancelledOrderCount = $orderView ? app(\App\Services\CancelledOrderService::class)->sidebarCount($user) : 0;
 
     $clientView = $user->canAccess('clients.view');
     $clientCreate = $user->canAccess('clients.create');
@@ -49,7 +50,7 @@
     $administrator = app(\App\Services\AccessControlService::class)->isAdministrator($user);
     $settingsGroupActive = request()->routeIs('company.setup', 'administration');
     $reportView = $user->canAccess('reports.view');
-    $reportGroupActive = request()->routeIs('reports', 'team-performance.report');
+    $reportGroupActive = request()->routeIs('reports', 'team-performance.report', 'order-summary.report');
 @endphp
 <aside id="sidebar" class="sidebar ft-sidebar-template">
     <a class="brand ft-system-brand" href="{{ route('dashboard') }}" wire:navigate aria-label="Open Dashboard">
@@ -107,6 +108,9 @@
                     @if($orderCreate)
                         <x-ui.nav-link route="jobs.index" label="Create Order" icon="plus" child :params="['create' => 1]" :active="request()->routeIs('jobs.index') && request()->boolean('create')" />
                         <x-ui.nav-link route="orders.bulk-import" label="Create Bulk Order" icon="upload" child />
+                    @endif
+                    @if($orderView)
+                        <x-ui.nav-link route="orders.cancelled" label="Cancelled Orders" icon="cancelled" :badge="$cancelledOrderCount" child :active="request()->routeIs('orders.cancelled')" />
                     @endif
                 </div>
             </details>
@@ -175,6 +179,9 @@
                     <svg class="ft-sidebar-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m8 10 4 4 4-4"/></svg>
                 </summary>
                 <div class="ft-sidebar-children">
+                    @if($orderView)
+                        <x-ui.nav-link route="order-summary.report" label="Order Summary" icon="reports" child :active="request()->routeIs('order-summary.report')" />
+                    @endif
                     <x-ui.nav-link route="reports" label="Inquiry Intelligence" icon="reports" child :active="request()->routeIs('reports')" />
                     <x-ui.nav-link route="team-performance.report" label="Team Performance Report" icon="work" child :active="request()->routeIs('team-performance.report')" />
                 </div>

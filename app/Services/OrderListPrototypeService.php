@@ -67,7 +67,7 @@ class OrderListPrototypeService
     }
 
     /** @return Collection<int,array{id:int,name:string,short_name:string,sequence:int,color:string,count:int}> */
-    public function stages(User $user): Collection
+    public function stages(User $user, bool $myTasksOnly = false): Collection
     {
         $workflowIds = OrderWorkflowSetupService::orderWorkflowQuery()
             ->where('is_active', true)
@@ -84,20 +84,33 @@ class OrderListPrototypeService
             ->get(['id','workflow_template_id','name','short_name','sequence','color']);
 
         $phaseIds = $phaseRows->pluck('id')->map(fn ($id) => (int) $id)->all();
-        $rawCounts = $phaseIds === [] ? collect() : app(JobService::class)
-            ->visibleQuery($user)
-            ->whereNull('flow_jobs.completed_at')
-            ->whereNotIn('flow_jobs.status', JobService::INACTIVE_STATUSES)
-            ->where(function (Builder $query) use ($phaseIds): void {
-                $query->whereIn('flow_jobs.source_workflow_phase_id', $phaseIds)
-                    ->orWhere(function (Builder $legacy) use ($phaseIds): void {
-                        $legacy->whereNull('flow_jobs.source_workflow_phase_id')
-                            ->whereIn('flow_jobs.workflow_phase_id', $phaseIds);
-                    });
-            })
-            ->selectRaw('COALESCE(flow_jobs.source_workflow_phase_id, flow_jobs.workflow_phase_id) as phase_key, COUNT(*) as aggregate')
-            ->groupByRaw('COALESCE(flow_jobs.source_workflow_phase_id, flow_jobs.workflow_phase_id)')
-            ->pluck('aggregate', 'phase_key');
+        if ($phaseIds === []) {
+            $rawCounts = collect();
+        } else {
+            $countQuery = app(JobService::class)
+                ->visibleQuery($user)
+                ->whereNull('flow_jobs.completed_at')
+                ->whereNotIn('flow_jobs.status', JobService::INACTIVE_STATUSES);
+
+            if ($myTasksOnly) {
+                $countQuery->whereIn(
+                    'flow_jobs.id',
+                    app(MyWorkService::class)->personalOpenOrderIdsQuery($user),
+                );
+            }
+
+            $rawCounts = $countQuery
+                ->where(function (Builder $query) use ($phaseIds): void {
+                    $query->whereIn('flow_jobs.source_workflow_phase_id', $phaseIds)
+                        ->orWhere(function (Builder $legacy) use ($phaseIds): void {
+                            $legacy->whereNull('flow_jobs.source_workflow_phase_id')
+                                ->whereIn('flow_jobs.workflow_phase_id', $phaseIds);
+                        });
+                })
+                ->selectRaw('COALESCE(flow_jobs.source_workflow_phase_id, flow_jobs.workflow_phase_id) as phase_key, COUNT(*) as aggregate')
+                ->groupByRaw('COALESCE(flow_jobs.source_workflow_phase_id, flow_jobs.workflow_phase_id)')
+                ->pluck('aggregate', 'phase_key');
+        }
 
         $countBySequence = $phaseRows->groupBy('sequence')->map(function (Collection $rows) use ($rawCounts): int {
             return (int) $rows->sum(fn ($phase) => (int) ($rawCounts[(int) $phase->id] ?? 0));
@@ -128,7 +141,7 @@ class OrderListPrototypeService
         });
     }
 
-    public function paginate(User $user, array $filters, Collection $stages, int $perPage = 10): LengthAwarePaginator
+    public function paginate(User $user, array $filters, Collection $stages, int $perPage = 10, bool $myTasksOnly = false): LengthAwarePaginator
     {
         $stageId = (int) ($filters['phase_id'] ?? 0);
         $sequence = (int) ($stages->firstWhere('id', $stageId)['sequence'] ?? 0);
@@ -146,6 +159,13 @@ class OrderListPrototypeService
             (string) ($filters['date_to'] ?? ''),
             $this->positiveInt($filters['import_id'] ?? null),
         );
+
+        if ($myTasksOnly) {
+            $query->whereIn(
+                'flow_jobs.id',
+                app(MyWorkService::class)->personalOpenOrderIdsQuery($user),
+            );
+        }
 
         if ($sequence > 0) {
             $query->where(function (Builder $phaseQuery) use ($phaseIds): void {

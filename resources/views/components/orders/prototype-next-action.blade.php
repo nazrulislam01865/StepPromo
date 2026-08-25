@@ -2,13 +2,13 @@
     $orderId = (int) data_get($row, 'order_id', 0);
     $taskId = (int) data_get($row, 'next_task_id', 0);
     $label = (string) data_get($row, 'next_action', 'Open order');
+    $useInlineListAction = (bool) ($inlineListActions ?? true);
 @endphp
 
-{{-- CHANGE 2026-08-24:
-     Phase-wise Next Action now executes the same workflow action used on the
-     Order Details page. Only rows without an actionable task keep the detail
-     fallback link. --}}
-@if($orderId > 0 && $taskId > 0)
+{{-- Orders page keeps its inline workflow action modal. Other pages that reuse
+     the exact Order-list table can disable the inline action while keeping the
+     same visual row and route users to the Order Details page instead. --}}
+@if($useInlineListAction && $orderId > 0 && $taskId > 0)
     <button
         type="button"
         class="stage-action stage-action-button"

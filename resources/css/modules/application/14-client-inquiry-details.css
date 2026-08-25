@@ -755,6 +755,121 @@
     cursor: wait
 }
 
+/* Order > Inquiry link — readable typography pass.
+   The prototype originally used 7.5px–10px text in several places, which is
+   too small for day-to-day order work. Keep the layout compact, but raise
+   labels, supporting copy, search/results, and actions to readable sizes. */
+.ft-order-inquiry-link {
+    line-height: 1.4
+}
+
+.ft-oil-summary-card small {
+    font-size: .6875rem
+}
+
+.ft-oil-summary-card strong {
+    font-size: .8125rem
+}
+
+.ft-oil-panel-head h2 {
+    font-size: 1rem
+}
+
+.ft-oil-panel-head p,
+.ft-oil-security-note {
+    font-size: .75rem
+}
+
+.ft-oil-callout strong,
+.ft-oil-error {
+    font-size: .75rem
+}
+
+.ft-oil-callout span span {
+    font-size: .6875rem
+}
+
+.ft-oil-section-head h3 {
+    font-size: .875rem
+}
+
+.ft-oil-section-head p {
+    font-size: .6875rem
+}
+
+.ft-oil-search,
+.ft-oil-search-meta {
+    font-size: .75rem
+}
+
+.ft-oil-clear {
+    font-size: .6875rem
+}
+
+.ft-oil-result-title,
+.ft-oil-result-subject,
+.ft-oil-result-client strong,
+.ft-oil-result-owner strong {
+    font-size: .75rem
+}
+
+.ft-oil-result-meta,
+.ft-oil-result-client small,
+.ft-oil-result-owner small {
+    font-size: .6875rem
+}
+
+.ft-oil-empty,
+.ft-oil-selection-empty {
+    font-size: .75rem
+}
+
+.ft-oil-empty strong,
+.ft-oil-selected-id {
+    font-size: .8125rem
+}
+
+.ft-oil-selected-card h4 {
+    font-size: .875rem
+}
+
+.ft-oil-check,
+.ft-oil-check b,
+.ft-oil-primary,
+.ft-oil-secondary,
+.ft-oil-danger {
+    font-size: .75rem
+}
+
+.ft-oil-helper,
+.ft-oil-linked-label,
+.ft-oil-linked-meta,
+.ft-oil-permission {
+    font-size: .6875rem
+}
+
+.ft-oil-linked-id {
+    font-size: .8125rem
+}
+
+.ft-oil-linked-title {
+    font-size: .75rem
+}
+
+.ft-oil-modal-head h3 {
+    font-size: 1rem
+}
+
+.ft-oil-pair-card small,
+.ft-oil-modal-note {
+    font-size: .6875rem
+}
+
+.ft-oil-pair-card strong,
+.ft-oil-modal-actions button {
+    font-size: .75rem
+}
+
 @keyframes ft-oil-spin {
     to {
         transform: rotate(360deg)

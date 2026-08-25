@@ -7,6 +7,7 @@ use App\Livewire\Concerns\RefreshesFromWorkspace;
 use App\Services\AccessControlService;
 use App\DTOs\Dashboard\DashboardFilterData;
 use App\Queries\Dashboard\DashboardPrimaryQuery;
+use App\Queries\Orders\OrderListQuery;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -142,6 +143,10 @@ class Index extends Component
             $user,
             new DashboardFilterData($clientId, $departmentId, $this->rangeDays, $query),
         );
+
+        // Reuse the exact Orders-page workflow-stage source so Dashboard and
+        // Orders always show the same stage names, colors and current counts.
+        $data['orderStages'] = app(OrderListQuery::class)->stages($user);
         $filterOptions = app(\App\Services\FilterOptionService::class);
         $data['dashboardClientFilterOptions'] = $filterOptions->options($user, 'clients', 'dashboard', '', $clientId ?: null, 6);
         $data['dashboardTeamFilterOptions'] = $filterOptions->options($user, 'departments', 'dashboard', '', $departmentId ?: null, 6);

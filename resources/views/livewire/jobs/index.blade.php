@@ -98,6 +98,8 @@
             :shipment-urgency-options="$shipmentUrgencyOptions ?? collect()"
             :overview-phase-id="$overviewPhaseId"
             :order-detail-context="$orderDetailContext ?? []"
+            :order-redo-context="$orderRedoContext ?? []"
+            :order-redo-form="$orderRedoForm ?? []"
             :products="$products"
             :categories="$categories"
             :show-add-job-product-form="$showAddJobProductForm"

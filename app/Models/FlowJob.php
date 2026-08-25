@@ -112,6 +112,8 @@ class FlowJob extends Model
     public function members(): HasMany { return $this->hasMany(FlowJobMember::class, 'flow_job_id'); }
     public function phaseHistories(): HasMany { return $this->hasMany(FlowJobPhaseHistory::class, 'flow_job_id'); }
     public function activities(): MorphMany { return $this->morphMany(Activity::class, 'subject'); }
+    public function redoRecords(): HasMany { return $this->hasMany(OrderRedo::class, 'original_order_id')->orderBy('sequence'); }
+    public function redoRecord(): \Illuminate\Database\Eloquent\Relations\HasOne { return $this->hasOne(OrderRedo::class, 'redo_order_id'); }
     public function createdActivity(): MorphOne { return $this->morphOne(Activity::class, 'subject')->oldestOfMany(); }
     public function latestActivity(): MorphOne { return $this->morphOne(Activity::class, 'subject')->latestOfMany(); }
     public function latestShipmentActivity(): MorphOne

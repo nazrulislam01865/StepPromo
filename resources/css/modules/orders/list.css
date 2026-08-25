@@ -2781,6 +2781,80 @@
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--ft-theme-primary) 10%, transparent)
 }
 
+/* 2026-08-25: searchable Order list filters.
+   Client, owner, supplier and stage assignee/client filters now reuse the
+   shared Inquiry-style search-select instead of native <select> controls. */
+.ft-order-list-v5 .ft-order-v5-search-select,
+.ft-order-list-v5 .ft-order-v5-stage-search-select {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+    margin: 0 !important;
+    gap: 0 !important;
+}
+
+.ft-order-list-v5 .ft-order-v5-search-select .ft-search-select__trigger,
+.ft-order-list-v5 .ft-order-v5-stage-search-select .ft-search-select__trigger {
+    width: 100%;
+    height: 40px;
+    min-height: 40px;
+    padding: 0 30px 0 10px;
+    border: 1px solid #ccd8e4;
+    border-radius: 8px;
+    background: #fff;
+    color: #263950;
+    font: inherit;
+    font-size: .625rem;
+    font-weight: 700;
+    line-height: 1;
+    box-shadow: none;
+}
+
+.ft-order-list-v5 .ft-order-v5-search-select .ft-search-select__trigger:hover,
+.ft-order-list-v5 .ft-order-v5-search-select .ft-search-select__trigger[aria-expanded="true"],
+.ft-order-list-v5 .ft-order-v5-search-select .ft-search-select__trigger:focus-visible,
+.ft-order-list-v5 .ft-order-v5-stage-search-select .ft-search-select__trigger:hover,
+.ft-order-list-v5 .ft-order-v5-stage-search-select .ft-search-select__trigger[aria-expanded="true"],
+.ft-order-list-v5 .ft-order-v5-stage-search-select .ft-search-select__trigger:focus-visible {
+    border-color: var(--ft-theme-primary-300);
+    background: var(--ft-theme-surface-subtle, #f8fbfb);
+    color: var(--ft-theme-primary);
+    outline: 0;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ft-theme-primary) 10%, transparent);
+}
+
+.ft-order-list-v5 .ft-order-v5-search-select .ft-filter-chevron,
+.ft-order-list-v5 .ft-order-v5-stage-search-select .ft-filter-chevron {
+    margin-left: auto;
+    color: #66768c;
+}
+
+.ft-order-list-v5 .ft-order-v5-search-select .ft-search-select__menu,
+.ft-order-list-v5 .ft-order-v5-stage-search-select .ft-search-select__menu {
+    font-size: .6875rem;
+}
+
+.ft-order-list-v5 .ft-order-v5-search-select .ft-search-select__search,
+.ft-order-list-v5 .ft-order-v5-stage-search-select .ft-search-select__search {
+    height: 42px;
+    min-height: 42px;
+    border-radius: 10px;
+    font-size: .75rem;
+}
+
+.ft-order-list-v5 .ft-order-v5-search-select .ft-search-select__option,
+.ft-order-list-v5 .ft-order-v5-stage-search-select .ft-search-select__option {
+    min-height: 38px;
+    font-size: .6875rem;
+}
+
+.ft-order-list-v5 .ft-order-v5-search-select .ft-search-select__option small,
+.ft-order-list-v5 .ft-order-v5-stage-search-select .ft-search-select__option small,
+.ft-order-list-v5 .ft-order-v5-search-select .ft-remote-filter-message,
+.ft-order-list-v5 .ft-order-v5-stage-search-select .ft-remote-filter-message {
+    font-size: .625rem;
+}
+
 .ft-order-list-v5 .search-box {
     position: relative;
     display: block
@@ -2943,6 +3017,12 @@
     gap: 8px;
     flex-wrap: wrap;
     margin-left: auto
+}
+
+.ft-order-list-v5 .stage-inline-selects .ft-order-v5-stage-search-select {
+    width: 200px;
+    min-width: 180px;
+    flex: 0 1 220px;
 }
 
 .ft-order-list-v5 .stage-inline-selects select {
@@ -3394,6 +3474,13 @@
         flex: 1;
         min-width: 150px
     }
+
+
+    .ft-order-list-v5 .stage-inline-selects .ft-order-v5-stage-search-select {
+        width: auto;
+        min-width: 150px;
+        flex: 1 1 180px
+    }
 }
 
 @media(max-width:760px) {
@@ -3419,6 +3506,12 @@
 
     .ft-order-list-v5 .filter-toolbar>.ft-order-list-date-range {
         grid-column: auto
+    }
+
+
+    .ft-order-list-v5 .filter-toolbar>.ft-order-v5-search-select {
+        width: 100%;
+        min-width: 0
     }
 
     .ft-order-list-v5 .active-filter-line,
@@ -3493,4 +3586,169 @@ body:has(.ft-order-list-v5) .ft-shell-order-export:hover {
 
 .ft-order-list-v5 .orders-modern-table tbody tr.order-row.ft-client-row-nep:hover>td {
     background-color: var(--ft-theme-o-nep-hover, #e4f0ff)
+}
+
+/* 2026-08-25: Order list searchable people filters.
+   Owner and stage assignee filters now use the complete active User list and
+   present people with avatars + department/role context, matching FlowTrack's
+   inquiry/task assignee picker instead of looking like a generic select. */
+.ft-order-list-v5 .ft-order-v5-owner-filter .ft-search-select__trigger,
+.ft-order-list-v5 .ft-order-v5-stage-assignee-filter .ft-search-select__trigger {
+    font-size: .6875rem;
+    font-weight: 760;
+}
+
+.ft-order-list-v5 .ft-search-select__selected-user {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+}
+
+.ft-order-list-v5 .ft-search-select__avatar {
+    width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
+    display: inline-grid;
+    place-items: center;
+    overflow: hidden;
+    border: 1px solid #d7e5e2;
+    border-radius: 999px;
+    background: #eaf6f3;
+    color: var(--ft-theme-primary, #0f8f7c);
+    font-size: .6875rem;
+    font-weight: 850;
+    line-height: 1;
+}
+
+.ft-order-list-v5 .ft-search-select__avatar--trigger {
+    width: 24px;
+    height: 24px;
+    flex-basis: 24px;
+    font-size: .625rem;
+}
+
+.ft-order-list-v5 .ft-search-select__avatar img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+}
+
+.ft-order-list-v5 .ft-search-select__user-option {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+}
+
+.ft-order-list-v5 .ft-search-select__user-copy {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+
+.ft-order-list-v5 .ft-search-select__user-copy strong {
+    overflow: hidden;
+    color: #1f3148;
+    font-size: .75rem;
+    font-weight: 780;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ft-order-list-v5 .ft-search-select__user-copy small {
+    overflow: hidden;
+    color: #708199;
+    font-size: .625rem !important;
+    font-weight: 620;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ft-order-list-v5 .ft-search-select__selected-mark {
+    color: var(--ft-theme-primary, #0f8f7c) !important;
+    font-size: .59375rem !important;
+    font-weight: 800;
+}
+
+.ft-order-list-v5 .ft-order-v5-owner-filter .ft-search-select__option,
+.ft-order-list-v5 .ft-order-v5-stage-assignee-filter .ft-search-select__option {
+    min-height: 48px;
+    padding: 7px 9px;
+}
+
+.ft-order-list-v5 .ft-order-v5-owner-filter .ft-search-select__menu,
+.ft-order-list-v5 .ft-order-v5-stage-assignee-filter .ft-search-select__menu,
+.ft-order-list-v5 .ft-order-v5-supplier-filter .ft-search-select__menu,
+.ft-order-list-v5 .ft-order-v5-stage-client-filter .ft-search-select__menu {
+    padding: 8px;
+    border-radius: 12px;
+    box-shadow: 0 16px 34px rgba(23, 42, 66, .16);
+}
+
+.ft-order-list-v5 .stage-inline-selects {
+    align-items: flex-end;
+    flex-wrap: nowrap;
+}
+
+.ft-order-list-v5 .stage-filter-field {
+    display: grid;
+    gap: 5px;
+    width: 220px;
+    min-width: 200px;
+}
+
+.ft-order-list-v5 .stage-filter-caption {
+    padding-left: 2px;
+    color: #667991;
+    font-size: .59375rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: .02em;
+}
+
+.ft-order-list-v5 .stage-filter-field .ft-order-v5-stage-search-select,
+.ft-order-list-v5 .stage-filter-field select {
+    width: 100%;
+    min-width: 0;
+    flex: none;
+}
+
+.ft-order-list-v5 .stage-filter-field-user {
+    width: 240px;
+}
+
+.ft-order-list-v5 .stage-filter-field-user .ft-search-select__trigger {
+    padding-left: 9px;
+}
+
+@media(max-width:1100px) {
+    .ft-order-list-v5 .stage-inline-selects {
+        width: 100%;
+        margin-left: 0;
+        flex-wrap: wrap;
+    }
+
+    .ft-order-list-v5 .stage-filter-field,
+    .ft-order-list-v5 .stage-filter-field-user {
+        width: auto;
+        min-width: 180px;
+        flex: 1 1 220px;
+    }
+}
+
+@media(max-width:620px) {
+    .ft-order-list-v5 .stage-inline-selects {
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+
+    .ft-order-list-v5 .stage-filter-field,
+    .ft-order-list-v5 .stage-filter-field-user {
+        width: 100%;
+        min-width: 0;
+    }
 }

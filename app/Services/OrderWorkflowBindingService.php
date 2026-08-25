@@ -219,6 +219,12 @@ class OrderWorkflowBindingService
             $fresh->workflow->setRelation('phases', $phases);
             $fresh->setRelation('phase', $targetPhase);
             app(JobService::class)->syncWorkflowTasks($fresh, null, true);
+
+            // A publish can replace legacy generated task identities. Repair
+            // artwork evidence immediately, before the Order is rendered, so
+            // Documents/links never disappear from a completed Artwork stage.
+            app(OrderArtworkEvidenceService::class)->repair((int) $job->id);
+
             app(OrderTaskSequenceService::class)->synchronizeCurrentPhase($fresh->fresh(['phase']));
 
             if ($changedWorkflow || $changedPhase) {

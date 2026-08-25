@@ -340,33 +340,47 @@ class FilterOptionService
     private function users(User $user, string $context, string $search, int $limit, array $constraints = [], int $offset = 0): Collection
     {
         return $this->visibleUsers($user, $context, $constraints)
-            ->with('department:id,name')
+            ->with(['department:id,name', 'role:id,name'])
             ->when(strlen($search) >= 2, fn ($q) => $q->whereLike('name', $search.'%'))
             ->orderBy('name')
             ->offset($offset)
             ->limit($limit)
-            ->get(['id', 'department_id', 'name', 'profile_image_path'])
-            ->map(fn (User $row) => [
-                'id' => (int) $row->id,
-                'label' => (string) $row->name,
-                'meta' => (string) ($row->department?->name ?: ''),
-                'avatarUrl' => $row->profileImageUrl(),
-            ]);
+            ->get(['id', 'department_id', 'role_id', 'name', 'profile_image_path'])
+            ->map(function (User $row) {
+                $meta = collect([
+                    $row->department?->name,
+                    $row->role?->name,
+                ])->filter()->unique()->implode(' · ');
+
+                return [
+                    'id' => (int) $row->id,
+                    'label' => (string) $row->name,
+                    'meta' => (string) $meta,
+                    'avatarUrl' => $row->profileImageUrl(),
+                ];
+            });
     }
 
     private function userById(User $user, string $context, int|string $id, array $constraints = []): ?array
     {
         if (!is_numeric($id)) return null;
         $row = $this->visibleUsers($user, $context, $constraints)
-            ->with('department:id,name')
-            ->find((int) $id, ['id', 'department_id', 'name', 'profile_image_path']);
+            ->with(['department:id,name', 'role:id,name'])
+            ->find((int) $id, ['id', 'department_id', 'role_id', 'name', 'profile_image_path']);
 
-        return $row ? [
+        if (! $row) return null;
+
+        $meta = collect([
+            $row->department?->name,
+            $row->role?->name,
+        ])->filter()->unique()->implode(' · ');
+
+        return [
             'id' => (int) $row->id,
             'label' => (string) $row->name,
-            'meta' => (string) ($row->department?->name ?: ''),
+            'meta' => (string) $meta,
             'avatarUrl' => $row->profileImageUrl(),
-        ] : null;
+        ];
     }
 
     private function productCategories(User $user, string $context, string $search, int $limit, int $offset = 0): Collection
@@ -916,6 +930,14 @@ class FilterOptionService
             return User::query()
                 ->where('is_active', true)
                 ->whereIn('id', $assigneeIds);
+        }
+
+        if ($context === 'order-list-user-filter') {
+            // List filters are read-only selectors, not assignment controls.
+            // Show the complete active FlowTrack user directory so Owner /
+            // stage-assignee filters are not limited to users who already
+            // happen to be assigned to one of the currently visible Orders.
+            return User::query()->where('is_active', true);
         }
 
         if ($context === 'order-list') {

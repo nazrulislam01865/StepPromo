@@ -12,7 +12,7 @@
                 @if($sourceFilter === 'inquiries' && $statusFilter !== '')
                     Inquiry tasks matching the selected dashboard status filter.
                 @else
-                    {{ $administratorView ? 'All Order tasks, grouped by Order and ranked by what needs action first.' : 'Tasks assigned to you or from Orders you created, grouped by Order and ranked by what needs action first.' }}
+                    Only the current active task is shown under each Order. It is visible to the task assignee, the Order creator, users with applicable access, and Admin/Super Admin.
                 @endif
             </p>
         </div>
@@ -69,16 +69,19 @@
     </section>
     @else
 
-    <section class="work-view" aria-busy="false">
-        <div class="metrics ft-summary-card-grid" aria-label="My Task summary filters">
-            <x-ui.summary-card label="Created Today" :value="$metrics['createdToday'] ?? 0" value-expression="metrics.createdToday ?? '—'" icon="created" tone="blue" caption="Tasks created today" :active="$quick === 'createdToday'" wire:click="setMetricFilter('createdToday')" aria-pressed="{{ $quick === 'createdToday' ? 'true' : 'false' }}" />
-            <x-ui.summary-card label="Not Started" :value="$metrics['notStarted'] ?? 0" value-expression="metrics.notStarted ?? '—'" icon="not-started" tone="slate" caption="Waiting for first action" :active="$quick === 'notStarted'" wire:click="setMetricFilter('notStarted')" aria-pressed="{{ $quick === 'notStarted' ? 'true' : 'false' }}" />
-            <x-ui.summary-card label="In Progress" :value="$metrics['inProgress'] ?? 0" value-expression="metrics.inProgress ?? '—'" icon="in-progress" tone="blue" caption="Work currently underway" :active="$quick === 'inProgress'" wire:click="setMetricFilter('inProgress')" aria-pressed="{{ $quick === 'inProgress' ? 'true' : 'false' }}" />
-            <x-ui.summary-card label="Due This Week" :value="$metrics['dueThisWeek'] ?? 0" value-expression="metrics.dueThisWeek ?? '—'" icon="due-week" tone="amber" caption="Tasks due this week" :active="$quick === 'dueThisWeek'" wire:click="setMetricFilter('dueThisWeek')" aria-pressed="{{ $quick === 'dueThisWeek' ? 'true' : 'false' }}" />
-            <x-ui.summary-card label="Completed This Week" :value="$metrics['completedThisWeek'] ?? 0" value-expression="metrics.completedThisWeek ?? '—'" icon="completed" tone="green" caption="Finished this week" :active="$quick === 'completedThisWeek'" wire:click="setMetricFilter('completedThisWeek')" aria-pressed="{{ $quick === 'completedThisWeek' ? 'true' : 'false' }}" />
-            <x-ui.summary-card label="Needs Attention" :value="$metrics['attention'] ?? 0" value-expression="metrics.attention ?? '—'" icon="attention" tone="red" caption="Blocked, overdue or unassigned" :active="$quick === 'attention'" wire:click="setMetricFilter('attention')" aria-pressed="{{ $quick === 'attention' ? 'true' : 'false' }}" />
-        </div>
+    {{-- Keep the current workflow-stage overview exactly as the current My Tasks design.
+         Only the table/filter area below is restored to the previous design. --}}
+    <x-orders.workflow-stage-overview
+        :stages="$taskStages"
+        :selected-stage-value="$phaseFilter"
+        mode="wire-filter"
+        filter-method="setPhaseFilter"
+        title="My tasks by workflow stage"
+        description="Click a stage to filter the tasks below on this page."
+        count-label="Open tasks"
+    />
 
+    <section class="work-view" aria-busy="false">
         <div class="toolbar ft-list-filter-bar">
             <div class="toolbar-primary">
                 <label class="search-wrap">
@@ -186,7 +189,7 @@
                                                 // Keep the renderless status update, but re-query once when
                                                 // completion changes list membership. This removes the task now,
                                                 // and removes its Order group too if it was the final visible task.
-                                                if(result.completed && @js($hideCompleted))await $wire.$refresh();
+                                                if(result.refresh || (result.completed && @js($hideCompleted)))await $wire.$refresh();
                                             }catch(error){select.value=previous;window.FlowTrack.ui.masterColor?.applySelect(select);}
                                             finally{this.saving=false;select.disabled=false;}
                                         }
