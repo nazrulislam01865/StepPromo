@@ -287,6 +287,7 @@ trait ManagesOrderCreation
                 $this->createOrderSupplierSkipProductIds,
                 fn (int $id): bool => $id !== $productId
             ));
+            unset($this->createOrderSupplierOverrides[$productId]);
         }
 
         $this->resetValidation('jobItems');
@@ -309,9 +310,11 @@ trait ManagesOrderCreation
     public function saveDraft(): void { $this->persistJob(true); }
 
     /**
-     * Keep Create Order supplier values canonical to Product Master.
+     * Resolve each Create Order supplier safely before validation.
      *
-     * A missing Product supplier still requires an explicit user choice. Products
+     * Product Master supplies the default, while an explicit Order-only override is
+     * preserved when it still references an active supplier. A missing Product supplier
+     * still requires an explicit user choice. Products
      * explicitly stored in createOrderSupplierSkipProductIds are allowed to continue
      * with supplier_id = null. The skip state stays outside jobItems so
      * the persisted Order item payload remains identical to the normal create flow.
@@ -325,7 +328,21 @@ trait ManagesOrderCreation
 
         $catalog = app(\App\Services\ProductCatalogService::class);
         $products = $catalog->selectedProducts(collect($this->jobItems)->pluck('product_id'));
-        $suppliers = $catalog->suppliersForProducts($products);
+        $defaultSuppliers = $catalog->suppliersForProducts($products);
+        $overrideIds = collect($this->createOrderSupplierOverrides)
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0)
+            ->unique()
+            ->values();
+        $overrideSuppliers = $overrideIds->isEmpty()
+            ? collect()
+            : MasterRecord::query()
+                ->forWorkspace(app(MasterDataService::class)->workspaceId())
+                ->ofType('supplier')
+                ->active()
+                ->whereIn('id', $overrideIds->all())
+                ->get(['id', 'name', 'code', 'status'])
+                ->keyBy('id');
         $missingSupplier = false;
 
         foreach ($this->jobItems as $index => $row) {
@@ -333,12 +350,12 @@ trait ManagesOrderCreation
             $product = $products->get($productId);
             if (!$product) continue;
 
-            $supplier = $suppliers->get($productId);
+            $overrideId = (int) ($this->createOrderSupplierOverrides[$productId] ?? 0);
+            $overrideSupplier = $overrideId > 0 ? $overrideSuppliers->get($overrideId) : null;
+            $supplier = $overrideSupplier ?: $defaultSuppliers->get($productId);
             $this->jobItems[$index]['supplier_id'] = $supplier?->id;
 
             if ($supplier) {
-                // Product Master is canonical. If a supplier was linked after the
-                // user skipped it, stop carrying the temporary skip state.
                 $this->createOrderSupplierSkipProductIds = array_values(array_filter(
                     $this->createOrderSupplierSkipProductIds,
                     fn (int $id): bool => $id !== $productId
@@ -352,19 +369,17 @@ trait ManagesOrderCreation
                 continue;
             }
 
-            if (!$supplier) {
-                $missingSupplier = true;
-                $this->addError(
-                    "jobItems.$index.supplier_id",
-                    'Supplier is not linked. Link one in Product Master or choose “Skip supplier for now”.'
-                );
+            $missingSupplier = true;
+            $this->addError(
+                "jobItems.$index.supplier_id",
+                'Supplier is not linked. Choose a supplier for this Order or choose “Skip supplier for now”.'
+            );
 
-                if (!$this->showMissingProductSupplierModal) {
-                    $this->missingProductSupplierName = (string) $product->name;
-                    $this->pendingMissingSupplierProductId = (int) $product->id;
-                    $this->pendingMissingSupplierRowIndex = $index;
-                    $this->showMissingProductSupplierModal = true;
-                }
+            if (!$this->showMissingProductSupplierModal) {
+                $this->missingProductSupplierName = (string) $product->name;
+                $this->pendingMissingSupplierProductId = (int) $product->id;
+                $this->pendingMissingSupplierRowIndex = $index;
+                $this->showMissingProductSupplierModal = true;
             }
         }
 
@@ -380,9 +395,8 @@ trait ManagesOrderCreation
             return;
         }
 
-        // Re-resolve every supplier from Product Master immediately before
-        // validation. This prevents stale browser state or request tampering from
-        // assigning a different supplier than the one configured on the Product.
+        // Re-resolve defaults and validate any explicit Order-only supplier override
+        // immediately before validation. This prevents stale or tampered supplier IDs.
         if (!$this->synchronizeCreateOrderProductSuppliersFromCatalog()) {
             return;
         }
@@ -515,7 +529,17 @@ trait ManagesOrderCreation
             if (!$valid) {
                 $catalogInvalid = true;
                 $this->addError("jobItems.$index.product", 'That product is no longer available in the selected catalog.');
+                continue;
             }
+
+            // Product Master pricing is authoritative for Create Order. Resolve
+            // the base/unit price again at save time so a stale browser value or
+            // client-side tampering cannot override the quantity price table.
+            $quantity = (int) ($row['quantity'] ?? 0);
+            $basePrice = $product->productPriceForQuantity($quantity);
+            $data['jobItems'][$index]['unit_price'] = $basePrice !== null
+                ? round($basePrice, 2)
+                : null;
         }
         if ($catalogInvalid) return;
 
@@ -650,6 +674,7 @@ trait ManagesOrderCreation
             'pendingMissingSupplierProductId',
             'pendingMissingSupplierRowIndex',
             'createOrderSupplierSkipProductIds',
+            'createOrderSupplierOverrides',
             'newProductCode',
             'newProductCategoryId',
             'newProductCategorySearch',

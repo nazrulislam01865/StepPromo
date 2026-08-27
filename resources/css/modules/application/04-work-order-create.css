@@ -686,22 +686,23 @@
 }
 
 .ft-create-breadcrumb {
-    font-size: .625rem;
+    font-size: var(--ft-form-type-breadcrumb-size, .625rem);
     color: #5e718c;
     margin-bottom: 3px
 }
 
 .ft-create-title h1 {
     margin: 0;
-    font-size: 1.3125rem;
-    line-height: 1.15;
-    letter-spacing: -.03em
+    font-size: var(--ft-form-type-page-title-size, 1.3125rem);
+    font-weight: var(--ft-form-type-page-title-weight, 700);
+    line-height: var(--ft-form-type-page-title-line-height, 1.15);
+    letter-spacing: var(--ft-form-type-page-title-letter-spacing, -.03em)
 }
 
 .ft-create-title p {
     margin: 5px 0 12px;
     color: #536985;
-    font-size: .6875rem
+    font-size: var(--ft-form-type-page-subtitle-size, .6875rem)
 }
 
 .ft-create-section {
@@ -727,14 +728,15 @@
     color: #fff;
     display: grid;
     place-items: center;
-    font-size: .6875rem;
+    font-size: var(--ft-form-type-section-marker-size, .6875rem);
     font-weight: 800
 }
 
 .ft-create-section-title h2 {
-    font-size: .9375rem;
+    font-size: var(--ft-form-type-section-title-size, .9375rem);
+    font-weight: var(--ft-form-type-section-title-weight, 700);
     margin: 0;
-    letter-spacing: -.015em
+    letter-spacing: var(--ft-form-type-section-title-letter-spacing, -.015em)
 }
 
 .ft-create-fields {
@@ -749,7 +751,8 @@
 
 .ft-create-field>b,
 .ft-product-row label>b {
-    font-size: .625rem;
+    font-size: var(--ft-form-type-label-size, .625rem);
+    font-weight: var(--ft-form-type-label-weight, 700);
     color: #1a2d48
 }
 
@@ -764,7 +767,7 @@
     background: #fff;
     min-height: 38px;
     padding: 0 12px;
-    font-size: .65625rem;
+    font-size: var(--ft-form-type-control-size, .65625rem);
     outline: none
 }
 
@@ -784,7 +787,7 @@
 }
 
 .ft-create-field>small {
-    font-size: .53125rem;
+    font-size: var(--ft-form-type-helper-size, .53125rem);
     color: #6c7e94
 }
 
@@ -798,7 +801,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 0 12px;
-    font-size: .65625rem
+    font-size: var(--ft-form-type-control-size, .65625rem)
 }
 
 .ft-product-rows {
@@ -961,7 +964,7 @@
     height: 38px;
     border-radius: 7px;
     padding: 0 17px;
-    font-size: .59375rem;
+    font-size: var(--ft-form-type-button-size, .59375rem);
     font-weight: 750
 }
 

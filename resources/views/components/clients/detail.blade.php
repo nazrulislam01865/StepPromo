@@ -14,6 +14,8 @@
     'clientOrderRange' => '3m',
     'documentCount' => 0,
     'orderMetrics' => [],
+    'orderCount' => 0,
+    'detailSectionsReady' => [],
     'clientCode' => '',
     'clientCountries' => [],
     'clientCountryFlags' => [],
@@ -42,7 +44,8 @@
 ])
 @php
     $client = $detail['client'];
-    $jobs = $detail['jobs'];
+    $jobs = $detail['jobs'] ?? collect();
+    $addressesReady = (bool) ($detailSectionsReady['addresses'] ?? false);
     $initials = collect(preg_split('/\s+/', trim((string) $client->name)))
         ->filter()->take(2)->map(fn ($part) => mb_strtoupper(mb_substr($part, 0, 1)))->implode('') ?: 'CL';
     $access = app(\App\Services\AccessControlService::class);
@@ -60,7 +63,7 @@
     $currencyText = $currencyCode.(isset($currencyNames[$currencyCode]) ? ' · '.$currencyNames[$currencyCode] : '');
     $primaryInitials = collect(preg_split('/\s+/', trim((string) ($client->contact_name ?: 'Primary Contact'))))->filter()->take(2)->map(fn ($p) => mb_strtoupper(mb_substr($p,0,1)))->implode('') ?: 'PC';
     $managerInitials = collect(preg_split('/\s+/', trim((string) ($client->accountManager?->name ?: 'Unassigned'))))->filter()->take(2)->map(fn ($p) => mb_strtoupper(mb_substr($p,0,1)))->implode('') ?: 'AM';
-    $contactCount = $client->contacts->count();
+    $contactCount = (int) ($client->contacts_count ?? ($client->relationLoaded('contacts') ? $client->contacts->count() : 0));
     if ($contactCount === 0 && (filled($client->contact_name) || filled($client->email) || filled($client->phone))) $contactCount = 1;
 
     $formatAddress = function (?string $line1, ?string $suite, ?string $city, ?string $state, ?string $zip, ?string $country): array {
@@ -71,7 +74,7 @@
 
     $officeLines = $formatAddress($client->office_address_line1 ?: $client->office_address, $client->office_suite, $client->office_city, $client->office_state, $client->office_zip, $client->country);
     $billingLines = $formatAddress($client->billing_address_line1, $client->billing_suite, $client->billing_city, $client->billing_state, $client->billing_zip, $client->billing_country ?: $client->country);
-    $shippingAddresses = $client->shippingAddresses ?? collect();
+    $shippingAddresses = $addressesReady && $client->relationLoaded('shippingAddresses') ? $client->shippingAddresses : collect();
     $addressCount = 1 + ($client->billing_same_as_office ? 0 : ($billingLines ? 1 : 0)) + $shippingAddresses->count();
 
     $statusLabel = function ($job) {
@@ -142,7 +145,7 @@
     <nav class="ft-client-proto-tabs" aria-label="Client detail sections">
         <button type="button" wire:click="setClientDetailTab('overview')" class="{{ $tab === 'overview' ? 'active' : '' }}">Overview</button>
         <button type="button" wire:click="setClientDetailTab('contacts')" class="{{ $tab === 'contacts' ? 'active' : '' }}">Contacts <span>{{ $contactCount }}</span></button>
-        <button type="button" wire:click="setClientDetailTab('orders')" class="{{ $tab === 'orders' ? 'active' : '' }}">Orders <span>{{ $jobs->count() }}</span></button>
+        <button type="button" wire:click="setClientDetailTab('orders')" class="{{ $tab === 'orders' ? 'active' : '' }}">Orders <span>{{ $orderCount }}</span></button>
         <button type="button" wire:click="setClientDetailTab('documents')" class="{{ $tab === 'documents' ? 'active' : '' }}">Documents <span>{{ $documentCount }}</span></button>
         <button type="button" wire:click="setClientDetailTab('activity')" class="{{ $tab === 'activity' ? 'active' : '' }}">Activity</button>
     </nav>
@@ -215,6 +218,7 @@
 
         </div>
 
+        @if($addressesReady)
         <section class="ft-client-proto-card ft-client-addresses-card">
             <div class="ft-client-card-head ft-client-address-card-head">
                 <div><h2>Addresses</h2><p>Office, billing and delivery locations.</p></div>
@@ -243,6 +247,9 @@
                 @endforeach
             </div>
         </section>
+        @else
+            <x-ui.progressive-section-loader section="addresses" method="loadClientDetailSection" key-prefix="client-detail" :rows="4" message="Loading client addresses when needed…" root-margin="340px 0px" />
+        @endif
 
         <div class="ft-client-overview-bottom-grid">
             <section class="ft-client-proto-card ft-client-commercial-card">

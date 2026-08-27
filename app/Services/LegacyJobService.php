@@ -54,7 +54,7 @@ class LegacyJobService
             ->when($quick !== 'completed', fn ($q) => $q->whereNull('completed_at'))
             ->when($quick !== 'completed' && empty($filters['status']), fn ($q) => $q->whereNotIn('status', self::INACTIVE_STATUSES))
             ->when($quick === 'completed', fn ($q) => $q->whereNotNull('completed_at'))
-            ->when($quick === 'attention', fn ($q) => $q->where(fn ($x) => $x->where('attention_requested', true)->orWhere('needs_attention', true)->orWhereIn('health', ['Needs Attention','At Risk','Delayed','Blocked'])))
+            ->when($quick === 'attention', fn ($q) => $q->where(fn ($x) => $x->where('attention_requested', true)->orWhere('needs_attention', true)))
             ->when($quick === 'due_week', fn ($q) => $q->whereBetween('delivery_date', [app(WorkspaceSettingsService::class)->localToday(), app(WorkspaceSettingsService::class)->localToday()->addDays(7)]))
             ->when($quick === 'waiting', fn ($q) => $q->whereHas('tasks', fn ($t) => $t->where('status', 'like', 'Waiting%')->whereNull('completed_at')))
             ->when($quick === 'invoice', fn ($q) => $q->where(fn ($x) => $x->where('commercial_value', '<=', 0)->orWhereHas('phase', fn ($p) => $p->where('short_name', 'Invoice'))))
@@ -73,7 +73,6 @@ class LegacyJobService
                         $legacy->whereNull('source_workflow_phase_id')->where('workflow_phase_id', $v);
                     });
             }))
-            ->when($filters['health'] ?? null, fn ($q, $v) => $q->where('health', $v))
             ->when($filters['client'] ?? null, fn ($q, $v) => $q->where('client_id', $v))
             ->when($filters['owner'] ?? null, fn ($q, $v) => $q->where('owner_id', $v))
             ->when($filters['assignee'] ?? null, function ($q, $v) use ($user) {
@@ -117,7 +116,7 @@ class LegacyJobService
                 'flow_jobs.id', 'flow_jobs.job_number', 'flow_jobs.order_number', 'flow_jobs.client_id',
                 'flow_jobs.workflow_phase_id', 'flow_jobs.owner_id', 'flow_jobs.coordinator_id', 'flow_jobs.created_by',
                 'flow_jobs.title', 'flow_jobs.product', 'flow_jobs.quantity', 'flow_jobs.next_action',
-                'flow_jobs.status', 'flow_jobs.health', 'flow_jobs.priority', 'flow_jobs.progress',
+                'flow_jobs.status', 'flow_jobs.priority', 'flow_jobs.progress',
                 'flow_jobs.delivery_date', 'flow_jobs.commercial_value', 'flow_jobs.currency',
                 'flow_jobs.needs_attention', 'flow_jobs.attention_requested', 'flow_jobs.attention_reason', 'flow_jobs.order_flag_id', 'flow_jobs.completed_at', 'flow_jobs.updated_at',
             ])
@@ -287,7 +286,7 @@ class LegacyJobService
                 'flow_jobs.id', 'flow_jobs.job_number', 'flow_jobs.order_number',
                 'flow_jobs.client_id', 'flow_jobs.workflow_phase_id', 'flow_jobs.source_workflow_phase_id', 'flow_jobs.owner_id', 'flow_jobs.source_inquiry_id',
                 'flow_jobs.title', 'flow_jobs.product', 'flow_jobs.quantity',
-                'flow_jobs.status', 'flow_jobs.health', 'flow_jobs.priority',
+                'flow_jobs.status', 'flow_jobs.priority',
                 'flow_jobs.progress', 'flow_jobs.delivery_date', 'flow_jobs.needs_attention', 'flow_jobs.attention_requested', 'flow_jobs.attention_reason', 'flow_jobs.order_flag_id',
                 'flow_jobs.completed_at', 'flow_jobs.created_at',
             ])
@@ -375,7 +374,7 @@ class LegacyJobService
             ->where(function (Builder $attention): void {
                 $attention->where('flow_jobs.attention_requested', true)
                     ->orWhere('flow_jobs.needs_attention', true)
-                    ->orWhereIn('flow_jobs.health', ['At Risk', 'Delayed', 'Blocked', 'Needs Attention']);
+;
             });
     }
 
@@ -452,7 +451,6 @@ class LegacyJobService
                 $attention->where('flow_jobs.attention_requested', true)
                     ->orWhere('flow_jobs.needs_attention', true)
                     ->orWhereNotNull('flow_jobs.order_flag_id')
-                    ->orWhereIn('flow_jobs.health', ['Needs Attention', 'At Risk', 'Delayed', 'Blocked'])
                     ->orWhereHas('tasks', function (Builder $task) use ($today): void {
                         $task->whereNull('tasks.completed_at')
                             ->where(function (Builder $taskAttention) use ($today): void {
@@ -695,10 +693,11 @@ class LegacyJobService
                 $relations[] = 'items.removedBy:id,name,profile_image_path';
                 $relations[] = 'items.supplier:id,name,code,type,status';
                 $relations[] = 'items.catalogProduct:id,name,code,parent_id,type,status,metadata';
-                $relations[] = 'items.catalogProduct.parent:id,name,code,type,status';
+                $relations[] = 'items.catalogProduct.parent:id,name,code,type,status,metadata';
             }
 
             $job->load($relations);
+            $this->hydrateLegacyOrderItemCatalogProducts($job);
             $this->hydratePublishedOrderWorkflow($job);
             $this->hydrateLoadedTaskLinks($job);
             $this->hydrateArtworkRevisionNotes($job);
@@ -785,6 +784,166 @@ class LegacyJobService
 
         $this->hydratePublishedOrderWorkflow($job);
         $this->hydrateLoadedTaskLinks($job);
+        return $job;
+    }
+
+
+    /**
+     * Hydrate only the small Order Overview summary graph.
+     *
+     * This is intentionally much smaller than loadVisibleDetailTab('overview'):
+     * the header/summary needs the published stage list plus tasks from the
+     * current stage, but it does not need products, every workflow task,
+     * attachments or activity yet.
+     */
+    public function loadVisibleOverviewSummary(FlowJob $job, User $user): FlowJob
+    {
+        $job->load(['workflow:id,name']);
+
+        if ($job->workflow) {
+            $phaseQuery = WorkflowPhase::query()
+                ->select([
+                    'id', 'workflow_id', 'workflow_template_id', 'task_pack_id',
+                    'sequence', 'name', 'short_name', 'is_active', 'color',
+                ])
+                ->where('is_active', true);
+
+            $published = ! $job->completed_at
+                && ! in_array((string) $job->status, self::INACTIVE_STATUSES, true)
+                && OrderWorkflowSetupService::orderWorkflowQuery()
+                    ->whereKey((int) $job->workflow_id)
+                    ->where('is_active', true)
+                    ->exists();
+
+            $phases = $published
+                ? $phaseQuery->where('workflow_template_id', (int) $job->workflow_id)->orderBy('sequence')->get()
+                : $phaseQuery->where('workflow_id', (int) $job->workflow_id)->orderBy('sequence')->get();
+
+            $job->workflow->setRelation('phases', $phases->values());
+
+            $currentPhase = $phases->firstWhere('id', (int) $job->workflow_phase_id);
+            if ($currentPhase && $currentPhase->task_pack_id) {
+                $currentPhase->load(['taskPack.items:id,task_pack_id']);
+            }
+        }
+
+        $job->load([
+            'tasks' => fn ($query) => app(AccessControlService::class)
+                ->applyTaskScope($query, $user)
+                ->where('workflow_phase_id', (int) $job->workflow_phase_id)
+                ->with([
+                    'assignee:id,name,profile_image_path',
+                    'phase:id,name,short_name,sequence,color',
+                    'template',
+                    'documentCategory',
+                    'setupTemplate.documentCategory',
+                ]),
+        ]);
+
+        return $job;
+    }
+
+    /** Load Product & Quantity data only when that Overview section is reached. */
+    public function loadVisibleOverviewProducts(FlowJob $job, User $user): FlowJob
+    {
+        if (! app(AccessControlService::class)->can($user, 'catalog_products', 'view')) {
+            $job->setRelation('items', collect());
+            return $job;
+        }
+
+        $job->load([
+            'items.updatedBy:id,name,profile_image_path',
+            'items.removedBy:id,name,profile_image_path',
+            'items.supplier:id,name,code,type,status',
+            'items.catalogProduct:id,name,code,parent_id,type,status,metadata',
+            'items.catalogProduct.parent:id,name,code,type,status,metadata',
+        ]);
+
+        $this->hydrateLegacyOrderItemCatalogProducts($job);
+
+        return $job;
+    }
+
+    /**
+     * Backward-compatible Product Master hydration for historical Order items.
+     *
+     * Older bulk imports saved product_name/category_name without catalog_product_id.
+     * Resolve those rows by exact Product Master name in one bounded query so the
+     * Order Details product card can use the same taxonomy hierarchy as Inquiry
+     * Details without mutating historical data during a read.
+     */
+    private function hydrateLegacyOrderItemCatalogProducts(FlowJob $job): void
+    {
+        if (! $job->relationLoaded('items')) {
+            return;
+        }
+
+        $missingCatalogItems = $job->items
+            ->filter(fn (FlowJobItem $item): bool => ! $item->catalogProduct && filled($item->product_name));
+
+        if ($missingCatalogItems->isEmpty()) {
+            return;
+        }
+
+        $workspaceId = max(1, (int) config('flowtrack.workspace_id', 1));
+        $productNames = $missingCatalogItems
+            ->pluck('product_name')
+            ->map(fn ($name) => trim((string) $name))
+            ->filter()
+            ->unique()
+            ->values();
+
+        $catalogByName = MasterRecord::query()
+            ->forWorkspace($workspaceId)
+            ->ofType('product')
+            ->whereIn('name', $productNames)
+            ->with('parent')
+            ->get()
+            ->keyBy(fn (MasterRecord $product) => mb_strtolower(trim((string) $product->name)));
+
+        $missingCatalogItems->each(function (FlowJobItem $item) use ($catalogByName): void {
+            $matched = $catalogByName->get(mb_strtolower(trim((string) $item->product_name)));
+            if ($matched) {
+                $item->setRelation('catalogProduct', $matched);
+            }
+        });
+    }
+
+    /** Load the full interactive workflow/task graph only near the taskflow. */
+    public function loadVisibleOverviewWorkflow(FlowJob $job, User $user): FlowJob
+    {
+        $job->load([
+            'workflow.phases.taskPack.items.documentCategory',
+            'tasks' => fn ($query) => app(AccessControlService::class)
+                ->applyTaskScope($query, $user)
+                ->with([
+                    'assignee:id,name,profile_image_path',
+                    'phase:id,name,short_name,sequence,color',
+                    'template',
+                    'documentCategory',
+                    'setupTemplate.documentCategory',
+                ]),
+            // Task rows expose their evidence inline, so document resources are
+            // part of the workflow section rather than the first page render.
+            'documents.uploader:id,name,profile_image_path',
+            'documents.task:id,title',
+        ]);
+
+        $this->hydratePublishedOrderWorkflow($job);
+        $this->hydrateLoadedTaskLinks($job);
+        $this->hydrateArtworkRevisionNotes($job);
+
+        return $job;
+    }
+
+    /** Load general Order attachments only if the workflow has not already done so. */
+    public function loadVisibleOverviewDocuments(FlowJob $job): FlowJob
+    {
+        $job->loadMissing([
+            'documents.uploader:id,name,profile_image_path',
+            'documents.task:id,title',
+        ]);
+
         return $job;
     }
 
@@ -975,6 +1134,7 @@ class LegacyJobService
         $perPage = max(1, min($perPage, 50));
 
         $query = $job->activities()
+            ->where(fn ($events) => $events->whereNull('event')->orWhere('event', '!=', 'job.health_updated'))
             ->with('user:id,name,profile_image_path')
             ->when($activityTab === 'comments', fn ($activity) => $activity->where('event', 'job.comment'))
             ->when($activityTab === 'history', fn ($activity) => $activity->where(fn ($events) => $events
@@ -1401,13 +1561,15 @@ class LegacyJobService
         return $job->refresh();
     }
 
+    /**
+     * @deprecated Order health is retained only as legacy storage compatibility and is no longer user-facing.
+     */
     public function updateHealth(FlowJob $job, string $health, User $actor): FlowJob
     {
         $this->assertEditable($job, $actor);
         $job->update(['health' => $health]);
         $job->phaseHistories()->whereNull('completed_at')->update(['health_override' => $health]);
-        $job->activities()->create(['user_id' => $actor->id, 'event' => 'job.health_updated', 'description' => 'Job health changed to '.$health]);
-        app(NotificationService::class)->notifyJobParticipants($job->refresh(), 'Order health updated', $job->job_number.' · Health changed to '.$health, in_array($health, ['Needs Attention','At Risk','Delayed','Blocked'], true) ? 'risk' : 'update', $actor);
+
         return $job->refresh();
     }
 
@@ -1853,6 +2015,28 @@ class LegacyJobService
         abort_unless((int) $item->flow_job_id === (int) $job->id, 404);
         abort_if((bool) ($item->is_removed ?? false), 422, 'Restore this product before editing it.');
 
+        $productId = (int) ($data['catalog_product_id'] ?? 0);
+        abort_unless($productId > 0, 422, 'Search for and select a product first.');
+        $product = app(ProductCatalogService::class)->findActiveProductOrFail($productId);
+
+        $categoryName = trim((string) ($product->parent?->name ?? ''));
+        if ($categoryName === '') {
+            $legacyCategory = trim((string) $product->description);
+            $categoryName = trim(explode(' ·', $legacyCategory, 2)[0]);
+        }
+        $categoryName = $categoryName !== '' ? $categoryName : 'Uncategorized';
+
+        $duplicateExists = FlowJobItem::query()
+            ->where('flow_job_id', $job->id)
+            ->where('id', '!=', $item->id)
+            ->where('is_removed', false)
+            ->where(function (Builder $query) use ($product): void {
+                $query->where('catalog_product_id', (int) $product->id)
+                    ->orWhereRaw('LOWER(product_name) = ?', [mb_strtolower((string) $product->name)]);
+            })
+            ->exists();
+        abort_if($duplicateExists, 422, 'This product is already added to the Order.');
+
         $supplierId = (int) ($data['supplier_id'] ?? 0);
         abort_unless($supplierId > 0, 422, 'Select a supplier for this product.');
         $validSupplier = MasterRecord::query()
@@ -1864,13 +2048,15 @@ class LegacyJobService
         abort_unless($validSupplier, 422, 'Select an active supplier for this product.');
 
         $quantity = max(1, (int) ($data['quantity'] ?? 1));
-        abort_unless(is_numeric($data['unit_price'] ?? null), 422, 'Unit price must be a number.');
-        $unitPrice = round(max(0, (float) $data['unit_price']), 2);
+        $basePrice = $product->productPriceForQuantity($quantity);
+        $fallbackPrice = $data['unit_price'] ?? 0;
+        abort_unless(is_numeric($fallbackPrice), 422, 'Unit price must be a number.');
+        $unitPrice = round(max(0, (float) ($basePrice ?? $fallbackPrice)), 2);
         abort_if($unitPrice > 999999999999.99, 422, 'Unit price is outside the allowed range.');
         $notes = trim((string) ($data['notes'] ?? ''));
         abort_if(mb_strlen($notes) > 2000, 422, 'Product notes may not exceed 2000 characters.');
 
-        $updated = DB::transaction(function () use ($job, $item, $actor, $supplierId, $quantity, $unitPrice, $notes): FlowJobItem {
+        $updated = DB::transaction(function () use ($job, $item, $actor, $product, $categoryName, $supplierId, $quantity, $unitPrice, $notes): FlowJobItem {
             $lockedJob = FlowJob::query()->whereKey($job->id)->lockForUpdate()->firstOrFail();
             $this->assertEditable($lockedJob, $actor);
             $lockedItem = FlowJobItem::query()
@@ -1880,7 +2066,21 @@ class LegacyJobService
                 ->firstOrFail();
             abort_if((bool) ($lockedItem->is_removed ?? false), 422, 'Restore this product before editing it.');
 
+            $duplicateExists = FlowJobItem::query()
+                ->where('flow_job_id', $lockedJob->id)
+                ->where('id', '!=', $lockedItem->id)
+                ->where('is_removed', false)
+                ->where(function (Builder $query) use ($product): void {
+                    $query->where('catalog_product_id', (int) $product->id)
+                        ->orWhereRaw('LOWER(product_name) = ?', [mb_strtolower((string) $product->name)]);
+                })
+                ->exists();
+            abort_if($duplicateExists, 422, 'This product is already added to the Order.');
+
             $lockedItem->update([
+                'catalog_product_id' => (int) $product->id,
+                'product_name' => (string) $product->name,
+                'category_name' => $categoryName,
                 'supplier_id' => $supplierId,
                 'quantity' => $quantity,
                 'unit_price' => $unitPrice,
@@ -1891,7 +2091,7 @@ class LegacyJobService
             $lockedJob->activities()->create([
                 'user_id' => $actor->id,
                 'event' => 'job.product_updated',
-                'description' => 'Product and quantity details updated',
+                'description' => 'Product, supplier, quantity and price updated',
             ]);
 
             return $lockedItem->refresh();

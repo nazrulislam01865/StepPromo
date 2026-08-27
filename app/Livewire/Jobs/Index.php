@@ -15,6 +15,7 @@ use App\Livewire\Jobs\Concerns\ManagesOrderDocuments;
 use App\Livewire\Jobs\Concerns\ManagesOrderTaskResources;
 use App\Livewire\Jobs\Concerns\ManagesOrderActivity;
 use App\Livewire\Jobs\Concerns\ManagesOrderRedo;
+use App\Livewire\Jobs\Concerns\ManagesDetailProgressiveLoading;
 use App\Livewire\Jobs\Concerns\BuildsOrderPageData;
 
 use App\Livewire\Concerns\HandlesInlineEdits;
@@ -46,6 +47,7 @@ class Index extends Component
     use ManagesOrderTaskResources;
     use ManagesOrderActivity;
     use ManagesOrderRedo;
+    use ManagesDetailProgressiveLoading;
     use BuildsOrderPageData;
 
     use RefreshesFromWorkspace;
@@ -55,7 +57,6 @@ class Index extends Component
 
     public string $search = '';
     public string $phase = '';
-    public string $health = '';
     public string $client = '';
     public string $owner = '';
     public string $assignee = '';
@@ -162,6 +163,8 @@ class Index extends Component
     public ?int $pendingMissingSupplierRowIndex = null;
     /** @var array<int,int> Product IDs explicitly allowed without a supplier for this Create Order draft. */
     public array $createOrderSupplierSkipProductIds = [];
+    /** @var array<int,int> Product ID => Supplier ID explicitly chosen for this Order only. */
+    public array $createOrderSupplierOverrides = [];
 
     // Order Details > Add another product flow. Kept separate from Create Order
     // state so opening the detail picker never mutates the create-order draft.
@@ -180,8 +183,12 @@ class Index extends Component
     // prototype while keeping persistence and validation in the backend.
     public bool $showEditOrderProductModal = false;
     public ?int $editOrderProductItemId = null;
+    public ?int $editOrderProductSelectedId = null;
+    public string $editOrderProductSearch = '';
+    public bool $editOrderProductShowAllResults = false;
     public string $editOrderProductName = '';
     public string $editOrderProductCode = '';
+    public string $editOrderProductCategory = '';
     public ?int $editOrderProductSupplierId = null;
     public string $editOrderProductSupplierLabel = '';
     public string $editOrderProductQuantity = '1';

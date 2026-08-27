@@ -3,15 +3,16 @@
 namespace App\Livewire\Jobs\Concerns;
 
 use App\Actions\Orders\EmailOrderInvoice;
+use App\DTOs\Email\EmailMessage;
 use App\Queries\Orders\VisibleOrderQuery;
 use App\Models\Invoice;
 use App\Models\MasterRecord;
 use App\Services\AccessControlService;
+use App\Services\Email\EmailService;
 use App\Services\MasterDataService;
 use App\Services\OrderFinanceService;
 use App\Support\AttachmentUpload;
 use Illuminate\Validation\Rule;
-use Illuminate\Support\Facades\Mail;
 use Throwable;
 
 /**
@@ -304,10 +305,16 @@ trait ManagesOrderFinance
         }
 
         try {
-            Mail::raw(
+            app(EmailService::class)->sendNow(EmailMessage::text(
+                $email,
+                'Payment reminder · '.$job->displayOrderNumber(),
                 'Payment reminder for '.$job->displayOrderNumber().'. Outstanding balance: '.$job->currency.' '.number_format((float) $summary['outstanding'], 2).'.',
-                fn ($message) => $message->to($email)->subject('Payment reminder · '.$job->displayOrderNumber())
-            );
+                [
+                    'type' => 'payment_reminder',
+                    'order_id' => (int) $job->id,
+                    'invoice_id' => $invoice?->id ? (int) $invoice->id : null,
+                ],
+            ));
             app(OrderFinanceService::class)->addCollectionUpdate($job, $user, [
                 'collection_owner_id' => $job->collection?->collection_owner_id ?: $job->owner_id ?: $user->id,
                 'follow_up_date' => now()->toDateString(),

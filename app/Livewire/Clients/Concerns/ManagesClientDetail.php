@@ -19,6 +19,18 @@ use Illuminate\Validation\ValidationException;
 
 trait ManagesClientDetail
 {
+    public function loadClientDetailSection(string $section): void
+    {
+        abort_unless($this->showDetail && $this->selectedClientId && $this->clientDetailTab === 'overview', 422);
+        abort_unless($section === 'addresses', 422);
+        $this->clientDetailSectionsReady['addresses'] = true;
+    }
+
+    private function resetClientDetailProgressiveSections(): void
+    {
+        $this->clientDetailSectionsReady = ['addresses' => false];
+    }
+
     public function openClient(int $id): void
     {
         // Client rows now open the full client view directly. Keep this method
@@ -43,6 +55,7 @@ trait ManagesClientDetail
         $this->selectedClientId = $id;
         $this->showClientPreview = false;
         $this->showDetail = true;
+        $this->resetClientDetailProgressiveSections();
         $this->showEdit = false;
         $this->clientDetailTab = 'overview';
         $this->clearClientOrderFilters();
@@ -51,6 +64,7 @@ trait ManagesClientDetail
     public function backToClients(): void
     {
         $this->showDetail = false;
+        $this->resetClientDetailProgressiveSections();
         $this->showEdit = false;
         $this->showClientPreview = false;
         $this->selectedClientId = null;

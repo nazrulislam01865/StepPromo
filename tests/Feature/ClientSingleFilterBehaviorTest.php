@@ -20,7 +20,7 @@ class ClientSingleFilterBehaviorTest extends TestCase
         $this->assertStringContainsString("\$this->activateSingleListFilter('search');", $component);
         $this->assertStringContainsString("\$this->activateSingleListFilter('manager');", $component);
         $this->assertStringContainsString("\$this->activateSingleListFilter('country');", $component);
-        $this->assertStringContainsString("\$this->activateSingleListFilter('jobHealth');", $component);
+        $this->assertStringNotContainsString("jobHealth", $component);
         $this->assertStringContainsString("\$this->activateSingleListFilter('outstanding');", $component);
         $this->assertStringContainsString('private function activateSingleListFilter(string $activeFilter): void', $component);
         $this->assertStringContainsString('private function clearClientListFilterValues(?string $except = null): void', $component);

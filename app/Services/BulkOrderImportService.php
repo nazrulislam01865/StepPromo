@@ -144,6 +144,10 @@ class BulkOrderImportService
             $row['product_resolved_name'] = null;
             $row['product_resolved_category'] = null;
             $row['product_quantity_resolved'] = 0;
+            $row['product_supplier_resolved_id'] = null;
+            $row['product_supplier_resolved_name'] = null;
+            $row['product_unit_price_resolved'] = null;
+            $product = null;
             if ($row['product_id'] !== '') {
                 $product = $this->lookupProduct($row['product_id'], $productMaps);
                 if (!$product || !$product->parent || $product->parent->status !== 'active') {
@@ -166,6 +170,28 @@ class BulkOrderImportService
                 }
             } elseif ($row['product_id'] !== '') {
                 $row['product_quantity_resolved'] = 1;
+            }
+
+            // Bulk import must mirror Create Order: once the Product is resolved,
+            // derive its active default Supplier and quantity-based Product Master
+            // price instead of persisting an unlinked supplier and a 0.00 price.
+            // The spreadsheet intentionally does not carry supplier/price columns;
+            // Product Master remains authoritative for both values.
+            if ($product && (int) $row['product_quantity_resolved'] > 0) {
+                $supplierId = $product->productSupplierId();
+                $supplier = $supplierId
+                    ? ($productMaps['active_suppliers_by_id'][(int) $supplierId] ?? null)
+                    : null;
+
+                if ($supplier) {
+                    $row['product_supplier_resolved_id'] = (int) $supplier->id;
+                    $row['product_supplier_resolved_name'] = (string) $supplier->name;
+                }
+
+                $basePrice = $product->productPriceForQuantity((int) $row['product_quantity_resolved']);
+                $row['product_unit_price_resolved'] = $basePrice !== null
+                    ? round((float) $basePrice, 2)
+                    : null;
             }
 
             $row['customer_delivery_normalized'] = $row['customer_delivery'] === '' ? null : $this->normalizeDate($row['customer_delivery']);
@@ -420,9 +446,13 @@ class BulkOrderImportService
         if (filled($row['product_resolved_id'] ?? null)) {
             $items[] = [
                 'product_id' => (int) $row['product_resolved_id'],
+                'supplier_id' => filled($row['product_supplier_resolved_id'] ?? null)
+                    ? (int) $row['product_supplier_resolved_id']
+                    : null,
                 'product' => $row['product_resolved_name'],
                 'category' => $row['product_resolved_category'],
                 'quantity' => max(1, (int) ($row['product_quantity_resolved'] ?? 1)),
+                'unit_price' => $row['product_unit_price_resolved'] ?? 0,
                 'notes' => null,
             ];
         }
@@ -498,10 +528,14 @@ class BulkOrderImportService
             $job->items()->delete();
             if (filled($row['product_resolved_id'] ?? null)) {
                 $job->items()->create([
+                    'catalog_product_id' => (int) $row['product_resolved_id'],
+                    'supplier_id' => filled($row['product_supplier_resolved_id'] ?? null)
+                        ? (int) $row['product_supplier_resolved_id']
+                        : null,
                     'product_name' => $row['product_resolved_name'],
                     'category_name' => $row['product_resolved_category'],
                     'quantity' => max(1, (int) ($row['product_quantity_resolved'] ?? 1)),
-                    'unit_price' => 0,
+                    'unit_price' => round(max(0, (float) ($row['product_unit_price_resolved'] ?? 0)), 2),
                     'notes' => null,
                     'updated_by' => $actor->id,
                     'sort_order' => 0,
@@ -615,12 +649,37 @@ class BulkOrderImportService
         return $maps['by_name'][mb_strtolower($value)] ?? null;
     }
 
-    /** @return array{by_id:array<int,MasterRecord>,by_code:array<string,MasterRecord>,by_display:array<string,MasterRecord>,by_reference:array<string,MasterRecord>} */
+    /**
+     * @return array{
+     *   by_id:array<int,MasterRecord>,
+     *   by_code:array<string,MasterRecord>,
+     *   by_display:array<string,MasterRecord>,
+     *   by_reference:array<string,MasterRecord>,
+     *   active_suppliers_by_id:array<int,MasterRecord>
+     * }
+     */
     private function productMaps(): array
     {
         $products = app(ProductCatalogService::class)->activeProductsQuery()
             ->with('parent:id,type,name,status')
             ->get(['id', 'type', 'parent_id', 'code', 'name', 'metadata', 'status']);
+
+        $defaultSupplierIds = $products
+            ->map(fn (MasterRecord $product) => $product->productSupplierId())
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $activeSuppliers = $defaultSupplierIds->isEmpty()
+            ? collect()
+            : MasterRecord::query()
+                ->forWorkspace(app(SetupContext::class)->workspaceId())
+                ->ofType('supplier')
+                ->active()
+                ->whereIn('id', $defaultSupplierIds->all())
+                ->get(['id', 'name', 'code', 'status'])
+                ->keyBy('id');
 
         $byReference = [];
         foreach ($products as $product) {
@@ -633,6 +692,7 @@ class BulkOrderImportService
             'by_code' => $products->filter(fn ($product) => filled($product->code))->keyBy(fn ($product) => strtoupper(trim((string) $product->code)))->all(),
             'by_display' => $products->keyBy(fn ($product) => strtoupper($product->productDisplayCode()))->all(),
             'by_reference' => $byReference,
+            'active_suppliers_by_id' => $activeSuppliers->all(),
         ];
     }
 

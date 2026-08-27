@@ -419,3 +419,97 @@
         flex: 1 1 0;
     }
 }
+
+/* CHANGE 2026-08-27: My Tasks gets the same stage-selected quick-filter
+   interaction as Orders, but the chips are driven by Order Task Status master
+   data because My Tasks is a task execution queue. */
+#my-work-app .my-task-stage-status-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+    padding: 10px 12px;
+    border: 1px solid #dbe3ed;
+    border-radius: 10px;
+    background: #fff;
+}
+
+#my-work-app .my-task-stage-status-label {
+    margin-right: 2px;
+    color: #52677f;
+    font-size: .625rem;
+    font-weight: 900;
+    white-space: nowrap;
+}
+
+#my-work-app .my-task-stage-status-chips {
+    display: flex;
+    min-width: 0;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+#my-work-app .my-task-stage-status-chip {
+    --task-status-color: var(--ft-theme-primary);
+    display: inline-flex;
+    min-height: 38px;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    border: 1px solid color-mix(in srgb, var(--task-status-color) 30%, #d9e3ec);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--task-status-color);
+    cursor: pointer;
+    font: 800 .625rem/1 var(--ft-theme-font-family);
+    white-space: nowrap;
+}
+
+#my-work-app .my-task-stage-status-chip:hover,
+#my-work-app .my-task-stage-status-chip.active {
+    border-color: color-mix(in srgb, var(--task-status-color) 52%, #fff);
+    background: color-mix(in srgb, var(--task-status-color) 8%, #fff);
+}
+
+#my-work-app .my-task-stage-status-check {
+    display: grid;
+    width: 17px;
+    height: 17px;
+    flex: 0 0 17px;
+    place-items: center;
+    border: 1px solid color-mix(in srgb, var(--task-status-color) 54%, #c8d4e0);
+    border-radius: 4px;
+    background: #fff;
+    color: transparent;
+    font-size: .625rem;
+    line-height: 1;
+}
+
+#my-work-app .my-task-stage-status-chip.active .my-task-stage-status-check {
+    border-color: var(--task-status-color);
+    background: var(--task-status-color);
+    color: #fff;
+}
+
+#my-work-app .my-task-stage-status-note {
+    margin-left: auto;
+    color: #6e8096;
+    font-size: .5625rem;
+    white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+    #my-work-app .my-task-stage-status-controls {
+        align-items: stretch;
+    }
+
+    #my-work-app .my-task-stage-status-label,
+    #my-work-app .my-task-stage-status-note {
+        width: 100%;
+    }
+
+    #my-work-app .my-task-stage-status-note {
+        margin-left: 0;
+    }
+}

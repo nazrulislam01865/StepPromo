@@ -24,16 +24,30 @@ trait BuildsClientPageData
     {
         $service = app(MasterDataService::class);
         $workspaceId = $service->workspaceId();
-        $countries = $service->active('country');
+        $addressOptionsReady = $this->showEdit || $this->createAddressOptionsReady;
+        $countries = $addressOptionsReady ? $service->active('country') : collect();
         $currencies = $service->active('currency');
-        $states = MasterRecord::query()
-            ->forWorkspace($workspaceId)
-            ->ofType('state')
-            ->active()
-            ->with('parent:id,name')
-            ->orderBy('sort_order')
-            ->orderBy('name')
-            ->get();
+        // Only hydrate state options for countries that are currently visible
+        // in the form. Loading every state for every country on every Livewire
+        // render is unnecessary and grows linearly with Master Data.
+        $stateCountries = collect([$this->clientCountry, $this->billingCountry])
+            ->merge(collect($this->shippingAddresses)->pluck('country'))
+            ->map(fn ($country) => trim((string) $country))
+            ->filter()
+            ->unique()
+            ->values();
+
+        $states = ! $addressOptionsReady || $stateCountries->isEmpty()
+            ? collect()
+            : MasterRecord::query()
+                ->forWorkspace($workspaceId)
+                ->ofType('state')
+                ->active()
+                ->whereHas('parent', fn ($query) => $query->whereIn('name', $stateCountries->all()))
+                ->with('parent:id,name')
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get();
 
         $countryFlags = $countries->mapWithKeys(function (MasterRecord $country) {
             $flag = (string) data_get($country->metadata, 'flag', '');
@@ -65,22 +79,29 @@ trait BuildsClientPageData
             'clientLanguages' => ['English','Chinese','Spanish','French','German','Arabic','Bengali'],
             'clientCurrencies' => $currencies->mapWithKeys(fn (MasterRecord $currency) => [$currency->code => $currency->name])->all(),
             'paymentTermOptions' => ['Net 15','Net 30','Net 45','Net 60','Due on receipt','Prepaid'],
+            'clientAddressOptionsReady' => $addressOptionsReady,
             'contacts' => $this->contacts,
         ];
     }
     private function detailPageData(User $user): array
     {
-        $detail = app(ClientService::class)->detail($user, (int) $this->selectedClientId);
+        $detailSectionsReady = array_merge(['addresses' => false], $this->clientDetailSectionsReady ?? []);
+        $loadAddresses = $this->clientDetailTab === 'overview' && $detailSectionsReady['addresses'];
+        $loadContacts = $this->clientDetailTab === 'contacts';
+        $detail = app(ClientService::class)->detailShell($user, (int) $this->selectedClientId, $loadAddresses, $loadContacts);
         $client = $detail['client'];
         $jobQuery = app(OrderReadService::class)->visibleQuery($user)->where('flow_jobs.client_id', $client->id);
 
-        $jobMetrics = (clone $jobQuery)
-            ->reorder()
-            ->selectRaw("sum(case when completed_at is null and status not in ('Inactive','Cancelled') then 1 else 0 end) as open_count")
-            ->selectRaw("sum(case when completed_at is null and status not in ('Inactive','Cancelled') and (needs_attention = 1 or health in ('Needs Attention','At Risk','Delayed','Blocked')) then 1 else 0 end) as attention_count")
-            ->selectRaw('sum(case when completed_at is not null then 1 else 0 end) as completed_count')
-            ->selectRaw('coalesce(sum(commercial_value), 0) as total_value')
-            ->first();
+        $jobMetrics = null;
+        if ($this->clientDetailTab === 'orders') {
+            $jobMetrics = (clone $jobQuery)
+                ->reorder()
+                ->selectRaw("sum(case when completed_at is null and status not in ('Inactive','Cancelled') then 1 else 0 end) as open_count")
+                ->selectRaw("sum(case when completed_at is null and status not in ('Inactive','Cancelled') and (needs_attention = 1 or health in ('Needs Attention','At Risk','Delayed','Blocked')) then 1 else 0 end) as attention_count")
+                ->selectRaw('sum(case when completed_at is not null then 1 else 0 end) as completed_count')
+                ->selectRaw('coalesce(sum(commercial_value), 0) as total_value')
+                ->first();
+        }
 
         $documentQuery = app(DocumentService::class)->query($user, ['client' => $client->id]);
 
@@ -158,6 +179,8 @@ trait BuildsClientPageData
 
         $pageData = [
             'detail' => $detail,
+            'clientDetailSectionsReady' => $detailSectionsReady,
+            'clientOrderCount' => (int) ($detail['orderCount'] ?? 0),
             'users' => collect(),
             'clientDetailTab' => $this->clientDetailTab,
             'clientOrders' => $clientOrders,
@@ -189,7 +212,6 @@ trait BuildsClientPageData
             'search' => $this->search,
             'country' => $this->country,
             'manager' => $this->manager,
-            'health' => $this->jobHealth,
             'outstanding' => $this->outstanding,
             'quick' => $this->quick,
             'archived' => $this->showArchived,
@@ -211,9 +233,6 @@ trait BuildsClientPageData
             'managerFilterOptions' => $this->showArchived ? collect() : app(\App\Services\FilterOptionService::class)->options($user, 'users', 'clients', '', $this->manager !== '' ? (int) $this->manager : null, 5),
             'createdByFilterOptions' => $this->showArchived ? app(\App\Services\FilterOptionService::class)->options($user, 'users', 'clients', '', $this->createdBy !== '' ? (int) $this->createdBy : null, 5) : collect(),
             'deleteCandidate' => $deleteCandidate,
-            'healthOptions' => $this->showArchived ? collect() : app(\App\Services\AccessControlService::class)->applyJobScope(FlowJob::query(), $user)
-                ->whereHas('client', fn ($client) => $client->where('is_active', true))
-                ->whereNotNull('health')->distinct()->orderBy('health')->pluck('health'),
             'users' => collect(),
         ];
     }

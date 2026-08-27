@@ -125,7 +125,7 @@ class BoardTaskPackService
             ->whereIn('id', $jobIds)
             ->select([
                 'id', 'job_number', 'title', 'client_id', 'workflow_phase_id', 'created_by',
-                'health', 'progress', 'status', 'updated_at',
+                'progress', 'status', 'updated_at',
             ])
             ->with([
                 'client:id,name,logo_path',
@@ -232,8 +232,6 @@ class BoardTaskPackService
                 'client' => (string) ($job->client?->name ?: 'No client'),
                 'stage' => (string) ($job->phase?->short_name ?: $job->phase?->name ?: 'No phase'),
                 'stageColor' => $job->phase?->color,
-                'health' => (string) ($job->health ?: 'On Track'),
-                'healthTone' => $this->tone((string) ($job->health ?: 'On Track')),
                 'progress' => max(0, min(100, (int) $job->progress)),
                 'taskCount' => $taskRows->count(),
                 'route' => $canOpenJob ? route('jobs.index', ['open' => $job->id]) : null,

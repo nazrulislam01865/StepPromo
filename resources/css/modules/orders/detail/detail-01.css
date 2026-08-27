@@ -1975,6 +1975,39 @@
     margin-top: 3px
 }
 
+/* Cancelled-order evidence can contain very tall pasted screenshots.
+ * Keep the activity feed compact and let the shared rich-text image viewer
+ * handle full-size inspection when the thumbnail is clicked.
+ */
+.ft-order-prototype-detail .ft-order-cancellation-activity-copy {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden
+}
+
+.ft-order-prototype-detail .ft-order-cancellation-activity-copy img {
+    display: block;
+    width: min(100%, 320px) !important;
+    height: 190px !important;
+    max-width: 100% !important;
+    max-height: 190px !important;
+    margin: 8px 0 4px;
+    object-fit: contain;
+    object-position: center;
+    border: 1px solid #dbe4ef;
+    border-radius: 8px;
+    background: #f8fafc;
+    cursor: zoom-in
+}
+
+@media (max-width: 620px) {
+    .ft-order-prototype-detail .ft-order-cancellation-activity-copy img {
+        width: min(100%, 280px) !important;
+        height: 160px !important;
+        max-height: 160px !important
+    }
+}
+
 .ft-order-prototype-detail .activity-pagination {
     display: flex;
     justify-content: space-between;
@@ -3889,5 +3922,107 @@
 
     .ft-order-prototype-detail .ft-order-product-add-modal .ft-order-detail-product-field.is-product {
         grid-column: 1/-1
+    }
+}
+
+/* Order header metadata icons: keep parity with Inquiry detail metadata. */
+.ft-order-prototype-detail .ft-order-prototype-meta {
+    gap: 8px 14px;
+    font-size: .78125rem;
+    font-weight: 500;
+    line-height: 1.35;
+}
+
+.ft-order-prototype-detail .ft-order-header-meta-item {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    gap: 7px;
+    white-space: nowrap;
+}
+
+.ft-order-prototype-detail .ft-order-header-meta-item > span:last-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ft-order-prototype-detail .ft-order-header-meta-item strong {
+    color: #243650;
+    font-weight: 650;
+}
+
+.ft-order-prototype-detail .ft-order-header-meta-icon {
+    display: inline-grid;
+    width: 17px;
+    height: 17px;
+    flex: 0 0 17px;
+    place-items: center;
+    color: #71839c;
+    line-height: 1;
+}
+
+.ft-order-prototype-detail .ft-order-header-meta-icon svg,
+.ft-order-prototype-detail .copy-order-code svg,
+.ft-order-prototype-detail .ft-order-header-copy svg {
+    width: 100%;
+    height: 100%;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.ft-order-prototype-detail .ft-order-header-reference {
+    gap: 6px;
+}
+
+.ft-order-prototype-detail .ft-order-header-copy {
+    display: inline-grid;
+    width: 22px;
+    height: 22px;
+    flex: 0 0 22px;
+    place-items: center;
+    padding: 4px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #71839c;
+    cursor: pointer;
+}
+
+.ft-order-prototype-detail .ft-order-header-copy:hover,
+.ft-order-prototype-detail .copy-order-code:hover {
+    color: #0f8a78;
+    background: #eef8f6;
+}
+
+.ft-order-prototype-detail .copy-order-code {
+    display: inline-grid;
+    width: 22px;
+    height: 22px;
+    place-items: center;
+    padding: 4px;
+    border-radius: 6px;
+}
+
+.ft-order-prototype-detail .ft-client-inline-identity {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    gap: 6px;
+}
+
+@media (max-width: 720px) {
+    .ft-order-prototype-detail .ft-order-prototype-meta {
+        gap: 8px 10px;
+    }
+
+    .ft-order-prototype-detail .ft-order-prototype-meta .meta-sep {
+        display: none;
+    }
+
+    .ft-order-prototype-detail .ft-order-header-meta-item {
+        max-width: 100%;
     }
 }

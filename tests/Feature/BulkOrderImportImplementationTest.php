@@ -63,6 +63,13 @@ class BulkOrderImportImplementationTest extends TestCase
         $this->assertStringContainsString('Repeat Order No. is required when Repeat Order? is Yes', $service);
         $this->assertStringContainsString('Product ID does not match an active Product', $service);
         $this->assertStringContainsString('Product Quantity must be a whole number', $service);
+        $this->assertStringContainsString("'product_supplier_resolved_id'", $service);
+        $this->assertStringContainsString("'product_unit_price_resolved'", $service);
+        $this->assertStringContainsString('productSupplierId()', $service);
+        $this->assertStringContainsString('productPriceForQuantity', $service);
+        $this->assertStringContainsString("'supplier_id' => filled(\$row['product_supplier_resolved_id']", $service);
+        $this->assertStringContainsString("'unit_price' => \$row['product_unit_price_resolved'] ?? 0", $service);
+        $this->assertStringContainsString("'catalog_product_id' => (int) \$row['product_resolved_id']", $service);
         $this->assertStringContainsString('Invalid Customer Requested Delivery Date', $service);
         $this->assertStringContainsString('Invalid Estimated Delivery Date', $service);
         $this->assertStringContainsString('resolveUrgency', $service);

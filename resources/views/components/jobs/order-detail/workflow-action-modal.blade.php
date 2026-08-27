@@ -22,6 +22,9 @@
     $clientName = (string) ($job->client?->name ?: 'Client');
     $ownerName = (string) ($job->owner?->name ?: $job->coordinator?->name ?: 'FlowTrack');
     $orderTotal = (float) $activeItems->sum(fn($item) => (float) ($item->unit_price ?? 0) * (int) ($item->quantity ?? 0));
+    $emailHandoffPreview = in_array($variant, ['purchase_order_email', 'artwork_email'], true)
+        ? app(\App\Services\Orders\OrderWorkflowEmailService::class)->preview($task, auth()->user())
+        : [];
 
     // Only the main Artwork preview/handoff screens need the large landscape
     // layout. Revision/issue follow-up steps must stay on the normal compact
@@ -44,7 +47,7 @@
     }
 @endphp
 <div class="ft-order-task-document-modal-backdrop" wire:key="order-workflow-action-modal-{{ $task->id }}-{{ $step }}" wire:click.self="closeOrderWorkflowAction">
-    <section class="ft-order-task-document-modal ft-order-workflow-action-modal {{ $isArtworkPreviewModal ? 'ft-order-workflow-action-modal--artwork-preview' : ($modalWide ? 'ft-order-workflow-action-modal--wide' : '') }}" role="dialog" aria-modal="true" aria-labelledby="order-workflow-action-modal-title">
+    <section class="ft-order-task-document-modal ft-order-workflow-action-modal {{ $isArtworkPreviewModal ? 'ft-order-workflow-action-modal--artwork-preview' : ($modalWide ? 'ft-order-workflow-action-modal--wide' : '') }}" data-ft-feedback-scope="form" role="dialog" aria-modal="true" aria-labelledby="order-workflow-action-modal-title">
         <header class="ft-order-task-document-modal-head">
             <div><h2 id="order-workflow-action-modal-title">{{ $title }}</h2><p>{{ $copy }}</p></div>
             <button type="button" wire:click="closeOrderWorkflowAction" aria-label="Close">×</button>
@@ -78,6 +81,22 @@
                 <label class="ft-prototype-field"><span>Description</span><textarea wire:model="orderWorkflowActionComment" rows="5" placeholder="Describe the issue and corrective action required..."></textarea>@error('orderWorkflowActionComment')<p class="validation-error">{{ $message }}</p>@enderror</label>
                 <div class="ft-prototype-file-placeholder"><strong>Screenshot / photo</strong><span>Supporting images/documents can be added to the task after the issue is recorded.</span></div>
                 <div class="ft-prototype-email-preview"><b>Email preview</b><span>The issue notification will be recorded for {{ $supplierName }} with this Order and task.</span></div>
+            @elseif($variant === 'purchase_order_email')
+                <div class="ft-order-task-document-target">
+                    <span class="ft-order-task-document-target-icon">PO</span>
+                    <div>
+                        <small>ATTACHMENT</small>
+                        <strong>{{ $emailHandoffPreview['document_name'] ?? 'No Purchase Order uploaded' }}</strong>
+                        <span>{{ filled($emailHandoffPreview['document_version'] ?? null) ? 'Version '.(int) $emailHandoffPreview['document_version'] : 'Upload the Purchase Order in the previous task first' }}</span>
+                    </div>
+                    <em>{{ $emailHandoffPreview['recipient_count'] ?? 0 }} recipient{{ (int) ($emailHandoffPreview['recipient_count'] ?? 0) === 1 ? '' : 's' }}</em>
+                </div>
+                <x-email.handoff-preview
+                    :preview="$emailHandoffPreview"
+                    :defaultSubject="'Purchase Order ready — '.$orderNumber"
+                    emptyRecipientText="No active user with a valid email is assigned to this Order's Artwork phase."
+                />
+                @error('orderWorkflowActionEmail')<p class="validation-error">{{ $message }}</p>@enderror
             @elseif($variant === 'artwork_review' || $variant === 'artwork_email' || $variant === 'client_erp')
                 <div class="ft-prototype-artwork-preview">
                     <div class="ft-prototype-artwork-canvas">
@@ -124,7 +143,12 @@
                 </div>
 
                 @if($variant === 'artwork_email')
-                    <div class="ft-prototype-email-preview"><b>To:</b> Order Team<br><b>Subject:</b> Artwork ready — {{ $orderNumber }}<br><br>The latest confirmed artwork is attached for client ERP upload.</div>
+                    <x-email.handoff-preview
+                        :preview="$emailHandoffPreview"
+                        :defaultSubject="'Artwork ready — '.$orderNumber"
+                        emptyRecipientText="No active user with a valid email has the Order Team role in Users & role assignments."
+                    />
+                    @error('orderWorkflowActionEmail')<p class="validation-error">{{ $message }}</p>@enderror
                 @elseif($variant === 'client_erp')
                     <label class="ft-prototype-field ft-prototype-field--top"><span>Client ERP reference</span><input wire:model="orderWorkflowActionPayload.erp_reference" placeholder="Client ERP reference">@error('orderWorkflowActionPayload.erp_reference')<p class="validation-error">{{ $message }}</p>@enderror</label>
                 @endif

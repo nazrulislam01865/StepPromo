@@ -24,12 +24,23 @@ trait ManagesMasterEditor
         $action = $id ? 'edit' : 'create';
         $this->authorizeGroupAction($action);
         $service = app(MasterDataService::class);
-        if ($this->group === 'product') {
+        if ($this->group === 'product' && $id) {
             app(\App\Services\ProductTaxonomyService::class)->synchronizeLegacyTaxonomy();
         }
-        $this->recordsReady = true;
+        // Product create/edit is a full-page editor. Do not hydrate the product
+        // list behind it; direct ?create=1 navigation should pay only for the
+        // form and the progressive sections the user reaches. Compact generic
+        // Master Data editors still keep their list available behind the modal.
+        if ($this->group !== 'product') {
+            $this->recordsReady = true;
+        }
         $this->showModal = true;
         $this->editId = $id;
+        // Existing products need their stored taxonomy/urgency values immediately.
+        // New products hydrate these below-the-fold reference datasets only when
+        // their sections approach the viewport.
+        $this->productTaxonomyReady = (bool) $id;
+        $this->productShipmentOptionsReady = (bool) $id;
         $this->productImage = null;
         $this->existingProductImageUrl = null;
         $this->removeProductImage = false;
@@ -196,9 +207,34 @@ Remote Area charge	".$remoteRow;
         $this->orderFlagId = null;
         $this->sortOrder = (int) MasterRecord::where('workspace_id', $service->workspaceId())->where('type', $this->group)->max('sort_order') + 1;
     }
+    public function loadCreateSection(string $section): void
+    {
+        abort_unless($this->group === 'product' && $this->showModal, 422);
+
+        if ($section === 'product-taxonomy') {
+            if (! $this->productTaxonomyReady) {
+                app(\App\Services\ProductTaxonomyService::class)->synchronizeLegacyTaxonomy();
+                $this->productTaxonomyReady = true;
+            }
+            return;
+        }
+
+        if ($section === 'product-shipping-urgencies') {
+            $this->productShipmentOptionsReady = true;
+            return;
+        }
+
+        abort(422, 'Unknown Create Product section.');
+    }
+
     public function close(): void
     {
         $this->showModal = false;
+        if ($this->group === 'product') {
+            $this->recordsReady = true;
+        }
+        $this->productTaxonomyReady = false;
+        $this->productShipmentOptionsReady = false;
         $this->productImage = null;
         $this->existingProductImageUrl = null;
         $this->removeProductImage = false;
@@ -419,8 +455,18 @@ Remote Area charge	".$remoteRow;
             $metadata ??= [];
             $metadata['reference_code'] = trim((string) $data['productReferenceCode']);
             if (filled($data['productSupplierId'] ?? null)) {
-                $metadata['supplier_id'] = (int) $data['productSupplierId'];
+                $defaultSupplierId = (int) $data['productSupplierId'];
+                $metadata['supplier_id'] = $defaultSupplierId;
+                unset($metadata['default_supplier_id']);
+                $metadata['supplier_ids'] = collect((array) ($metadata['supplier_ids'] ?? []))
+                    ->map(fn ($id) => (int) $id)
+                    ->filter(fn (int $id) => $id > 0)
+                    ->prepend($defaultSupplierId)
+                    ->unique()
+                    ->values()
+                    ->all();
             } else {
+                // Clearing the default supplier must not destroy other supplier links.
                 unset($metadata['supplier_id'], $metadata['default_supplier_id']);
             }
             $metadata['main_category'] = trim((string) $data['productFormMainCategory']);

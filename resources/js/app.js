@@ -1,5 +1,6 @@
 import { installBrowserApi } from './core/browser-api.js';
 import { bootAttachmentAutoUpload } from './components/attachment-auto-upload.js';
+import { bootAsyncFeedback, resetAsyncFeedback } from './components/async-feedback.js';
 import { bootFileDropzones } from './components/file-dropzones.js';
 import { resetInlineEditState } from './components/inline-edit.js';
 import { bootMasterColors } from './components/master-colors.js';
@@ -27,6 +28,7 @@ installBrowserApi();
 const bootShared = () => {
     syncBrowserTimezone();
     bootShell();
+    bootAsyncFeedback();
 
     const realtime = bootRealtimeClient();
     bootNotifications(realtime);
@@ -53,6 +55,7 @@ const bootLivewire = () => {
     bootLivewireNotificationEvents();
     bootLivewireRichTextHooks();
     bootLivewireMentionHooks();
+    bootAsyncFeedback();
     bootMasterColors();
 
     const realtime = bootRealtimeClient();
@@ -74,6 +77,7 @@ bindNavigationLifecycle({
     },
     navigating: (event) => {
         resetInlineEditState();
+        resetAsyncFeedback();
         event.detail?.onSwap?.(() => {
             scheduleRichTextRefresh();
             observeRichTextEditors();

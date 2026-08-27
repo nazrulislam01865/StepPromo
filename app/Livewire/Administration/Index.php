@@ -11,10 +11,8 @@ use App\Models\RoleModuleAccess;
 use App\Models\User;
 use App\Services\AccessControlService;
 use App\Services\AdminService;
-use App\Services\FilterOptionService;
 use App\Services\BrandingService;
 use App\Services\SetupContext;
-use Illuminate\Validation\Rule;
 use Livewire\Attributes\Renderless;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -32,17 +30,6 @@ class Index extends Component
 
     // CHANGE 2026-08-24: Users & Assignments search state.
     public string $userSearch = '';
-
-    public bool $showUserModal = false;
-    public ?int $editingUserId = null;
-    public string $name = '';
-    public string $position = '';
-    public string $email = '';
-    public string $password = '';
-    public string $passwordConfirmation = '';
-    public array $roleIds = [];
-    public ?int $departmentId = null;
-    public bool $userActive = true;
 
     public $logoUpload = null;
     public $faviconUpload = null;
@@ -107,73 +94,12 @@ class Index extends Component
 
     public function openUser(?int $id = null): void
     {
-        $this->tab = 'users';
-        $this->resetValidation();
-        $this->editingUserId = $id;
-        $this->password = '';
-        $this->passwordConfirmation = '';
-
         if ($id) {
-            $user = User::findOrFail($id);
-            $this->name = $user->name;
-            $this->position = app(AdminService::class)->positionFor($user) ?? '';
-            $this->email = $user->email;
-            $this->roleIds = $user->assignedRoleIds();
-            $this->departmentId = $user->department_id;
-            $this->userActive = (bool) $user->is_active;
-        } else {
-            $this->reset(['name','position','email','roleIds','departmentId']);
-            $this->userActive = true;
+            $this->redirectRoute('users.edit', ['user' => $id, 'from' => 'administration'], navigate: true);
+            return;
         }
 
-        $this->showUserModal = true;
-    }
-
-    public function closeUser(): void
-    {
-        $this->showUserModal = false;
-        $this->editingUserId = null;
-        $this->resetValidation();
-        $this->reset(['name','position','email','password','passwordConfirmation','roleIds','departmentId']);
-        $this->userActive = true;
-    }
-
-    public function saveUser(): void
-    {
-        $editing = $this->editingUserId !== null;
-        $rules = [
-            'name' => ['required','string','max:255'],
-            'position' => ['nullable','string','max:120'],
-            'email' => ['required','email', $editing ? 'unique:users,email,'.$this->editingUserId : 'unique:users,email'],
-            'roleIds' => ['required','array','min:1'],
-            'roleIds.*' => ['distinct', Rule::exists('roles', 'id')->where('workspace_id', app(SetupContext::class)->workspaceId())],
-            'departmentId' => ['nullable','exists:departments,id'],
-            'userActive' => ['boolean'],
-            'password' => $editing ? ['nullable','string','min:10'] : ['required','string','min:10'],
-            'passwordConfirmation' => $editing ? ['required_with:password','same:password'] : ['required','same:password'],
-        ];
-        $data = $this->validate($rules, [
-            'passwordConfirmation.same' => 'The password confirmation does not match.',
-        ]);
-
-        $payload = [
-            'name' => $data['name'],
-            'position' => filled(trim((string) ($data['position'] ?? ''))) ? trim($data['position']) : null,
-            'email' => $data['email'],
-            'role_ids' => array_values($data['roleIds']),
-            'department_id' => $data['departmentId'],
-            'is_active' => $data['userActive'],
-        ];
-        if (filled($data['password'] ?? null)) $payload['password'] = $data['password'];
-
-        if ($editing) {
-            app(AdminService::class)->updateUser(User::findOrFail($this->editingUserId), $payload, auth()->user());
-        } else {
-            app(AdminService::class)->createUser($payload);
-        }
-
-        session()->flash('success', $editing ? 'User updated.' : 'User created.');
-        $this->closeUser();
+        $this->redirectRoute('users.create', navigate: true);
     }
 
     public function deleteUser(int $userId): void
@@ -181,8 +107,6 @@ class Index extends Component
         app(AdminService::class)->deleteUser(User::findOrFail($userId), auth()->user());
         session()->flash('success', 'User deleted.');
     }
-
-    public function createUser(): void { $this->saveUser(); }
 
     public function openRole(?int $id = null): void
     {
@@ -356,13 +280,6 @@ class Index extends Component
         return $this->redirectRoute('administration', ['tab' => 'branding']);
     }
 
-    public function setDepartmentSelection(string $property, string $value): void
-    {
-        abort_unless($property === 'departmentId', 422);
-        abort_unless(auth()->user()->isSuperAdmin(), 403);
-        $this->departmentId = $value !== '' ? (int) $value : null;
-    }
-
     public function render()
     {
         $service = app(AdminService::class);
@@ -422,15 +339,6 @@ class Index extends Component
         return [
             // CHANGE 2026-08-24: search stays server-side and workspace scoped.
             'users' => $service->paginateUsers(10, 'usersPage', $this->userSearch),
-            'roles' => $service->roleOptions(),
-            'departments' => app(FilterOptionService::class)->options(
-                auth()->user(),
-                'departments',
-                'administration',
-                '',
-                $this->departmentId,
-                FilterOptionService::COMPACT_PER_PAGE,
-            ),
         ];
     }
 }

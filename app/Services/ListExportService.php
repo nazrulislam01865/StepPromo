@@ -120,7 +120,7 @@ class ListExportService
         // The remaining tabs preserve the existing full-detail/report data.
         $this->fillListViewSheet($book->getActiveSheet(), 'Order List', [
             'Created by / on', 'Order', 'Inquiry', 'Client / Products', 'Phase',
-            'Health', 'Flag', 'Owner / Delivery', 'Progress',
+            'Flag', 'Owner / Delivery', 'Progress',
         ], $this->orderListRows($orders));
 
         $this->fillSheet($book->createSheet(), 'Order Details', [
@@ -136,7 +136,7 @@ class ListExportService
         $this->fillSheet($book->createSheet(), 'Orders', [
             'Order ID', 'Order Number', 'Reference Order No.', 'Repeat Order?', 'Repeat Order No.',
             'Order Title', 'Order Description', 'Notes', 'Client ID', 'Client Code', 'Client Name',
-            'Source Inquiry', 'Workflow', 'Current Phase', 'Started From Phase', 'Status', 'Health',
+            'Source Inquiry', 'Workflow', 'Current Phase', 'Started From Phase', 'Status',
             'Order Flag', 'Priority', 'Progress %', 'Owner', 'Coordinator', 'Created By', 'Received Date',
             'Customer Requested Delivery Date', 'Estimated Delivery Date', 'Shipping Address',
             'Phone Country Code', 'Phone Number', 'Postal Code', 'Production Urgency', 'Shipment Urgency',
@@ -161,7 +161,6 @@ class ListExportService
             $order->phase?->name,
             $order->startedFromPhase?->name,
             $order->status,
-            $order->health,
             $order->orderFlag?->name,
             $order->priority,
             $order->progress,
@@ -267,17 +266,17 @@ class ListExportService
         ])));
 
         $this->fillSheet($book->createSheet(), 'Phase History', [
-            'Order Number', 'Phase', 'Status', 'Phase Owner ID', 'Target Date', 'Health Override', 'Changed By',
+            'Order Number', 'Phase', 'Status', 'Phase Owner ID', 'Target Date', 'Changed By',
             'Entered At', 'Completed At', 'Created At',
         ], $orders->flatMap(fn (FlowJob $order) => $order->phaseHistories->map(fn ($history) => [
             $order->displayOrderNumber(), $history->phase?->name, $history->status, $history->phase_owner_id,
-            $this->date($history->target_date), $history->health_override, $history->actor?->name,
+            $this->date($history->target_date), $history->actor?->name,
             $this->dateTime($history->entered_at), $this->dateTime($history->completed_at), $this->dateTime($history->created_at),
         ])));
 
         $this->fillSheet($book->createSheet(), 'Activities', [
             'Order Number', 'Event', 'Description', 'User', 'Metadata', 'Created At',
-        ], $orders->flatMap(fn (FlowJob $order) => $order->activities->map(fn ($activity) => [
+        ], $orders->flatMap(fn (FlowJob $order) => $order->activities->where('event', '!=', 'job.health_updated')->map(fn ($activity) => [
             $order->displayOrderNumber(), $activity->event, $this->plainText($activity->description), $activity->user?->name,
             $this->json($activity->meta), $this->dateTime($activity->created_at),
         ])));
@@ -498,7 +497,6 @@ class ListExportService
             }
 
             $phaseName = trim((string) ($order->phase?->name ?: $order->status ?: '—'));
-            $health = $order->completed_at ? 'Completed' : trim((string) ($order->health ?: 'On Track'));
             $automaticFlag = trim((string) ($flags->labelForOrder($order) ?: ''));
             $manualAttention = (bool) ($order->attention_requested ?? false);
             $flag = $manualAttention ? 'Requires attention' : ($automaticFlag !== '' ? $automaticFlag : 'No flag');
@@ -518,7 +516,6 @@ class ListExportService
                     $inquiryCell,
                     $this->orderListProductCell($order),
                     $phaseName,
-                    $health,
                     $flag,
                     $ownerName."\n".$delivery,
                     max(0, min(100, (int) $order->progress)).'%',
@@ -527,8 +524,7 @@ class ListExportService
                 // 1-based column numbers, matching the sheet's visible columns.
                 'cell_colors' => array_filter([
                     5 => \App\Support\MasterColor::normalize((string) ($order->phase?->color ?? '')),
-                    6 => $this->semanticListColor($health),
-                    7 => $flag === 'No flag' ? null : ($flagColor ?: $this->semanticListColor($flag)),
+                    6 => $flag === 'No flag' ? null : ($flagColor ?: $this->semanticListColor($flag)),
                 ]),
             ];
         }

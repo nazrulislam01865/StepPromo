@@ -92,7 +92,7 @@
 
     <div class="ft-grid ft-grid-balanced">
         <section class="ft-panel ft-dashboard-jobs-panel">
-            <div class="ft-panel-head"><div><h2 class="ft-panel-title">Ongoing Orders</h2><div class="ft-panel-note">Current stage, health and exception flags</div></div><a class="ft-link" href="{{ route('jobs.index') }}" wire:navigate>View orders</a></div>
+            <div class="ft-panel-head"><div><h2 class="ft-panel-title">Ongoing Orders</h2><div class="ft-panel-note">Current stage and exception flags</div></div><a class="ft-link" href="{{ route('jobs.index') }}" wire:navigate>View orders</a></div>
             <div class="ft-table-wrap">
                 <table class="ft-table responsive ft-dashboard-jobs-table">
                     <colgroup><col class="ft-dashboard-col--31"><col class="ft-dashboard-col--18"><col class="ft-dashboard-col--23"><col class="ft-dashboard-col--18"><col class="ft-dashboard-col--10"></colgroup>
@@ -162,27 +162,27 @@
         </section>
 
         <section class="ft-panel ft-dashboard-clients-panel">
-            <div class="ft-panel-head"><div><h2 class="ft-panel-title">Client portfolio</h2><div class="ft-panel-note">Active work, inquiry volume and delivery health</div></div><a class="ft-link" href="{{ route('clients.index') }}" wire:navigate>All clients</a></div>
+            <div class="ft-panel-head"><div><h2 class="ft-panel-title">Client portfolio</h2><div class="ft-panel-note">Active work, inquiry volume and delivery performance</div></div><a class="ft-link" href="{{ route('clients.index') }}" wire:navigate>All clients</a></div>
             <div class="ft-table-wrap">
                 <table class="ft-table responsive ft-dashboard-clients-table">
                     <colgroup><col class="ft-dashboard-col--28"><col class="ft-dashboard-col--15"><col class="ft-dashboard-col--18"><col class="ft-dashboard-col--19"><col class="ft-dashboard-col--20"></colgroup>
-                    <thead><tr><th>Client</th><th>Orders</th><th>Inquiries</th><th>At risk</th><th>On time</th></tr></thead>
+                    <thead><tr><th>Client</th><th>Orders</th><th>Inquiries</th><th>Attention</th><th>On time</th></tr></thead>
                     <tbody>
                         @forelse($clientPortfolio as $portfolioClient)
                             @php
                                 $portfolioOpenTasks = (int) ($portfolioClient->open_tasks_count ?? 0);
                                 $portfolioOverdueTasks = (int) ($portfolioClient->overdue_tasks_count ?? 0);
-                                $portfolioAtRiskJobs = (int) ($portfolioClient->at_risk_jobs_count ?? 0);
+                                $portfolioAttentionJobs = (int) ($portfolioClient->attention_jobs_count ?? 0);
                                 $portfolioOnTime = $portfolioOpenTasks > 0
                                     ? max(0, (int) round((($portfolioOpenTasks - $portfolioOverdueTasks) / $portfolioOpenTasks) * 100))
                                     : 100;
-                                $portfolioRiskTone = $portfolioAtRiskJobs > 1 ? 'red' : ($portfolioAtRiskJobs === 1 ? 'amber' : 'green');
+                                $portfolioAttentionTone = $portfolioAttentionJobs > 1 ? 'red' : ($portfolioAttentionJobs === 1 ? 'amber' : 'green');
                             @endphp
                             <tr wire:key="dashboard-client-portfolio-{{ $portfolioClient->id }}">
                                 <td data-label="Client"><a class="ft-text-link ft-dashboard-client-logo-link" href="{{ route('clients.index') }}" wire:navigate><x-ui.client-logo :client="$portfolioClient" :name="$portfolioClient->name" :size="24" /><span>{{ $portfolioClient->name }}</span></a></td>
                                 <td data-label="Orders"><a class="ft-text-link" href="{{ route('jobs.index', ['client' => $portfolioClient->id]) }}" wire:navigate>{{ (int) ($portfolioClient->active_jobs_count ?? 0) }} ↗</a></td>
                                 <td data-label="Inquiries"><a class="ft-text-link" href="{{ route('inquiries.index') }}" wire:navigate>{{ (int) ($portfolioClient->open_inquiries_count ?? 0) }} ↗</a></td>
-                                <td data-label="At risk"><span class="ft-flag {{ $portfolioRiskTone }}">{{ $portfolioAtRiskJobs }}</span></td>
+                                <td data-label="Attention"><span class="ft-flag {{ $portfolioAttentionTone }}">{{ $portfolioAttentionJobs }}</span></td>
                                 <td data-label="On time">{{ $portfolioOnTime }}%</td>
                             </tr>
                         @empty

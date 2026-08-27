@@ -12,6 +12,7 @@ use App\Services\ProductPriceTableParser;
 use App\Services\ProductCategoryDeletionService;
 use App\Support\MasterColor;
 use App\Support\AttachmentUpload;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -24,14 +25,20 @@ trait BuildsMasterDataPageData
         $this->authorizeGroupAction('view');
         $service = app(MasterDataService::class);
         $workspaceId = $service->workspaceId();
-        $summaries = MasterRecord::query()
-            ->where('workspace_id', $workspaceId)
-            ->where('type', $this->group)
-            ->selectRaw('type, count(*) as total_count')
-            ->selectRaw("sum(case when status = 'active' then 1 else 0 end) as active_count")
-            ->groupBy('type')
-            ->get()
-            ->keyBy('type');
+        $editorOnly = $this->showModal
+            || $this->supplierCreateMode
+            || ($this->group === 'supplier' && ($this->supplierViewId || $this->supplierEditId))
+            || ($this->group === 'product_category' && $this->categoryEditorLevel);
+        $summaries = $editorOnly
+            ? collect()
+            : MasterRecord::query()
+                ->where('workspace_id', $workspaceId)
+                ->where('type', $this->group)
+                ->selectRaw('type, count(*) as total_count')
+                ->selectRaw("sum(case when status = 'active' then 1 else 0 end) as active_count")
+                ->groupBy('type')
+                ->get()
+                ->keyBy('type');
 
         $rows = null;
         // Progressive rendering fallback retained for non-product groups: ? $service->paginate($this->group, $this->search, 30)
@@ -42,7 +49,11 @@ trait BuildsMasterDataPageData
                     'parent_id' => $this->productCategory,
                     'client_availability' => $this->productClientAvailability,
                     'status' => $this->productStatus,
+                    'supplier_id' => $this->productSupplierFilterId,
+                    'supplier_state' => $this->productSupplierState,
                 ]);
+            } elseif ($this->group === 'supplier') {
+                $rows = $this->supplierListRows($workspaceId);
             } else {
                 $rows = $service->paginate($this->group, $this->search, 30);
             }
@@ -50,7 +61,7 @@ trait BuildsMasterDataPageData
 
         $selected = $summaries->get($this->group);
 
-        $parents = $this->showModal && $this->group === 'product'
+        $parents = $this->showModal && $this->group === 'product' && ($this->editId || $this->productTaxonomyReady)
             ? $service->active('product_category')
             : ($this->showModal && $this->group === 'state' ? $service->active('country') : collect());
 
@@ -58,7 +69,9 @@ trait BuildsMasterDataPageData
         // the Product Categories page. Do not infer child categories from
         // products: newly-created Product Categories/Subcategories may have zero
         // products and still need to be immediately selectable.
-        $productTaxonomy = $this->group === 'product'
+        $productTaxonomyReady = $this->group === 'product'
+            && (! $this->showModal || $this->editId || $this->productTaxonomyReady);
+        $productTaxonomy = $productTaxonomyReady
             ? app(\App\Services\ProductTaxonomyService::class)
             : null;
         $canonicalMainCategories = $productTaxonomy ? $productTaxonomy->mainCategories(true) : collect();
@@ -98,7 +111,7 @@ trait BuildsMasterDataPageData
         $hasExactCategory = false;
         $productCodeDuplicate = null;
 
-        if ($this->showModal && $this->group === 'product' && !$this->editId) {
+        if ($this->showModal && $this->group === 'product' && !$this->editId && $this->productTaxonomyReady) {
             $manualCode = trim($this->code);
             if ($manualCode !== '') {
                 $productCodeDuplicate = MasterRecord::withTrashed()
@@ -141,7 +154,7 @@ trait BuildsMasterDataPageData
             ])->values()
             : collect();
         $productSubcategories = collect();
-        if ($this->group === 'product') {
+        if ($this->group === 'product' && $productTaxonomy) {
             $selectedCategoryId = (int) ($this->parentId ?? 0);
 
             $cataloguedSubcategories = $productTaxonomy->subcategories(true)
@@ -203,6 +216,27 @@ trait BuildsMasterDataPageData
         $categorySubcategoryProductCounts = collect();
         $categoryProductChildTotals = collect();
         $categorySubcategoryChildTotals = collect();
+
+        // A direct Add Category route opens the editor without hydrating the
+        // category list behind it. Load only the parent choices that the compact
+        // editor actually needs; the hierarchy/list counts stay deferred.
+        if ($this->group === 'product_category' && $this->categoryEditorLevel && ! $this->recordsReady) {
+            if ($this->categoryEditorLevel === 'product') {
+                $categoryMainCategories = MasterRecord::query()
+                    ->forWorkspace($workspaceId)
+                    ->ofType('product_main_category')
+                    ->active()
+                    ->orderBy('sort_order')->orderBy('name')
+                    ->get(['id', 'code', 'name', 'status', 'sort_order']);
+            } elseif ($this->categoryEditorLevel === 'sub') {
+                $categoryProductCategories = MasterRecord::query()
+                    ->forWorkspace($workspaceId)
+                    ->ofType('product_category')
+                    ->active()
+                    ->orderBy('sort_order')->orderBy('name')
+                    ->get(['id', 'code', 'name', 'status', 'sort_order', 'metadata']);
+            }
+        }
 
         if ($this->group === 'product_category' && $this->recordsReady) {
             // Match the category lazy-pagination prototype exactly:
@@ -561,6 +595,84 @@ trait BuildsMasterDataPageData
             }
         }
         $productSelectionCount = $this->group === 'product' ? $this->productSelectionCount() : 0;
+        $productSuppliersByProduct = collect();
+        if ($this->group === 'product' && $rows) {
+            $pageProducts = collect($rows->items());
+            $pageProductIds = $pageProducts->pluck('id')->map(fn ($id) => (int) $id)->values();
+            $supplierIdsByProduct = $pageProducts->mapWithKeys(fn (MasterRecord $product) => [
+                (int) $product->id => collect($product->productSupplierIds())->map(fn ($id) => (int) $id)->filter()->unique()->values(),
+            ]);
+
+            if (Schema::hasTable('product_supplier_links') && $pageProductIds->isNotEmpty()) {
+                DB::table('product_supplier_links')
+                    ->where('workspace_id', $workspaceId)
+                    ->whereIn('product_id', $pageProductIds->all())
+                    ->get(['product_id', 'supplier_id'])
+                    ->each(function ($link) use ($supplierIdsByProduct): void {
+                        $productId = (int) $link->product_id;
+                        $supplierId = (int) $link->supplier_id;
+                        $bucket = collect($supplierIdsByProduct->get($productId, collect()))->push($supplierId)->unique()->values();
+                        $supplierIdsByProduct->put($productId, $bucket);
+                    });
+            }
+
+            $allSupplierIds = $supplierIdsByProduct->flatten()->map(fn ($id) => (int) $id)->filter()->unique()->values();
+            $supplierRecords = $allSupplierIds->isEmpty()
+                ? collect()
+                : MasterRecord::query()
+                    ->forWorkspace($workspaceId)
+                    ->ofType('supplier')
+                    ->whereIn('id', $allSupplierIds->all())
+                    ->get(['id', 'name', 'code', 'status'])
+                    ->keyBy('id');
+
+            $productSuppliersByProduct = $pageProducts->mapWithKeys(fn (MasterRecord $product) => [
+                (int) $product->id => collect($supplierIdsByProduct->get((int) $product->id, collect()))
+                    ->map(fn ($supplierId) => $supplierRecords->get((int) $supplierId))
+                    ->filter()
+                    ->values(),
+            ]);
+        }
+
+        $bulkProductSupplierOptions = collect();
+        $bulkProductSupplierProductCounts = collect();
+        if ($this->group === 'product' && $this->bulkProductPanel === 'supplier') {
+            $bulkProductSupplierOptions = MasterRecord::query()
+                ->forWorkspace($workspaceId)
+                ->ofType('supplier')
+                ->active()
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'name', 'code', 'metadata', 'status']);
+
+            $optionIds = $bulkProductSupplierOptions->pluck('id')->map(fn ($id) => (int) $id)->flip();
+            $bulkSupplierLinks = collect();
+            MasterRecord::query()
+                ->forWorkspace($workspaceId)
+                ->ofType('product')
+                ->get(['id', 'metadata'])
+                ->each(function (MasterRecord $product) use ($bulkSupplierLinks, $optionIds): void {
+                    foreach ($product->productSupplierIds() as $supplierId) {
+                        $supplierId = (int) $supplierId;
+                        if ($optionIds->has($supplierId)) {
+                            $bulkSupplierLinks->put((int) $product->id.':'.$supplierId, $supplierId);
+                        }
+                    }
+                });
+
+            if (Schema::hasTable('product_supplier_links')) {
+                DB::table('product_supplier_links')
+                    ->where('workspace_id', $workspaceId)
+                    ->whereIn('supplier_id', $optionIds->keys()->all())
+                    ->get(['product_id', 'supplier_id'])
+                    ->each(function ($link) use ($bulkSupplierLinks): void {
+                        $supplierId = (int) $link->supplier_id;
+                        $bulkSupplierLinks->put((int) $link->product_id.':'.$supplierId, $supplierId);
+                    });
+            }
+
+            $bulkProductSupplierProductCounts = $bulkSupplierLinks->values()->countBy();
+        }
         $categorySelectionCount = $this->group === 'product_category' ? count($this->selectedCategoryKeys) : 0;
         $bulkProductCategories = collect();
         $bulkProductSubcategories = collect();
@@ -611,7 +723,7 @@ trait BuildsMasterDataPageData
             : collect();
 
         $availableProductShipmentUrgencies = collect();
-        if ($this->group === 'product' && $this->showModal) {
+        if ($this->group === 'product' && $this->showModal && ($this->editId || $this->productShipmentOptionsReady)) {
             $selectedShipmentUrgencyIds = collect($this->productShipmentUrgencies)
                 ->pluck('shipment_urgency_id')
                 ->map(fn ($value) => (int) $value)
@@ -633,6 +745,37 @@ trait BuildsMasterDataPageData
             }
         }
 
+        $supplierDetail = null;
+        $supplierDetailProducts = collect();
+        if ($this->group === 'supplier' && ! $this->supplierCreateMode && ($this->supplierEditId || $this->supplierViewId)) {
+            $supplierDetailId = (int) ($this->supplierEditId ?: $this->supplierViewId);
+            $supplierDetail = MasterRecord::query()
+                ->forWorkspace($workspaceId)
+                ->ofType('supplier')
+                ->with('creator:id,name')
+                ->findOrFail($supplierDetailId);
+            $supplierDetailProducts = $this->supplierDetailProducts($workspaceId, $supplierDetail);
+        }
+
+        $supplierCreateCodeRows = $this->group === 'supplier' && $this->supplierCreateMode
+            ? $this->supplierCreateCodeRows($workspaceId)
+            : collect();
+        $supplierCreateExamples = $this->group === 'supplier' && $this->supplierCreateMode
+            ? $this->supplierCreateExamples($workspaceId)
+            : collect();
+        $supplierListSummary = $this->group === 'supplier'
+            && ! $this->supplierCreateMode
+            && ! $this->supplierViewId
+            && ! $this->supplierEditId
+            ? $this->supplierListSummary($workspaceId, $rows)
+            : [
+                'active_suppliers' => 0,
+                'total_products' => 0,
+                'assigned_products' => 0,
+                'unassigned_products' => 0,
+                'products_by_supplier' => collect(),
+            ];
+
         return view('livewire.master-data.index', [
             'labels' => MasterDataService::LABELS,
             'rows' => $rows,
@@ -641,7 +784,9 @@ trait BuildsMasterDataPageData
             'similarCategories' => $similarCategories,
             'hasExactCategory' => $hasExactCategory,
             'productCodeDuplicate' => $productCodeDuplicate,
-            'productCategories' => $this->group === 'product' ? $service->list('product_category') : collect(),
+            'productCategories' => $this->group === 'product' && (! $this->showModal || $this->editId || $this->productTaxonomyReady)
+                ? $service->list('product_category')
+                : collect(),
             'productFormCategories' => $productFormCategories,
             'productMainCategories' => $productMainCategories,
             'productMainCategoryFilterOptions' => $productMainCategoryFilterOptions,
@@ -653,6 +798,9 @@ trait BuildsMasterDataPageData
             'viewProduct' => $viewProduct,
             'editProduct' => $editProduct,
             'productSelectionCount' => $productSelectionCount,
+            'productSuppliersByProduct' => $productSuppliersByProduct,
+            'bulkProductSupplierOptions' => $bulkProductSupplierOptions,
+            'bulkProductSupplierProductCounts' => $bulkProductSupplierProductCounts,
             'categorySelectionCount' => $categorySelectionCount,
             'bulkProductCategories' => $bulkProductCategories,
             'bulkProductSubcategories' => $bulkProductSubcategories,
@@ -678,6 +826,11 @@ trait BuildsMasterDataPageData
             'selectedActive' => (int) ($selected?->active_count ?? 0),
             'orderTaskFlagOptions' => $orderTaskFlagOptions,
             'orderFlagOptions' => $orderFlagOptions,
+            'supplierCreateCodeRows' => $supplierCreateCodeRows,
+            'supplierCreateExamples' => $supplierCreateExamples,
+            'supplierListSummary' => $supplierListSummary,
+            'supplierDetail' => $supplierDetail,
+            'supplierDetailProducts' => $supplierDetailProducts,
         ]);
     }
 }

@@ -36,6 +36,18 @@ Artisan::command('flowtrack:sync-order-flags', function (): int {
 // persisted values are refreshed independently of page traffic.
 Schedule::command('flowtrack:sync-order-flags')->hourly()->withoutOverlapping()->onOneServer();
 
+
+Artisan::command('flowtrack:send-rfq-reminders', function (): int {
+    $result = app(\App\Services\Inquiries\InquiryRfqService::class)->sendDueReminders();
+    $this->info('RFQ due-date reminders sent: '.(int) $result['sent'].'. Failed: '.(int) $result['failed'].'.');
+    return (int) $result['failed'] > 0 ? 1 : 0;
+})->purpose('Send supplier RFQ reminders for quotations due tomorrow');
+
+Schedule::command('flowtrack:send-rfq-reminders')
+    ->dailyAt('09:00')
+    ->withoutOverlapping()
+    ->onOneServer();
+
 Artisan::command('flowtrack:performance:explain {--user=1 : User ID used for assignee/member query plans}', function (): int {
     $userId = max(1, (int) $this->option('user'));
     $driver = DB::connection()->getDriverName();

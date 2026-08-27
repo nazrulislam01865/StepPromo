@@ -2217,3 +2217,15 @@ a.ft-new-job-btn:active {
     line-height: 1.15
 }
 
+
+
+/* Order Health removed from Task Board order-group summaries. */
+.ft-board-taskpack-job-head {
+    grid-template-columns:22px minmax(180px,1.3fr) minmax(130px,.8fr) minmax(110px,.7fr) minmax(120px,.8fr) auto;
+}
+.ft-task-board-list-page .ft-board-taskpack-job-head {
+    grid-template-columns:28px minmax(210px,1.35fr) minmax(145px,.8fr) minmax(115px,.68fr) minmax(135px,.75fr) auto;
+}
+@media (max-width:820px) {
+    .ft-board-taskpack-job-head { grid-template-columns:22px minmax(0,1fr) auto; }
+}

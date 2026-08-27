@@ -62,7 +62,7 @@
                     </div>
                     <p class="validation-error ft-order-popup-form-error" x-cloak x-show="errors.form" x-text="errors.form"></p>
                 </div>
-                <div class="modal-foot"><button type="button" class="btn" x-on:click="editOpen=false">Cancel</button><button type="button" class="btn primary" :disabled="saving" x-on:click="saveShipping()"><span x-show="!saving">Save Changes</span><span x-show="saving">Saving…</span></button></div>
+                <div class="modal-foot"><button type="button" class="btn" x-on:click="editOpen=false">Cancel</button><button type="button" class="btn primary" :disabled="saving" data-ft-feedback="off" x-on:click="saveShipping()"><span x-show="!saving">Save Changes</span><span x-show="saving">Saving…</span></button></div>
             </div>
         </div>
     @endif

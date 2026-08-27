@@ -8,7 +8,7 @@
         <a href="{{ route('workflow.setup') }}" wire:navigate class="ft-admin-back">← Back to Workflow Setup</a>
     </div>
 
-    <form wire:submit="save" class="ft-admin-form-card ft-workflow-create-card">
+    <form wire:submit="save" class="ft-admin-form-card ft-workflow-create-card" data-ft-feedback-scope="form">
         <section class="ft-workflow-form-section ft-workflow-details-section">
             <div class="ft-workflow-section-heading">
                 <h2>1. Workflow details</h2>
@@ -129,24 +129,29 @@
             <section class="ft-workflow-form-section ft-workflow-start-section">
                 <div class="ft-workflow-section-heading">
                     <h2>3. Start from</h2>
+                    <p>Existing workflow templates are fetched only when this section is needed.</p>
                 </div>
-                <div class="ft-admin-field">
-                    <label for="workflow-source">Start from</label>
-                    <select id="workflow-source" wire:model="sourceWorkflowId">
-                        <option value="">Blank workflow</option>
-                        @foreach($workflows as $workflow)
-                            <option value="{{ $workflow->id }}">{{ $workflow->name }}</option>
-                        @endforeach
-                    </select>
-                    <small>
-                        @if($workflowAppliesTo === 'orders')
-                            A blank Order workflow automatically receives the fixed seven Order stages and separate stage Task Packs. Duplicating an Order workflow clones its Task Packs so each workflow remains independently editable.
-                        @else
-                            Duplicating copies the Inquiry phase sequence and configuration, but not Inquiry history.
-                        @endif
-                    </small>
-                    @error('sourceWorkflowId')<div class="validation-error">{{ $message }}</div>@enderror
-                </div>
+                @if($sourceOptionsReady)
+                    <div class="ft-admin-field" wire:key="workflow-source-options-ready">
+                        <label for="workflow-source">Start from</label>
+                        <select id="workflow-source" wire:model="sourceWorkflowId">
+                            <option value="">Blank workflow</option>
+                            @foreach($workflows as $workflow)
+                                <option value="{{ $workflow->id }}">{{ $workflow->name }}</option>
+                            @endforeach
+                        </select>
+                        <small>
+                            @if($workflowAppliesTo === 'orders')
+                                A blank Order workflow automatically receives the fixed seven Order stages and separate stage Task Packs. Duplicating an Order workflow clones its Task Packs so each workflow remains independently editable.
+                            @else
+                                Duplicating copies the Inquiry phase sequence and configuration, but not Inquiry history.
+                            @endif
+                        </small>
+                        @error('sourceWorkflowId')<div class="validation-error">{{ $message }}</div>@enderror
+                    </div>
+                @else
+                    <x-ui.progressive-section-loader section="source-workflows" :rows="3" />
+                @endif
             </section>
         @endunless
 

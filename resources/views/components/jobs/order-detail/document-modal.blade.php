@@ -41,7 +41,7 @@
     };
 @endphp
 <div class="ft-order-task-document-modal-backdrop" wire:key="order-task-document-modal-{{ $task->id }}" wire:click.self="closeOverviewTaskDocumentModal">
-    <section class="ft-order-task-document-modal {{ $prototypeUpload ? 'ft-order-prototype-upload-modal' : '' }}" role="dialog" aria-modal="true" aria-labelledby="order-task-document-modal-title">
+    <section class="ft-order-task-document-modal {{ $prototypeUpload ? 'ft-order-prototype-upload-modal' : '' }}" data-ft-feedback-scope="form" role="dialog" aria-modal="true" aria-labelledby="order-task-document-modal-title">
         <header class="ft-order-task-document-modal-head">
             <div>
                 <h2 id="order-task-document-modal-title">{{ $prototypeConfig['title'] }}</h2>

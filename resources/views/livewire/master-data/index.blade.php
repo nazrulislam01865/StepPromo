@@ -1,4 +1,4 @@
-<div class="ft-master-page" wire:init="loadMasterRecords">
+<div class="ft-master-page" @if(!$showModal && !$showProductView && !$categoryEditorLevel && !$supplierCreateMode && !$supplierViewId && !$supplierEditId) wire:init="loadMasterRecords" @endif>
     {{-- Master category navigation now lives in the application sidebar; counts remain available as $groupCounts[$key] ?? 0 for navigation extensions. --}}
     @php
         $hasParent = in_array($group, ['product', 'state'], true);
@@ -88,6 +88,14 @@
         @include('livewire.master-data.sections.product')
     @elseif($group === 'product_category')
         @include('livewire.master-data.sections.product-category')
+    @elseif($group === 'supplier' && $supplierCreateMode)
+        @include('livewire.master-data.sections.supplier-create')
+    @elseif($group === 'supplier' && $supplierEditId)
+        @include('livewire.master-data.sections.supplier-edit')
+    @elseif($group === 'supplier' && $supplierViewId)
+        @include('livewire.master-data.sections.supplier-detail')
+    @elseif($group === 'supplier')
+        @include('livewire.master-data.sections.supplier-list')
     @else
         @include('livewire.master-data.sections.generic-list')
     @endif

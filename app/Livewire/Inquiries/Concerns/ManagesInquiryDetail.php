@@ -10,14 +10,57 @@ use Livewire\Attributes\Renderless;
 
 trait ManagesInquiryDetail
 {
+    public function loadDetailSection(string $section, ?string $contextType = null, ?int $contextId = null): void
+    {
+        if (! in_array($section, ['products', 'taskflow', 'documents', 'activity'], true)) {
+            return;
+        }
+
+        // IntersectionObserver callbacks may complete after the user changes tab,
+        // opens another Inquiry, or navigates away. Ignore those stale requests
+        // instead of returning 422 and letting an obsolete response participate
+        // in the current Livewire morph.
+        if ($contextType === 'inquiry') {
+            if (
+                ! $this->selectedInquiryId
+                || (int) $this->selectedInquiryId !== (int) $contextId
+                || $this->detailTab !== 'overview'
+            ) {
+                return;
+            }
+
+            $this->inquiryDetailSectionsReady[$section] = true;
+            return;
+        }
+
+        // Backward-compatible path for callers that do not yet send context.
+        if (! $this->selectedInquiryId || $this->detailTab !== 'overview') {
+            return;
+        }
+
+        $this->inquiryDetailSectionsReady[$section] = true;
+    }
+
+    private function resetInquiryDetailProgressiveSections(): void
+    {
+        $this->inquiryDetailSectionsReady = [
+            'products' => false,
+            'taskflow' => false,
+            'documents' => false,
+            'activity' => false,
+        ];
+    }
+
     public function openInquiry(int $id): void
     {
         app(\App\Queries\Inquiries\InquiryDetailQuery::class)->find(auth()->user(), $id);
         $this->selectedInquiryId = $id;
+        $this->resetInquiryDetailProgressiveSections();
         $this->userOptions = [];
         $this->showCreate = false;
         $this->detailTab = 'overview';
         $this->selectedTaskId = null;
+        $this->resetInquiryRfqState();
         $this->showAddTaskForm = false;
         $this->editingInquiryProducts = false;
         $this->inquiryProductRows = [];
@@ -29,6 +72,12 @@ trait ManagesInquiryDetail
         $this->inquiryProductCategory = '';
         $this->inquiryProductQuantity = '1';
         $this->inquiryProductUnitPrice = '0.00';
+        $this->editInquiryProductItemId = null;
+        $this->editInquiryProductCategory = '';
+        $this->editInquiryProductName = '';
+        $this->editInquiryProductQuantity = '1';
+        $this->editInquiryProductUnitPrice = '';
+        $this->editInquiryProductNotes = '';
         $this->resetPage('inquiryDocumentsPage');
         $this->resetPage('inquiryActivityPage');
     }
@@ -36,7 +85,9 @@ trait ManagesInquiryDetail
     public function closeInquiry(): void
     {
         $this->selectedInquiryId = null;
+        $this->resetInquiryDetailProgressiveSections();
         $this->selectedTaskId = null;
+        $this->resetInquiryRfqState();
         $this->showWorkflowManager = false;
         $this->showAddTaskForm = false;
         $this->editingInquiryProducts = false;
@@ -49,6 +100,12 @@ trait ManagesInquiryDetail
         $this->inquiryProductCategory = '';
         $this->inquiryProductQuantity = '1';
         $this->inquiryProductUnitPrice = '0.00';
+        $this->editInquiryProductItemId = null;
+        $this->editInquiryProductCategory = '';
+        $this->editInquiryProductName = '';
+        $this->editInquiryProductQuantity = '1';
+        $this->editInquiryProductUnitPrice = '';
+        $this->editInquiryProductNotes = '';
         $this->showInquiryDocumentPicker = false;
         $this->inquiryExistingDocumentId = null;
         $this->showTaskAttentionModal = false;
@@ -58,11 +115,14 @@ trait ManagesInquiryDetail
 
     public function setDetailTab(string $tab): void
     {
-        // Overview is now the single Inquiry details page. Keep this method for
-        // backward compatibility with stale Livewire DOM/history entries.
-        abort_unless(in_array($tab, ['overview', 'workflow'], true), 422);
-        $this->detailTab = 'overview';
+        // Legacy workflow links still land on Overview. RFQ, comparison and
+        // activity are lightweight Inquiry-detail tabs with independent data.
+        if ($tab === 'workflow') $tab = 'overview';
+        abort_unless(in_array($tab, ['overview', 'rfq', 'comparison', 'activity'], true), 422);
+        $this->detailTab = $tab;
         $this->selectedTaskId = null;
+        $this->showRfqEmailPreview = false;
+        if ($tab === 'activity') $this->inquiryDetailSectionsReady['activity'] = true;
         $this->resetPage('inquiryDocumentsPage');
         $this->resetPage('inquiryActivityPage');
     }

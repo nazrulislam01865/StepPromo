@@ -1,61 +1,98 @@
+    @php
+        $orderToolbarAnyFilterActive = filled($searchFilter)
+            || filled($clientFilter)
+            || filled($ownerFilter)
+            || filled($phaseFilter)
+            || filled($dateFrom)
+            || filled($dateTo)
+            || filled($metricFilter)
+            || (int) $importFilterId > 0
+            || $selectedStageFiltersActive;
+        $orderToolbarAllActive = ! $orderToolbarAnyFilterActive;
+    @endphp
+
     <section class="list-card orders-table-card" aria-label="Orders">
-        <div class="filter-toolbar">
-            <label class="search-box">
-                <span>⌕</span>
-                <input type="search" autocomplete="off" placeholder="Search order, reference, client or product" wire:model.live.debounce.700ms="search">
-            </label>
+        <div class="filter-toolbar ft-order-filter-layout">
+            <div class="ft-order-filter-search-row">
+                <label class="search-box">
+                    <span aria-hidden="true">⌕</span>
+                    <input
+                        type="search"
+                        autocomplete="off"
+                        placeholder="Search order, reference, client or product"
+                        wire:model.live.debounce.700ms="search"
+                        aria-label="Search orders"
+                    >
+                </label>
+            </div>
 
-            <x-ui.search-select
-                class="ft-order-v5-search-select ft-order-v5-client-filter"
-                label="Client"
-                property="client"
-                type="clients"
-                context="jobs"
-                :value="$clientFilter"
-                placeholder="All clients"
-                :initial-options="$clientFilterOptions"
-                :hide-label="true"
-                :fixed-menu="true"
-                :menu-width="300"
-                wire:key="order-v5-client-filter-{{ filled($clientFilter) ? $clientFilter : 'all' }}"
-            />
+            <div class="ft-order-filter-controls-row" aria-label="Order filters">
+                <button
+                    type="button"
+                    class="ft-order-filter-chip {{ $orderToolbarAllActive ? 'active' : '' }}"
+                    wire:click="clearFilters"
+                    aria-pressed="{{ $orderToolbarAllActive ? 'true' : 'false' }}"
+                >All</button>
 
-            <x-ui.search-select
-                class="ft-order-v5-search-select ft-order-v5-owner-filter"
-                label="Owner"
-                property="owner"
-                type="users"
-                context="order-list-user-filter"
-                :value="$ownerFilter"
-                placeholder="All owners"
-                :initial-options="$ownerFilterOptions"
-                :show-avatar="true"
-                search-placeholder="Search user..."
-                footer-message="All active FlowTrack users are available."
-                :hide-label="true"
-                :fixed-menu="true"
-                :menu-width="300"
-                wire:key="order-v5-owner-filter-{{ filled($ownerFilter) ? $ownerFilter : 'all' }}"
-            />
 
-            <select wire:model.live="phase" aria-label="Workflow stage filter">
-                <option value="">All stages</option>
-                @foreach($stages as $stage)
-                    <option value="{{ data_get($stage, 'id') }}">{{ data_get($stage, 'name') }}</option>
-                @endforeach
-            </select>
+                <select class="ft-order-native-filter" wire:model.live="phase" aria-label="Workflow stage filter">
+                    <option value="">All stages</option>
+                    @foreach($stages as $stage)
+                        <option value="{{ data_get($stage, 'id') }}">{{ data_get($stage, 'name') }}</option>
+                    @endforeach
+                </select>
 
-            <x-ui.date-range
-                class="ft-order-list-date-range"
-                from-property="dateFrom"
-                to-property="dateTo"
-                :from-value="$dateFrom"
-                :to-value="$dateTo"
-                label="Created date range"
-                from-label="From"
-                to-label="To"
-            />
-            <button class="btn" type="button" wire:click="clearFilters">Clear</button>
+                <x-ui.search-select
+                    class="ft-order-v5-search-select ft-order-v5-client-filter"
+                    label="Client"
+                    property="client"
+                    type="clients"
+                    context="jobs"
+                    :value="$clientFilter"
+                    placeholder="All clients"
+                    :initial-options="$clientFilterOptions"
+                    :hide-label="true"
+                    :fixed-menu="true"
+                    :menu-width="300"
+                    wire:key="order-v5-client-filter-{{ filled($clientFilter) ? $clientFilter : 'all' }}"
+                />
+
+                <x-ui.search-select
+                    class="ft-order-v5-search-select ft-order-v5-owner-filter"
+                    label="Owner"
+                    property="owner"
+                    type="users"
+                    context="order-list-user-filter"
+                    :value="$ownerFilter"
+                    placeholder="All owners"
+                    :initial-options="$ownerFilterOptions"
+                    :show-avatar="true"
+                    search-placeholder="Search user..."
+                    footer-message="All active FlowTrack users are available."
+                    :hide-label="true"
+                    :fixed-menu="true"
+                    :menu-width="300"
+                    wire:key="order-v5-owner-filter-{{ filled($ownerFilter) ? $ownerFilter : 'all' }}"
+                />
+
+                <x-ui.date-range
+                    class="ft-order-list-date-range"
+                    from-property="dateFrom"
+                    to-property="dateTo"
+                    :from-value="$dateFrom"
+                    :to-value="$dateTo"
+                    label="Created date range"
+                    from-label="From"
+                    to-label="To"
+                />
+
+                <button
+                    class="btn ft-order-filter-reset"
+                    type="button"
+                    wire:click="clearFilters"
+                    @disabled(! $orderToolbarAnyFilterActive)
+                ><span aria-hidden="true">×</span> Clear filter</button>
+            </div>
         </div>
 
         @if($selectedStage)

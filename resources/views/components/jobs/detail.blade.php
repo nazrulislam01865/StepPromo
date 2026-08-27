@@ -9,6 +9,7 @@
     'shipmentUrgencyOptions'=>collect(),
     'overviewPhaseId'=>null,
     'orderDetailContext'=>[],
+    'orderDetailSectionsReady'=>[],
     'orderRedoContext'=>[],
     'orderRedoForm'=>[],
     'products'=>collect(),
@@ -16,13 +17,21 @@
     'showAddJobProductForm'=>false,
     'jobProductSearch'=>'',
     'jobProductSearchResults'=>collect(),
+    'jobProductSearchSuppliers'=>collect(),
     'jobProductResultTotal'=>0,
+    'jobProductShowAllResults'=>false,
     'jobProductSelectedProduct'=>null,
+    'jobProductSelectedSupplier'=>null,
     'jobProductCategory'=>'',
+    'jobProductQuantity'=>'1000',
+    'jobProductUnitPrice'=>'0.00',
     'jobProductSupplierId'=>null,
     'jobProductSupplierLabel'=>'',
     'jobProductSupplierLocked'=>false,
     'showEditOrderProductModal'=>false, 'editOrderProductItemId'=>null, 'editOrderProductName'=>'', 'editOrderProductCode'=>'',
+    'editOrderProductCategory'=>'', 'editOrderProductSearch'=>'', 'editOrderProductSearchResults'=>collect(),
+    'editOrderProductSearchSuppliers'=>collect(), 'editOrderProductResultTotal'=>0, 'editOrderProductSelectedProduct'=>null,
+    'editOrderProductSelectedSupplier'=>null, 'editOrderProductShowAllResults'=>false,
     'editOrderProductSupplierId'=>null, 'editOrderProductSupplierLabel'=>'', 'editOrderProductQuantity'=>'1',
     'editOrderProductUnitPrice'=>'0.00', 'editOrderProductNotes'=>'',
     'availableDocuments'=>collect(),
@@ -35,7 +44,6 @@
     'overviewTaskDocumentUpload'=>null,
     'overviewTaskExistingDocumentId'=>null,
     'overviewTaskLinkFormTaskId'=>null,
-    'healthOptions'=>collect(),
     'jobTaskSearch'=>'',
     'activityTab'=>'all',
     'activityPage'=>1,
@@ -103,7 +111,7 @@
     $manualAttention = (bool) ($job->attention_requested ?? false);
 @endphp
 <div
-    {{ $attributes->class('ft-job-detail-page ft-order-prototype-detail') }}
+    {{ $attributes->class('ft-job-detail-page ft-order-prototype-detail ft-detail-products-scope') }}
     x-data="{ redoNotice: '', redoNoticeOpen: false, showRedoNotice(message) { this.redoNotice = message; this.redoNoticeOpen = true; clearTimeout(this.__redoNoticeTimer); this.__redoNoticeTimer = setTimeout(() => this.redoNoticeOpen = false, 2600); } }"
     x-on:order-redo-notice.window="showRedoNotice($event.detail.message ?? 'Redo update saved.')"
 >
@@ -134,14 +142,20 @@
             :shipment-urgency-options="$shipmentUrgencyOptions"
             :overview-phase-id="$overviewPhaseId"
             :order-detail-context="$orderDetailContext"
+            :detail-sections-ready="$orderDetailSectionsReady"
             :products="$products"
             :categories="$categories"
             :show-add-job-product-form="$showAddJobProductForm"
             :job-product-search="$jobProductSearch"
             :job-product-search-results="$jobProductSearchResults"
+            :job-product-search-suppliers="$jobProductSearchSuppliers"
             :job-product-result-total="$jobProductResultTotal"
+            :job-product-show-all-results="$jobProductShowAllResults"
             :job-product-selected-product="$jobProductSelectedProduct"
+            :job-product-selected-supplier="$jobProductSelectedSupplier"
             :job-product-category="$jobProductCategory"
+            :job-product-quantity="$jobProductQuantity"
+            :job-product-unit-price="$jobProductUnitPrice"
             :job-product-supplier-id="$jobProductSupplierId"
             :job-product-supplier-label="$jobProductSupplierLabel"
             :job-product-supplier-locked="$jobProductSupplierLocked"
@@ -149,6 +163,14 @@
             :edit-order-product-item-id="$editOrderProductItemId"
             :edit-order-product-name="$editOrderProductName"
             :edit-order-product-code="$editOrderProductCode"
+            :edit-order-product-category="$editOrderProductCategory"
+            :edit-order-product-search="$editOrderProductSearch"
+            :edit-order-product-search-results="$editOrderProductSearchResults"
+            :edit-order-product-search-suppliers="$editOrderProductSearchSuppliers"
+            :edit-order-product-result-total="$editOrderProductResultTotal"
+            :edit-order-product-selected-product="$editOrderProductSelectedProduct"
+            :edit-order-product-selected-supplier="$editOrderProductSelectedSupplier"
+            :edit-order-product-show-all-results="$editOrderProductShowAllResults"
             :edit-order-product-supplier-id="$editOrderProductSupplierId"
             :edit-order-product-supplier-label="$editOrderProductSupplierLabel"
             :edit-order-product-quantity="$editOrderProductQuantity"
@@ -371,7 +393,7 @@
 
     @if($showOrderAttentionModal)
         <div class="ft-inquiry-attention-modal-backdrop" wire:key="order-attention-modal" wire:click.self="closeOrderAttentionReason">
-            <section class="ft-inquiry-attention-modal" role="dialog" aria-modal="true" aria-labelledby="order-attention-modal-title">
+            <section class="ft-inquiry-attention-modal" data-ft-feedback-scope="form" role="dialog" aria-modal="true" aria-labelledby="order-attention-modal-title">
                 <header class="ft-inquiry-attention-modal-head">
                     <div>
                         <h2 id="order-attention-modal-title">Request attention</h2>

@@ -19,6 +19,22 @@ use Illuminate\Validation\ValidationException;
 
 trait ManagesProductRecords
 {
+    public function loadProductDetailSection(string $section): void
+    {
+        abort_unless($this->showProductView && $this->viewProductId, 422);
+        abort_unless(in_array($section, ['pricing', 'options', 'documents'], true), 422);
+        $this->productDetailSectionsReady[$section] = true;
+    }
+
+    private function resetProductDetailProgressiveSections(): void
+    {
+        $this->productDetailSectionsReady = [
+            'pricing' => false,
+            'options' => false,
+            'documents' => false,
+        ];
+    }
+
     public function saveProductDraft(): void
     {
         $this->status = 'inactive';
@@ -37,12 +53,14 @@ trait ManagesProductRecords
 
         $this->viewProductId = $id;
         $this->showProductView = true;
+        $this->resetProductDetailProgressiveSections();
     }
 
     public function closeProductView(): void
     {
         $this->showProductView = false;
         $this->viewProductId = null;
+        $this->resetProductDetailProgressiveSections();
     }
 
     public function toggleProductStatus(int $id): void
@@ -77,6 +95,7 @@ trait ManagesProductRecords
 
         $this->showProductView = false;
         $this->viewProductId = null;
+        $this->resetProductDetailProgressiveSections();
 
         // Resolve the row inside the active workspace/type before opening the
         // editor. This prevents a stale/tampered action id from ever opening a

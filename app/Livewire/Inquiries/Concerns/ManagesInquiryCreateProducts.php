@@ -25,6 +25,21 @@ trait ManagesInquiryCreateProducts
         abort_unless($this->showCreate && $this->canUseCreateInquiryProducts(auth()->user()), 403);
     }
 
+    /**
+     * Keep Create Inquiry pricing synchronized with the Product Master quantity
+     * price table. The price is derived from the selected Product and quantity;
+     * it is not a manual per-Inquiry override on this screen.
+     */
+    public function updatedCreateProductRows(mixed $value, string $key): void
+    {
+        if (!$this->showCreate || !str_ends_with($key, '.quantity')) return;
+
+        $index = (int) str($key)->before('.')->toString();
+        if (!array_key_exists($index, $this->createProductRows)) return;
+
+        $this->syncCreateInquiryProductBasePrice($index);
+    }
+
     public function addCreateProductRow(): void
     {
         $this->authorizeCreateInquiryProducts();
@@ -85,18 +100,49 @@ trait ManagesInquiryCreateProducts
 
         if (!$alreadySelected) {
             abort_if(count($this->createProductRows) >= 25, 422, 'An Inquiry can contain up to 25 products.');
+            $defaultQuantity = 1000;
+            $basePrice = $product->productPriceForQuantity($defaultQuantity);
+
             $this->createProductRows[] = [
                 'product_id' => (int) $product->id,
                 'category' => $productCategory,
                 'product' => (string) $product->name,
-                'quantity' => 1000,
-                'unit_price' => '',
+                'quantity' => $defaultQuantity,
+                'unit_price' => $basePrice !== null ? number_format($basePrice, 2, '.', '') : '',
                 'notes' => '',
             ];
         }
 
+        $this->createProductShowAllResults = false;
         $this->resetValidation('createProductRows');
         $this->dispatch('create-order-product-selected');
+    }
+
+    private function syncCreateInquiryProductBasePrice(int $index): void
+    {
+        if (!array_key_exists($index, $this->createProductRows)) return;
+
+        $productId = (int) ($this->createProductRows[$index]['product_id'] ?? 0);
+        $quantity = (int) ($this->createProductRows[$index]['quantity'] ?? 0);
+
+        if ($productId <= 0 || $quantity <= 0) {
+            $this->createProductRows[$index]['unit_price'] = '';
+            $this->resetValidation("createProductRows.$index.unit_price");
+            return;
+        }
+
+        $product = MasterRecord::query()
+            ->forWorkspace(app(MasterDataService::class)->workspaceId())
+            ->ofType('product')
+            ->active()
+            ->find($productId);
+
+        $basePrice = $product?->productPriceForQuantity($quantity);
+        $this->createProductRows[$index]['unit_price'] = $basePrice !== null
+            ? number_format($basePrice, 2, '.', '')
+            : '';
+
+        $this->resetValidation("createProductRows.$index.unit_price");
     }
 
     public function incrementCreateProductQuantity(int $index): void
@@ -105,6 +151,7 @@ trait ManagesInquiryCreateProducts
         abort_unless(array_key_exists($index, $this->createProductRows), 422);
         $current = max(1, (int) ($this->createProductRows[$index]['quantity'] ?? 1));
         $this->createProductRows[$index]['quantity'] = min(999999999, $current + 1);
+        $this->syncCreateInquiryProductBasePrice($index);
         $this->resetValidation("createProductRows.$index.quantity");
     }
 
@@ -114,6 +161,7 @@ trait ManagesInquiryCreateProducts
         abort_unless(array_key_exists($index, $this->createProductRows), 422);
         $current = max(1, (int) ($this->createProductRows[$index]['quantity'] ?? 1));
         $this->createProductRows[$index]['quantity'] = max(1, $current - 1);
+        $this->syncCreateInquiryProductBasePrice($index);
         $this->resetValidation("createProductRows.$index.quantity");
     }
 

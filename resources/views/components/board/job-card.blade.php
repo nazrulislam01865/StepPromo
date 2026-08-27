@@ -5,17 +5,15 @@
     $nextTask = \App\Support\BoardPresenter::nextTask($job);
     $team = \App\Support\BoardPresenter::team($job);
     $completedCurrent = $currentTasks->filter(fn($task) => $task->completed_at || $task->status === 'Completed')->count();
-    $healthKey = str($job->health)->lower()->replace(' ', '-');
     $attentionActive = (bool) ($job->attention_requested ?? false) || (bool) $job->needs_attention;
 @endphp
-<article {{ $attributes->class(['ft-job-card', 'is-expanded' => $expanded, 'health-'.$healthKey]) }}>
-    <span class="ft-job-health-line" aria-hidden="true"></span>
+<article {{ $attributes->class(['ft-job-card', 'is-expanded' => $expanded]) }}>
 
     <div class="ft-job-card-top">
         <div class="ft-job-card-signals">
-            <span class="ft-health-pill {{ $attentionActive ? 'red' : (in_array($job->health, ['On Track','Completed']) ? 'green' : (in_array($job->health, ['Blocked']) ? 'purple' : 'red')) }}">
-                <span class="ft-health-dot"></span>{{ $attentionActive ? 'Needs Attention' : $job->health }}
-            </span>
+            @if($attentionActive)
+                <span class="ft-health-pill red"><span class="ft-health-dot"></span>Needs Attention</span>
+            @endif
             <span class="ft-phase-age">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
                 {{ \App\Support\BoardPresenter::phaseDays($job) }}d in phase

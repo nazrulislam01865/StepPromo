@@ -74,7 +74,7 @@ foreach ($protected as $name => $hash) {
 }
 
 $worker = $read('deploy/flowtrack-workers-horizontal.conf.example');
-foreach (['realtime', 'notifications', 'default'] as $queue) {
+foreach (['realtime', 'notifications', 'emails', 'default'] as $queue) {
     if (! str_contains($worker, "--queue={$queue}")) $failures[] = "horizontal worker pool missing {$queue} queue";
 }
 

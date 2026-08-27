@@ -2,8 +2,7 @@
     $selected = $detail['client'] ?? null;
     $activeJobs = $detail['active'] ?? collect();
     $attentionTasks = $detail['tasks'] ?? collect();
-    $selectedHealth = $detail['health'] ?? 'On Track';
-    $clientListFieldFilterActive = collect([$search, $country, $manager, $jobHealth, $outstanding, $archivedDate, $createdBy])
+    $clientListFieldFilterActive = collect([$search, $country, $manager, $outstanding, $archivedDate, $createdBy])
         ->contains(fn ($value) => trim((string) $value) !== '');
     $clientAnyFilterActive = $clientListFieldFilterActive || (!$showArchived && $quick !== 'all');
 @endphp
@@ -11,7 +10,7 @@
     <div class="ft-clients-page-head">
         <div>
             <h1>{{ $showArchived ? 'Archived Clients' : 'Clients' }}</h1>
-            <p>{{ $showArchived ? 'Review inactive clients and restore them when needed.' : 'Monitor client Jobs, task delivery, account health and outstanding balances.' }}</p>
+            <p>{{ $showArchived ? 'Review inactive clients and restore them when needed.' : 'Monitor client Orders, task delivery, account activity and outstanding balances.' }}</p>
         </div>
         @if(auth()->user()->canModule('clients','create'))
             <button class="ft-clients-new ft-dashboard-action-match" type="button" wire:click="openCreate"><span class="ft-dashboard-action-match-icon">+</span>New Client</button>
@@ -73,7 +72,6 @@
                         <x-ui.search-input property="search" :value="$search" placeholder="Client, Job ID, country or manager…" />
                         <x-ui.search-select label="Account manager" property="manager" type="users" context="clients" :value="$manager" placeholder="Anyone" :initial-options="$managerFilterOptions" />
                         <x-ui.search-select label="Country" property="country" type="countries" context="clients" :value="$country" placeholder="All countries" :initial-options="$countryFilterOptions" />
-                        <x-ui.search-select label="Job health" property="jobHealth" :value="$jobHealth" placeholder="All health" :options="$healthOptions->map(fn($healthOption) => ['id'=>$healthOption,'label'=>$healthOption])" />
                         <x-ui.search-select label="Outstanding" property="outstanding" :value="$outstanding" placeholder="Any balance" :options="collect([['id'=>'positive','label'=>'Has balance'],['id'=>'high','label'=>'$10,000+'],['id'=>'zero','label'=>'No balance']])" />
                         <button type="button" class="ft-client-clear-filter" wire:click="clearFilters" @disabled(! $clientAnyFilterActive)>× Clear filter</button>
                     </div>
@@ -82,7 +80,6 @@
                         if($search) $chips->push(['key'=>'search','label'=>'Search: '.$search]);
                         if($manager) $chips->push(['key'=>'manager','label'=>'Manager: '.(collect($managerFilterOptions)->firstWhere('id',(int)$manager)['label'] ?? 'Selected')]);
                         if($country) $chips->push(['key'=>'country','label'=>'Country: '.$country]);
-                        if($jobHealth) $chips->push(['key'=>'jobHealth','label'=>'Health: '.$jobHealth]);
                         if($outstanding) $chips->push(['key'=>'outstanding','label'=>'Outstanding: '.(['positive'=>'Has balance','high'=>'$10,000+','zero'=>'No balance'][$outstanding] ?? $outstanding)]);
                     @endphp
                     @if($chips->isNotEmpty())
@@ -95,7 +92,7 @@
 
 
             <div class="ft-client-list-card">
-                <div class="ft-client-table-scroll ft-results-refreshable" wire:loading.class="is-refreshing" wire:target="search,manager,country,jobHealth,outstanding,quick,archivedDate,createdBy">
+                <div class="ft-client-table-scroll ft-results-refreshable" wire:loading.class="is-refreshing" wire:target="search,manager,country,outstanding,quick,archivedDate,createdBy">
                     @if($showArchived)
                     <table class="ft-client-table ft-archived-client-table">
                         <thead><tr><th>Client</th><th>Contact</th><th>Status</th><th>Archived</th><th>Actions</th></tr></thead>
@@ -124,13 +121,9 @@
                     </table>
                     @else
                     <table class="ft-client-table">
-                        <thead><tr><th>Client</th><th>Account manager</th><th>Jobs</th><th>Tasks</th><th>Health</th><th>Next delivery</th><th>Outstanding</th><th>Updated</th><th>Actions</th></tr></thead>
+                        <thead><tr><th>Client</th><th>Account manager</th><th>Jobs</th><th>Tasks</th><th>Next delivery</th><th>Outstanding</th><th>Updated</th><th>Actions</th></tr></thead>
                         <tbody>
                         @forelse($clients as $clientRow)
-                            @php
-                                $rowHealth = $clientRow->attention_jobs_count > 0 ? 'Needs Attention' : ($clientRow->overdue_tasks_count > 0 ? 'At Risk' : 'On Track');
-                                $healthClass = $rowHealth === 'On Track' ? 'green' : ($rowHealth === 'At Risk' ? 'amber' : 'red');
-                            @endphp
                             <tr
                                 wire:key="client-row-{{ $clientRow->id }}"
                                 class="{{ $showClientPreview && (int)$selectedClientId === (int)$clientRow->id ? 'selected' : '' }}"
@@ -153,7 +146,6 @@
                                         <small class="ft-text-green">0 overdue</small>
                                     @endif
                                 </td>
-                                <td data-label="Health"><span class="ft-client-health {{ $healthClass }}">{{ $rowHealth }}</span></td>
                                 <td data-label="Next delivery">{{ $clientRow->next_delivery_at ? \Carbon\Carbon::parse($clientRow->next_delivery_at)->format('M j') : '—' }}</td>
                                 <td data-label="Outstanding"><b>${{ number_format($clientRow->outstanding_balance,0) }}</b></td>
                                 <td data-label="Updated">{{ $clientRow->updated_at?->diffForHumans(short:true) }}</td>
@@ -193,7 +185,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="9" class="ft-client-empty">{{ $showArchived ? 'No archived clients match the selected filters.' : 'No clients match the selected filters.' }}</td></tr>
+                            <tr><td colspan="8" class="ft-client-empty">{{ $showArchived ? 'No archived clients match the selected filters.' : 'No clients match the selected filters.' }}</td></tr>
                         @endforelse
                         </tbody>
                     </table>

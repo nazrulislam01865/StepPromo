@@ -3507,3 +3507,153 @@
         width: 100%
     }
 }
+
+/* CHANGE 2026-08-26: Dashboard responsive hardening.
+   The desktop sidebar remains visible above 900px, so 901-1180px must be
+   treated as a constrained content width instead of a full desktop canvas. */
+.ft-management-dashboard-page .ft-dashboard-content-shell,
+.ft-mgmt-dashboard,
+.ft-mgmt-page-head,
+.ft-mgmt-control-bar,
+.ft-mgmt-panel,
+.ft-mgmt-table-wrap {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.ft-mgmt-control-bar > * {
+    min-width: 0;
+}
+
+.ft-mgmt-control-bar .ft-mgmt-remote-filter {
+    flex: 1 1 190px;
+    min-width: 0;
+}
+
+.ft-mgmt-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width:1180px) and (min-width:901px) {
+    .ft-management-dashboard-page .ft-dashboard-content-shell {
+        padding-left: 20px;
+        padding-right: 20px;
+    }
+
+    .ft-mgmt-page-head {
+        flex-wrap: wrap;
+    }
+
+    .ft-mgmt-head-actions {
+        width: 100%;
+        margin-left: 0;
+        flex-wrap: wrap;
+    }
+
+    .ft-mgmt-control-bar {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
+        overflow: visible;
+    }
+
+    .ft-mgmt-range {
+        align-self: stretch;
+    }
+
+    .ft-mgmt-control-bar .ft-mgmt-remote-filter {
+        width: 100%;
+    }
+
+    .ft-mgmt-search {
+        grid-column: 1 / -1;
+        width: 100%;
+        min-width: 0;
+        margin-left: 0;
+    }
+}
+
+@media (max-width:900px) {
+    .ft-mgmt-control-bar {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 9px;
+        overflow: visible;
+    }
+
+    .ft-mgmt-range {
+        grid-column: 1 / -1;
+        width: 100%;
+    }
+
+    .ft-mgmt-range button {
+        flex: 1 1 0;
+    }
+
+    .ft-mgmt-control-bar .ft-mgmt-remote-filter {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .ft-mgmt-search {
+        grid-column: 1 / -1;
+        width: 100%;
+        min-width: 0;
+        margin-left: 0;
+    }
+
+    .ft-mgmt-panel-head {
+        min-width: 0;
+        flex-wrap: wrap;
+    }
+
+    .ft-mgmt-tabs {
+        max-width: 100%;
+        margin-left: auto;
+        overflow-x: auto;
+        overscroll-behavior-inline: contain;
+    }
+}
+
+@media (max-width:600px) {
+    .ft-mgmt-control-bar {
+        grid-template-columns: 1fr;
+    }
+
+    .ft-mgmt-range,
+    .ft-mgmt-search {
+        grid-column: 1;
+    }
+
+    .ft-mgmt-control-bar .ft-mgmt-remote-filter {
+        grid-column: 1;
+    }
+
+    .ft-mgmt-head-actions {
+        width: 100%;
+    }
+
+    .ft-mgmt-head-actions .ft-mgmt-btn {
+        min-width: 0;
+        white-space: normal;
+        text-align: center;
+    }
+
+    .ft-mgmt-panel-head {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .ft-mgmt-tabs {
+        width: 100%;
+        margin-left: 0;
+        justify-content: flex-start;
+    }
+
+    .ft-mgmt-table {
+        min-width: 680px;
+    }
+}

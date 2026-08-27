@@ -192,7 +192,7 @@ class Index extends Component
             $departmentId,
             $query,
             fn ($row): array => [
-                $row->job_number, $row->title, $row->health, $row->priority,
+                $row->job_number, $row->title, $row->priority,
                 $row->client?->name, $row->phase?->short_name, $row->phase?->name,
                 $row->owner?->name,
             ],
@@ -206,7 +206,7 @@ class Index extends Component
             $departmentId,
             $query,
             fn ($row): array => [
-                $row->job_number, $row->title, $row->health, $row->attention_reason,
+                $row->job_number, $row->title, $row->attention_reason,
                 $row->client?->name, $row->owner?->name,
                 $row->flaggedTasks?->first()?->attention_reason,
                 $row->tasks?->pluck('title')->filter()->implode(' '),

@@ -215,7 +215,7 @@
                     @else
                         <span>Created by / on</span>
                     @endif
-                </span><span>Order</span><span>Inquiry</span><span>Client / Products</span><span>Phase</span><span>Health</span><span>Flag</span><span>Owner / Delivery</span><span>Progress</span><span aria-label="Actions"></span>
+                </span><span>Order</span><span>Inquiry</span><span>Client / Products</span><span>Phase</span><span>Flag</span><span>Owner / Delivery</span><span>Progress</span><span aria-label="Actions"></span>
             </div>
 
             <div class="ft-job-list">
@@ -234,7 +234,6 @@
                         : collect([(object)['product_name'=>$job->product ?: 'Product','quantity'=>(int)$job->quantity]]);
                     $totalUnits = (int) $productRows->sum(fn($item)=>(int)($item->quantity ?? 0));
                     $productNames = $productRows->pluck('product_name')->filter()->values();
-                    $health = $job->completed_at ? 'Completed' : ($job->health ?: 'On Track');
                     $phaseName = $job->phase?->name ?? $job->status ?? '—';
                     // The automatic Order Flag remains stored independently in
                     // flow_jobs.order_flag_id. A manual attention request is also stored
@@ -290,7 +289,6 @@
                         @endif
                     </div>
                     <div class="ft-cell ft-stage-cell" data-label="Phase"><x-ui.phase-label :phase="$job->phase" :fallback="$phaseName" class="ft-pill" /></div>
-                    <div class="ft-cell ft-health-cell" data-label="Health"><span class="ft-pill {{ $tone($health) }}">{{ $health }}</span></div>
                     <div class="ft-cell ft-flag-cell" data-label="Flag">@if($flag)<span class="ft-pill {{ $flagColor ? 'ft-master-color' : $tone($flag) }}" style="{{ \App\Support\MasterColor::style($flagColor) }}" @if($flagReason) title="{{ $flagReason }}" @endif>{{ $flag }}</span>@else<span class="ft-standard-empty">No flag</span>@endif</div>
                     <div class="ft-cell ft-owner-cell" data-label="Owner / delivery">
                         <div class="ft-owner">

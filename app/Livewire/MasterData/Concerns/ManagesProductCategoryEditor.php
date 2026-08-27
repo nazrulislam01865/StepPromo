@@ -24,8 +24,12 @@ trait ManagesProductCategoryEditor
         abort_unless($this->group === 'product_category', 404);
         abort_unless(in_array($level, ['main', 'product', 'sub'], true), 404);
         $this->authorizeGroupAction($readOnly ? 'view' : ($id ? 'edit' : 'create'));
-        app(\App\Services\ProductTaxonomyService::class)->synchronizeLegacyTaxonomy();
 
+        // Opening a category editor must be a read-only navigation operation.
+        // The legacy taxonomy synchronizer scans every product/category and may also
+        // write normalization rows, so doing it here made the form wait for the
+        // entire catalogue before it could render. Parent options are loaded by
+        // BuildsMasterDataPageData with small, level-specific queries instead.
         $this->categoryEditorReadOnly = $readOnly;
         $this->categoryEditorLevel = $level;
         $this->categoryEditorId = $id;

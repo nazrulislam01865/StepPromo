@@ -24,21 +24,51 @@
     <div class="breadcrumbs ft-order-prototype-breadcrumb">
         Orders &nbsp;/&nbsp;
         <b>{{ $job->displayOrderNumber() }}</b>
-        <button type="button" class="copy-order-code" title="Copy Order ID" aria-label="Copy {{ $job->displayOrderNumber() }}" data-copy-value="{{ $job->displayOrderNumber() }}">▣</button>
+        <button type="button" class="copy-order-code" title="Copy Order ID" aria-label="Copy {{ $job->displayOrderNumber() }}" data-copy-value="{{ $job->displayOrderNumber() }}">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="8" y="8" width="10" height="10" rx="1.5"></rect><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path></svg>
+        </button>
     </div>
 
     <div class="detail-title-row ft-order-prototype-title-row">
         <div class="detail-heading" style="flex:1">
             <h1 class="detail-title ft-order-prototype-title">{{ $job->title }}</h1>
 
-            <div class="meta-line ft-order-prototype-meta">
-                <span>♙ &nbsp;Client <b>{{ $job->client?->name ?: '—' }}</b></span>
-                <span class="meta-sep">•</span>
-                <span>▯ &nbsp;Reference <b>{{ $job->order_number ?: '—' }}</b></span>
-                <span class="meta-sep">•</span>
-                <span>♙ &nbsp;Created by <b>{{ $job->creator?->name ?: 'System' }}</b></span>
-                <span class="meta-sep">•</span>
-                <span>▣ &nbsp;Created <b>{{ $job->created_at ? \App\Support\UserLocalTime::format($job->created_at, 'M j, Y \\a\\t g:i A') : '—' }}</b></span>
+            <div class="meta-line ft-order-prototype-meta" aria-label="Order information">
+                <span class="ft-order-header-meta-item">
+                    <span class="ft-order-header-meta-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.5"></circle><path d="M5.5 19c.8-3.4 3-5.2 6.5-5.2s5.7 1.8 6.5 5.2"></path></svg>
+                    </span>
+                    <span class="ft-client-inline-identity">
+                        <x-ui.client-logo :client="$job->client" :name="$job->client?->name ?: 'Client'" :size="20" />
+                        <span>Client <strong>{{ $job->client?->name ?: '—' }}</strong></span>
+                    </span>
+                </span>
+                <span class="meta-sep" aria-hidden="true">•</span>
+                <span class="ft-order-header-meta-item ft-order-header-reference">
+                    <span class="ft-order-header-meta-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none"><path d="M7 3.5h7l4 4V20.5H7z"></path><path d="M14 3.5v4h4"></path></svg>
+                    </span>
+                    <span>Reference <strong>{{ $job->order_number ?: '—' }}</strong></span>
+                    @if($job->order_number)
+                        <button type="button" class="ft-order-header-copy" title="Copy Reference Number" aria-label="Copy reference number {{ $job->order_number }}" data-copy-value="{{ $job->order_number }}">
+                            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="8" y="8" width="10" height="10" rx="1.5"></rect><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path></svg>
+                        </button>
+                    @endif
+                </span>
+                <span class="meta-sep" aria-hidden="true">•</span>
+                <span class="ft-order-header-meta-item">
+                    <span class="ft-order-header-meta-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.5"></circle><path d="M5.5 19c.8-3.4 3-5.2 6.5-5.2s5.7 1.8 6.5 5.2"></path></svg>
+                    </span>
+                    <span>Created by <strong>{{ $job->creator?->name ?: 'System' }}</strong></span>
+                </span>
+                <span class="meta-sep" aria-hidden="true">•</span>
+                <span class="ft-order-header-meta-item">
+                    <span class="ft-order-header-meta-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none"><rect x="4" y="5.5" width="16" height="14" rx="2"></rect><path d="M8 3.5v4M16 3.5v4M4 10h16"></path></svg>
+                    </span>
+                    <span>Created <strong>{{ $job->created_at ? \App\Support\UserLocalTime::format($job->created_at, 'M j, Y') : '—' }}@if($job->created_at) at {{ \App\Support\UserLocalTime::format($job->created_at, 'g:i A') }}@endif</strong></span>
+                </span>
             </div>
 
             <div class="pills ft-order-prototype-pills">
@@ -51,40 +81,31 @@
                     </span>
                 @endif
 
-                <span class="pill {{ strtolower((string) $job->health) === 'on track' || blank($job->health) ? 'green' : 'amber' }}">{{ $job->health ?: 'On Track' }}</span>
-                <span class="pill purple" id="stagePill" title="The workflow stage containing the current required task.">{{ $stageName }}</span>
+                @if($isCancelled)
+                    <span class="pill cancelled">⊘ Cancelled</span>
+                    <span class="pill purple" id="stagePill" title="The last workflow stage reached before cancellation.">Last stage · {{ $stageName }}</span>
+                @else
+                    <span class="pill purple" id="stagePill" title="The workflow stage containing the current required task.">{{ $stageName }}</span>
+                @endif
 
                 @if($isRedoOrder)
                     <span class="pill redo">↻ Redo order</span>
                 @endif
-                @if($isCancelled)
-                    <div class="state-banner cancelled show ft-order-state-banner">
-                        <span>⊘</span>
-
-                        <div>
-                            <b>Order cancelled</b>
-
-                            @if($job->cancellation_reason)
-                                <div class="ft-rich-text-content">
-                                    <x-ui.mention-text
-                                        :text="$job->cancellation_reason"
-                                    />
-                                </div>
-                            @else
-                                <p>
-                                    Workflow progression is blocked.
-                                </p>
-                            @endif
-
-                            @if($job->cancelledBy)
-                                <p>
-                                    Cancelled by {{ $job->cancelledBy->name }}
-                                </p>
-                            @endif
-                        </div>
-                    </div>
-                @endif
             </div>
+
+        </div>
+
+        <div class="ft-order-header-side">
+            <div class="people ft-order-team-stack" title="Team members currently involved in this order">
+                @foreach($team->take(4) as $member)
+                    @php($initials = collect(preg_split('/\s+/', trim((string) $member->name)))->filter()->map(fn($part) => mb_strtoupper(mb_substr($part, 0, 1)))->take(2)->implode(''))
+                    <i title="{{ $member->name }}">{{ $initials ?: '—' }}</i>
+                @endforeach
+                @if($team->count() > 4)<i>+{{ $team->count() - 4 }}</i>@endif
+            </div>
+
+        </div>
+    </div>
 
             <div class="order-commandbar ft-order-commandbar">
                 <x-jobs.order-detail.shipment-urgency-inline
@@ -124,31 +145,25 @@
                     @endif
                 </div>
 
-                <span class="command-spacer"></span>
-                @if($canInitiateRedo)
-                    <button type="button" class="btn redo small" wire:click="openRedoModal" title="Create a controlled redo linked to this order.">↻ Initiate Redo</button>
-                @endif
-                <button type="button" class="btn small flag-btn {{ $flagged ? 'flagged' : '' }}" wire:click="openOrderAttentionReason" @disabled($attentionLocked) title="{{ $flagReason ?: 'Flag this order so it remains visibly marked for attention across every stage.' }}">⚑ {{ $flagged ? 'Flagged' : 'Flag order' }}</button>
-                <button type="button" class="btn danger small" wire:click="openOrderCancelModal" @disabled(!$canCancel) title="{{ $canCancel ? 'Cancel this order. Cancellation is available only through the QC stage.' : 'Cancellation is available only through the QC stage.' }}">⊘ Cancel order</button>
-            </div>
-        </div>
+                <div class="ft-order-header-actions" aria-label="Order actions">
+                    @if($canInitiateRedo)
+                        <button type="button" class="btn redo small" wire:click="openRedoModal" title="Create a controlled redo linked to this order.">↻ Initiate Redo</button>
+                    @endif
 
-        <div class="ft-order-header-side">
-            <div class="people ft-order-team-stack" title="Team members currently involved in this order">
-                @foreach($team->take(4) as $member)
-                    @php($initials = collect(preg_split('/\s+/', trim((string) $member->name)))->filter()->map(fn($part) => mb_strtoupper(mb_substr($part, 0, 1)))->take(2)->implode(''))
-                    <i title="{{ $member->name }}">{{ $initials ?: '—' }}</i>
-                @endforeach
-                @if($team->count() > 4)<i>+{{ $team->count() - 4 }}</i>@endif
+                    @if(!$isCancelled)
+                        <button type="button" class="btn small flag-btn {{ $flagged ? 'flagged' : '' }}" wire:click="openOrderAttentionReason" @disabled($attentionLocked) title="{{ $flagReason ?: 'Flag this order so it remains visibly marked for attention across every stage.' }}">⚑ {{ $flagged ? 'Flagged' : 'Flag order' }}</button>
+                        <button type="button" class="btn danger small" wire:click="openOrderCancelModal" @disabled(!$canCancel) title="{{ $canCancel ? 'Cancel this order. Cancellation is available only through the QC stage.' : 'Cancellation is available only through the QC stage.' }}">⊘ Cancel order</button>
+                    @else
+                        <span class="ft-order-workflow-lock" title="Workflow actions are blocked because this order is cancelled.">⊘ Workflow locked</span>
+                    @endif
+                </div>
             </div>
-
-        </div>
-    </div>
 </section>
+
+@if($isCancelled)
+    <x-jobs.order-detail.cancellation-card :job="$job" :stage-name="$stageName" />
+@endif
 
 @if($flagged)
     <div class="state-banner flag show ft-order-state-banner"><span>⚑</span><div><b>Flagged for attention</b><p>{{ $flagReason ?: 'This order requires attention.' }}</p></div></div>
-@endif
-@if($isCancelled)
-    <div class="state-banner cancelled show ft-order-state-banner"><span>⊘</span><div><b>Order cancelled</b><p>{{ $job->cancellation_reason ?: 'Workflow progression is blocked.' }}@if($job->cancelledBy) · {{ $job->cancelledBy->name }}@endif</p></div></div>
 @endif

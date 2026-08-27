@@ -40,11 +40,6 @@ final class DashboardOverviewService
         return $this->legacy->summaryForFilters(...$arguments);
     }
 
-    public function operationalHealth(mixed ...$arguments): mixed
-    {
-        return $this->legacy->operationalHealth(...$arguments);
-    }
-
     public function priorityJobs(mixed ...$arguments): mixed
     {
         return $this->legacy->priorityJobs(...$arguments);

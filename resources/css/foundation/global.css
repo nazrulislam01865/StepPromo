@@ -116,3 +116,20 @@
         }
     }
 }
+
+/* Keep one intentional clear action in search fields. Browsers such as Chrome
+   and Safari inject their own cancel icon for input[type="search"], which
+   duplicates FlowTrack's explicit clear button. */
+@layer ft-foundation {
+    input[type="search"]::-webkit-search-cancel-button {
+        -webkit-appearance: none;
+        appearance: none;
+        display: none;
+    }
+
+    input[type="search"]::-ms-clear {
+        width: 0;
+        height: 0;
+        display: none;
+    }
+}

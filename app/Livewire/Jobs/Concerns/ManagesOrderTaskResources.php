@@ -301,9 +301,12 @@ trait ManagesOrderTaskResources
 
     public function uploadSelectedTaskDocuments(): array
     {
-        abort_unless(auth()->user()->canModule('documents','create'), 403);
         abort_unless($this->selectedTaskId, 422);
-        $task = app(TaskService::class)->visibleQuery(auth()->user())->with(['job','documentCategory','setupTemplate.documentCategory'])->findOrFail($this->selectedTaskId);
+        $task = app(TaskService::class)->visibleQuery(auth()->user())
+            ->with(['job','documentCategory','setupTemplate.documentCategory'])
+            ->findOrFail($this->selectedTaskId);
+        abort_unless(app(AccessControlService::class)->canEditTask(auth()->user(), $task), 403);
+        abort_unless(auth()->user()->canModule('documents','create'), 403);
         $this->resetValidation(['taskDocumentUploads', 'taskDocumentUploads.*']);
 
         $validator = validator(['taskDocumentUploads' => $this->taskDocumentUploads], [
@@ -322,13 +325,23 @@ trait ManagesOrderTaskResources
         }
 
         try {
+            $documentService = app(DocumentService::class);
             foreach ($this->taskDocumentUploads as $upload) {
-                app(\App\Services\DocumentService::class)->store($upload, [
-                    'flow_job_id'=>$task->flow_job_id,
-                    'client_id'=>$task->job?->client_id,
-                    'task_id'=>$task->id,
-                    'category'=>'Task attachment'
-                ], auth()->user());
+                $storeData = [
+                    'flow_job_id' => $task->flow_job_id,
+                    'client_id' => $task->job?->client_id,
+                    'task_id' => $task->id,
+                ];
+
+                // Uploading from Task Details must satisfy the same Task Pack
+                // document requirement as uploading from the Order taskflow.
+                if ($documentService->taskHasRequirement($task)) {
+                    $storeData['require_task_pack_requirement'] = true;
+                } else {
+                    $storeData['category'] = 'Task attachment';
+                }
+
+                $documentService->store($upload, $storeData, auth()->user());
             }
         } catch (\Throwable $e) {
             report($e);
@@ -363,9 +376,10 @@ trait ManagesOrderTaskResources
 
     public function deleteSelectedTaskDocument(int $documentId): void
     {
-        abort_unless(auth()->user()->canModule('documents','delete'), 403);
         abort_unless($this->selectedTaskId, 422);
         $task = app(TaskService::class)->visibleQuery(auth()->user())->findOrFail($this->selectedTaskId);
+        abort_unless(app(AccessControlService::class)->canEditTask(auth()->user(), $task), 403);
+        abort_unless(auth()->user()->canModule('documents','delete'), 403);
         $document = Document::where('task_id',$task->id)->findOrFail($documentId);
         app(\App\Services\DocumentService::class)->delete($document, auth()->user());
     }

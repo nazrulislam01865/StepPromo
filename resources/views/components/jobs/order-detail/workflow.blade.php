@@ -35,7 +35,7 @@
     };
 @endphp
 
-<section class="section-card integrated-process ft-order-section-card ft-order-workflow-card" id="workflowSection">
+<section class="section-card integrated-process ft-order-section-card ft-order-workflow-card" id="workflowSection" wire:key="order-detail-workflow-{{ $job->id }}">
     <div class="process-head">
         <div>
             <h2>Order process &amp; tasks</h2>

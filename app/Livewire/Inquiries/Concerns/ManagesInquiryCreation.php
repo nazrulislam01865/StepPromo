@@ -27,6 +27,7 @@ trait ManagesInquiryCreation
         if ($this->createReceivedDate === '') {
             $this->createReceivedDate = app(WorkspaceSettingsService::class)->localToday()->toDateString();
         }
+        $this->initialiseCreateRfqState();
         $priorityOptions = app(MasterDataService::class)->active('priority');
         if (! $priorityOptions->contains(fn ($priority) => (string) $priority->name === (string) $this->createPriority)) {
             $preferred = $priorityOptions->first(fn ($priority) => strcasecmp((string) $priority->name, 'Medium') === 0)
@@ -40,6 +41,27 @@ trait ManagesInquiryCreation
     {
         $this->showCreate = false;
         $this->resetCreateForm();
+    }
+
+    public function loadCreateSection(string $section): void
+    {
+        abort_unless($this->showCreate, 422);
+
+        if ($section === 'catalog') {
+            abort_unless($this->canUseCreateInquiryProducts(auth()->user()), 403);
+            $this->createCatalogReady = true;
+            return;
+        }
+
+        if ($section === 'workflow') {
+            if (! $this->createWorkflowReady) {
+                $this->createWorkflowReady = true;
+                $this->refreshCreateWorkflowOptions();
+            }
+            return;
+        }
+
+        abort(422, 'Unknown Create Inquiry section.');
     }
 
     public function openCreateClientModal(): void
@@ -89,7 +111,13 @@ trait ManagesInquiryCreation
         $this->clientFilterOptions = app(\App\Services\FilterOptionService::class)
             ->options(auth()->user(), 'clients', 'create-inquiry', '', $client->id, 6)
             ->all();
-        $this->refreshCreateWorkflowOptions();
+        if ($this->createWorkflowReady) {
+            $this->refreshCreateWorkflowOptions();
+        } else {
+            $this->createWorkflowId = null;
+            $this->selectedWorkflowLabel = '';
+            $this->resetCreateCollections();
+        }
 
         $this->showCreateClientModal = false;
         $this->resetCreateClientModal();
@@ -250,7 +278,13 @@ trait ManagesInquiryCreation
                 ->where('is_active', true)
                 ->find($id);
             $this->loadClientContactOptions($client);
-            $this->refreshCreateWorkflowOptions();
+            if ($this->createWorkflowReady) {
+                $this->refreshCreateWorkflowOptions();
+            } else {
+                $this->createWorkflowId = null;
+                $this->selectedWorkflowLabel = '';
+                $this->resetCreateCollections();
+            }
             return;
         }
 
@@ -294,6 +328,15 @@ trait ManagesInquiryCreation
     private function persistInquiry(bool $draft): void
     {
         $user = auth()->user();
+
+        // The workflow selector is below the fold and normally hydrates when it
+        // approaches the viewport. Keyboard submission can happen first, so
+        // resolve the current client's workflow just-in-time instead of showing
+        // a false validation error or forcing the whole form to load up front.
+        if (! $this->createWorkflowReady) {
+            $this->createWorkflowReady = true;
+            $this->refreshCreateWorkflowOptions();
+        }
         $canUseInquiryProducts = $this->canUseCreateInquiryProducts($user);
         if (!$canUseInquiryProducts && collect($this->createProductRows)->contains(fn (array $row): bool =>
             (int) ($row['product_id'] ?? 0) > 0
@@ -347,6 +390,10 @@ trait ManagesInquiryCreation
             'createProductRows.*.unit_price' => ['nullable', 'numeric', 'min:0', 'max:999999999999.99'],
             'createProductRows.*.notes' => ['nullable', 'string', 'max:2000'],
             'createAttachments.*' => AttachmentUpload::itemRules(AttachmentUpload::DOCUMENTS_WITH_AI, 20480),
+            'createRfqSupplierIds' => ['array', 'max:25'],
+            'createRfqSupplierIds.*' => ['integer', 'distinct'],
+            'createRfqDueDate' => ['nullable', 'date_format:Y-m-d'],
+            'createRfqMessage' => ['nullable', 'string', 'max:2000'],
         ]);
 
         // Client is shared reference data for Inquiry creation. Fetch the
@@ -420,9 +467,33 @@ trait ManagesInquiryCreation
             if (!$valid) {
                 $catalogInvalid = true;
                 $this->addError("createProductRows.$index.product", 'That product is no longer available in the product catalog.');
+                continue;
             }
+
+            // Product Master pricing is authoritative for Create Inquiry.
+            // Re-resolve it at save time so the stored base price always follows
+            // the Product quantity price table, even if browser state is stale.
+            $quantity = (int) ($row['quantity'] ?? 0);
+            $basePrice = $product->productPriceForQuantity($quantity);
+            $data['createProductRows'][$index]['unit_price'] = $basePrice !== null
+                ? round($basePrice, 2)
+                : null;
         }
         if ($catalogInvalid) return;
+
+        $createRfqSupplierIds = $this->validatedCreateRfqSupplierIds();
+        if ($this->getErrorBag()->has('createRfqSupplierIds')) return;
+        if ($createRfqSupplierIds !== []) {
+            if ($this->createRfqDueDate === '') {
+                $this->addError('createRfqDueDate', 'Choose a quotation due date when inviting suppliers.');
+                return;
+            }
+            $rfqDueDate = \Illuminate\Support\Carbon::createFromFormat('Y-m-d', $this->createRfqDueDate)->startOfDay();
+            if ($rfqDueDate->lt(app(WorkspaceSettingsService::class)->localToday()->startOfDay())) {
+                $this->addError('createRfqDueDate', 'Quotation due date cannot be in the past.');
+                return;
+            }
+        }
 
         $workflowQuery = app(\App\Queries\Inquiries\InquiryWorkflowQuery::class);
         $canonicalRows = $workflowQuery->rows(
@@ -467,12 +538,28 @@ trait ManagesInquiryCreation
 
         foreach ($this->createAttachments as $upload) app(\App\Actions\Inquiries\UploadInquiryDocument::class)->handle($inquiry, $upload, auth()->user());
 
+        $rfqDelivery = ['sent' => 0, 'failed' => 0];
+        if (! $draft && $createRfqSupplierIds !== []) {
+            $rfqDelivery = $this->sendCreateRfqInvitations($inquiry, $user, $createRfqSupplierIds);
+        }
+
         $this->showCreate = false;
         $this->selectedInquiryId = $inquiry->id;
         $this->detailTab = 'overview';
         $this->metrics = app(\App\Queries\Inquiries\InquiryListQuery::class)->metrics(auth()->user());
         $this->resetCreateForm();
-        session()->flash('success', $draft ? 'Inquiry draft saved.' : $inquiry->inquiry_number.' created with its taskflow tasks.');
+        if ($draft) {
+            session()->flash('success', 'Inquiry draft saved.');
+        } else {
+            $message = $inquiry->inquiry_number.' created with its taskflow tasks.';
+            if ($rfqDelivery['sent'] > 0) {
+                $message .= ' '.$rfqDelivery['sent'].' RFQ '.\Illuminate\Support\Str::plural('invitation', $rfqDelivery['sent']).' sent.';
+            }
+            if ($rfqDelivery['failed'] > 0) {
+                $message .= ' '.$rfqDelivery['failed'].' RFQ '.\Illuminate\Support\Str::plural('email', $rfqDelivery['failed']).' could not be delivered; the Inquiry is still available from the RFQ tab.';
+            }
+            session()->flash('success', $message);
+        }
     }
 
     private function loadCreateOptions(): void
@@ -498,7 +585,6 @@ trait ManagesInquiryCreation
             $this->selectedOwnerLabel = (int) $this->createOwnerId === (int) $user->id ? 'Me · '.$name : $name;
         }
 
-        $this->refreshCreateWorkflowOptions();
     }
 
     private function refreshCreateWorkflowOptions(): void
@@ -584,11 +670,14 @@ trait ManagesInquiryCreation
         $this->newContactPhone = '';
         $this->resetCreateClientModal();
         $this->createAttachments = [];
+        $this->resetCreateRfqState();
         $this->createProductRows = [];
         $this->createProductCategoryOptions = [];
         $this->createProductSearch = '';
         $this->createProductCategoryFilter = '';
         $this->createProductShowAllResults = false;
+        $this->createCatalogReady = false;
+        $this->createWorkflowReady = false;
         $this->showCreateOrderProductModal = false;
         $this->resetCreateOrderProductModal();
         $this->createWorkflowId = null;

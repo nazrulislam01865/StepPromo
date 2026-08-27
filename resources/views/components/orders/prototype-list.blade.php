@@ -10,6 +10,7 @@
     'phaseFilter' => '',
     'dateFrom' => '',
     'dateTo' => '',
+    'metricFilter' => '',
     'stageQuick' => 'all',
     'stageSupplier' => '',
     'stageAssignee' => '',

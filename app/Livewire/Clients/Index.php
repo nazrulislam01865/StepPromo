@@ -52,7 +52,6 @@ class Index extends Component
     public string $search = '';
     public string $country = '';
     public string $manager = '';
-    public string $jobHealth = '';
     public string $outstanding = '';
     public string $quick = 'all';
     public bool $showArchived = false;
@@ -62,7 +61,11 @@ class Index extends Component
     public ?int $selectedClientId = null;
     public bool $showClientPreview = false;
     public bool $showCreate = false;
+    public bool $createAddressOptionsReady = false;
     public bool $showDetail = false;
+    public array $clientDetailSectionsReady = [
+        'addresses' => false,
+    ];
     public bool $showEdit = false;
     public ?int $actionMenuClientId = null;
     public ?int $deleteArchivedClientId = null;

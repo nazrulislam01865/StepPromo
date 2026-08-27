@@ -1,42 +1,85 @@
+            @php
+                $taskAutomationKey = app(\App\Services\OrderWorkflowActionService::class)->automationKey($task);
+                $isArtworkUploadTask = $taskAutomationKey === 'ART_PREPARE_UPLOAD';
+                $taskAttachmentDocuments = $task->documents->sortByDesc('created_at')->values();
+
+                // Keep Task Details in parity with the Artwork task row on Order Details:
+                // the live view shows only the newest artwork revision. Older revisions stay
+                // stored for audit/version history and are never deleted by this presentation filter.
+                $artworkVersionDocuments = $isArtworkUploadTask
+                    ? $taskAttachmentDocuments
+                        ->sortBy(function ($document) {
+                            $version = (int) ($document->version ?? 0);
+
+                            return [
+                                $version > 0 ? $version : 999999,
+                                optional($document->created_at)->timestamp ?? 0,
+                                (int) $document->id,
+                            ];
+                        })
+                        ->values()
+                    : collect();
+                $latestArtworkDocument = $artworkVersionDocuments->last();
+                $visibleTaskDocuments = $isArtworkUploadTask
+                    ? collect([$latestArtworkDocument])->filter()->values()
+                    : $taskAttachmentDocuments;
+                $visibleAttachmentCount = $visibleTaskDocuments->count()
+                    + ($task->relationLoaded('links') ? $task->links->count() : 0);
+            @endphp
             <section class="ft-detail-card ft-attachment-card">
-                <h2>Attachments <span>{{ $task->documents->count() + ($task->relationLoaded('links') ? $task->links->count() : 0) }}</span></h2>
+                <h2>Attachments <span>{{ $visibleAttachmentCount }}</span></h2>
                 <div class="ft-upload-zone compact ft-task-upload-zone">
-                    @if($canUploadDocument && !$showTaskDocumentPicker)
+                    @if($canUploadDocument)
                         <label class="ft-task-upload-drop ft-livewire-upload-zone" data-file-dropzone data-auto-upload-method="uploadSelectedTaskDocuments" for="taskDocumentUpload-{{ $task->id }}">
                             <input id="taskDocumentUpload-{{ $task->id }}" type="file" wire:model="taskDocumentUploads" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.zip,.txt,.csv,.eps,.esp">
-                            <span class="ft-paperclip">⌕</span>
-                            <div>Drop files here or <strong>browse</strong><small data-drop-status>{{ $taskDocumentName ? 'Required document: '.$taskDocumentName.' · ' : '' }}PDF, Office files, JPG, PNG, ZIP, EPS or ESP · Max 20 MB</small></div>
-                            @if($taskDocumentInstructions !== '')<div class="ft-upload-note">{{ $taskDocumentInstructions }}</div>@endif
+                            <span class="ft-paperclip" aria-hidden="true">⌕</span>
+                            <div class="ft-task-upload-copy">
+                                <div class="ft-task-upload-title">Drop files here or <strong>browse</strong></div>
+                                <small data-drop-status>{{ $taskDocumentName ? 'Required document: '.$taskDocumentName.' · ' : '' }}PDF, Office files, JPG, PNG, ZIP, EPS or ESP · Max 20 MB</small>
+                                @if($taskDocumentInstructions !== '')
+                                    <small class="ft-task-upload-instruction">{{ $taskDocumentInstructions }}</small>
+                                @endif
+                            </div>
                         </label>
-                    @elseif(!$canUploadDocument)
-                        <div class="ft-task-upload-drop ft-task-upload-readonly"><span class="ft-paperclip">⌕</span><div>Attachments<small>You have read-only access to task attachments.</small></div></div>
+                    @else
+                        <div class="ft-task-upload-drop ft-task-upload-readonly">
+                            <span class="ft-paperclip" aria-hidden="true">⌕</span>
+                            <div class="ft-task-upload-copy">
+                                <div class="ft-task-upload-title">Attachments</div>
+                                <small>You have read-only access to task attachments.</small>
+                            </div>
+                        </div>
                     @endif
-                    @if($canLinkDocument)<button class="ft-outline-btn ft-task-choose-document" type="button" wire:click="toggleTaskDocumentPicker">{{ $showTaskDocumentPicker && $canUploadDocument ? 'Upload new' : 'Choose from Documents' }}</button>@endif
                 </div>
-                @if(!$showTaskDocumentPicker && count($taskDocumentUploads ?? []))
+                @if(count($taskDocumentUploads ?? []))
                     <div class="ft-upload-ready-row ft-auto-upload-state" aria-live="polite"><span>Uploading and linking {{ count($taskDocumentUploads ?? []) }} file{{ count($taskDocumentUploads ?? [])===1?'':'s' }} automatically…</span></div>
                 @endif
                 @error('taskDocumentUploads')<div class="validation-error">{{ $message }}</div>@enderror
                 @error('taskDocumentUploads.*')<div class="validation-error">{{ $message }}</div>@enderror
-                @if($canLinkDocument && $showTaskDocumentPicker)
-                    <div class="ft-existing-document-picker ft-task-document-picker">
-                        <select wire:model="taskExistingDocumentId"><option value="">Select a stored document</option>@foreach($availableDocuments as $stored)<option value="{{ $stored->id }}">{{ $stored->name }} · {{ $stored->job?->displayOrderNumber() ?? 'Archive' }}</option>@endforeach</select>
-                        <button class="ft-new-job-btn" type="button" wire:click="attachExistingToSelectedTask">Link document</button>
-                        <button class="ft-outline-btn" type="button" wire:click="toggleTaskDocumentPicker">Cancel</button>
-                    </div>
-                    @error('taskExistingDocumentId')<div class="validation-error">{{ $message }}</div>@enderror
-                @endif
-                @if($task->documents->isNotEmpty())
+                @if($visibleTaskDocuments->isNotEmpty())
                     <div class="ft-task-attachment-list" aria-label="Task attachments">
-                        @foreach($task->documents->sortByDesc('created_at') as $doc)
-                            <div class="ft-order-task-document-row ft-task-detail-document-row" wire:key="task-detail-document-{{ $doc->id }}">
+                        @foreach($visibleTaskDocuments as $doc)
+                            <div class="ft-order-task-document-row ft-task-detail-document-row {{ $isArtworkUploadTask ? 'is-latest-artwork' : '' }}" wire:key="task-detail-document-{{ $doc->id }}">
                                 <span class="ft-order-task-file-type">{{ strtoupper(pathinfo($doc->name, PATHINFO_EXTENSION) ?: 'FILE') }}</span>
                                 <div class="ft-order-task-file-copy">
-                                    <b title="{{ $doc->name }}">{{ $doc->name }}</b>
+                                    <b title="{{ $doc->name }}">
+                                        {{ $doc->name }}
+                                        @if($isArtworkUploadTask)
+                                            · Version {{ max(1, (int) $doc->version) }}
+                                        @endif
+                                    </b>
                                     @if($doc->note)<span class="ft-order-task-file-note">{{ $doc->note }}</span>@endif
-                                    <small>{{ $doc->category ?: 'Task attachment' }} · {{ $doc->uploader?->name ?? 'FlowTrack' }} · {{ \App\Support\UserLocalTime::format($doc->created_at, 'M j, Y, g:i A') }}</small>
+                                    <small>
+                                        {{ $doc->category ?: 'Task attachment' }} · {{ $doc->uploader?->name ?? 'FlowTrack' }} · {{ \App\Support\UserLocalTime::format($doc->created_at, 'M j, Y, g:i A') }}
+                                        @if($isArtworkUploadTask)
+                                            · Latest
+                                        @endif
+                                    </small>
                                 </div>
                                 <div class="ft-order-task-file-actions">
+                                    @if($isArtworkUploadTask)
+                                        <em class="ft-task-latest-artwork-badge">Latest</em>
+                                    @endif
                                     <a href="{{ route('documents.open', $doc) }}" target="_blank" rel="noopener">Open</a>
                                     @if(auth()->user()->canModule('documents','export'))<a href="{{ route('documents.download', $doc) }}">Download</a>@endif
                                     @if($canDeleteDocument)
@@ -65,5 +108,9 @@
                         @endforeach
                     </div>
                 @endif
-                <p class="ft-upload-note">Files and external links attached to this task remain available here and in the Order taskflow. Either can satisfy a Task Pack document requirement.</p>
+                @if($isArtworkUploadTask)
+                    <p class="ft-upload-note">Only the latest artwork version is shown here. Older artwork versions remain available in document/version history.</p>
+                @else
+                    <p class="ft-upload-note">Files and external links attached to this task remain available here and in the Order taskflow. Either can satisfy a Task Pack document requirement.</p>
+                @endif
             </section>

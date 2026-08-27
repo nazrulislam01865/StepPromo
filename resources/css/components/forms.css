@@ -1,4 +1,36 @@
 @layer ft-components {
+    /*
+     * Shared form typography contract.
+     *
+     * Create Order is the visual reference for application forms. Pages that
+     * opt in with .ft-form-standard inherit these values instead of defining
+     * independent font sizes/weights. This keeps form typography centralized
+     * while allowing each feature to retain its own layout and business logic.
+     */
+    .ft-form-standard {
+        --ft-form-font-family: var(--ft-font-family);
+        --ft-form-type-breadcrumb-size: 0.625rem;
+        --ft-form-type-page-title-size: 1.3125rem;
+        --ft-form-type-page-title-weight: var(--ft-font-weight-bold);
+        --ft-form-type-page-title-line-height: 1.15;
+        --ft-form-type-page-title-letter-spacing: -0.03em;
+        --ft-form-type-page-subtitle-size: 0.6875rem;
+        --ft-form-type-section-title-size: 0.9375rem;
+        --ft-form-type-section-title-weight: var(--ft-font-weight-bold);
+        --ft-form-type-section-title-letter-spacing: -0.015em;
+        --ft-form-type-section-marker-size: 0.6875rem;
+        --ft-form-type-label-size: 0.625rem;
+        --ft-form-type-label-weight: var(--ft-font-weight-bold);
+        --ft-form-type-control-size: 0.65625rem;
+        --ft-form-type-control-weight: var(--ft-font-weight-regular);
+        --ft-form-type-helper-size: 0.53125rem;
+        --ft-form-type-helper-weight: var(--ft-font-weight-regular);
+        --ft-form-type-button-size: 0.59375rem;
+        --ft-form-type-button-weight: var(--ft-font-weight-bold);
+        --ft-form-type-badge-size: 0.5rem;
+        font-family: var(--ft-form-font-family);
+    }
+
     .ft-field[data-ft-ui-component="field"] {
         display: grid;
         min-width: 0;

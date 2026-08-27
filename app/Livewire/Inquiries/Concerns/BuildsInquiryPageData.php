@@ -8,6 +8,7 @@ use App\Models\MasterRecord;
 use App\Models\Document;
 use App\Models\User;
 use App\Services\AccessControlService;
+use App\Services\Inquiries\InquiryRfqService;
 use App\Services\MentionService;
 use App\Services\MasterDataService;
 use Throwable;
@@ -55,14 +56,26 @@ trait BuildsInquiryPageData
         $user = auth()->user();
         $workspaceId = app(MasterDataService::class)->workspaceId();
         $canUseInquiryProductSelector = $this->canUseCreateInquiryProducts($user);
+        $catalogReady = $canUseInquiryProductSelector
+            && ($this->createCatalogReady || $this->showCreateOrderProductModal);
         $canViewProductCategories = $user->canModule('product_categories', 'view');
         $productCategories = collect();
         $productSearchResults = collect();
         $selectedProductDetails = collect();
+        $selectedProductSuppliers = collect();
+        $productSearchSuppliers = collect();
         $activeProductCount = 0;
         $productResultTotal = 0;
+        $createRfqSupplierCandidates = app(InquiryRfqService::class)->supplierChoicesForWorkspace(
+            $workspaceId,
+            $this->createRfqSupplierSearch,
+            trim($this->createRfqSupplierSearch) === '' ? 100 : 50,
+        );
+        $createRfqProductCount = collect($this->createProductRows)
+            ->filter(fn (array $row): bool => (int) ($row['product_id'] ?? 0) > 0 || trim((string) ($row['product'] ?? '')) !== '')
+            ->count();
 
-        if ($canUseInquiryProductSelector) {
+        if ($catalogReady) {
             if ($canViewProductCategories) {
                 $productCategories = MasterRecord::query()
                     ->forWorkspace($workspaceId)
@@ -80,9 +93,11 @@ trait BuildsInquiryPageData
                 ? (int) $this->createProductCategoryFilter
                 : 0;
             $productResultTotal = $catalog->orderSearchCount($search, $categoryFilterId ?: null);
-            $resultLimit = $this->createProductShowAllResults || $productResultTotal <= 20 ? 20 : 3;
+            $resultLimit = $this->createProductShowAllResults ? 100 : 3;
             $productSearchResults = $catalog->searchForOrderCreation($search, $categoryFilterId ?: null, $resultLimit);
+            $productSearchSuppliers = $catalog->suppliersForProducts($productSearchResults->keyBy('id'));
             $selectedProductDetails = $catalog->selectedProducts(collect($this->createProductRows)->pluck('product_id'));
+            $selectedProductSuppliers = $catalog->suppliersForProducts($selectedProductDetails);
         }
 
         $duplicateProduct = null;
@@ -180,11 +195,13 @@ trait BuildsInquiryPageData
             'mode' => 'create',
             'selectedInquiry' => null,
             'selectedTask' => null,
-            'catalogReady' => $canUseInquiryProductSelector,
+            'catalogReady' => $catalogReady,
             'canUseInquiryProductSelector' => $canUseInquiryProductSelector,
             'productCategories' => $productCategories,
             'productSearchResults' => $productSearchResults,
+            'productSearchSuppliers' => $productSearchSuppliers,
             'selectedProductDetails' => $selectedProductDetails,
+            'selectedProductSuppliers' => $selectedProductSuppliers,
             'activeProductCount' => $activeProductCount,
             'productResultTotal' => $productResultTotal,
             'canCreateCatalogProduct' => $canUseInquiryProductSelector && $user->canModule('catalog_products', 'create'),
@@ -198,6 +215,8 @@ trait BuildsInquiryPageData
             'newProductHasExactCategory' => $newProductHasExactCategory,
             'newProductImagePreview' => $newProductImagePreview,
             'createPriorityOptions' => app(MasterDataService::class)->active('priority'),
+            'createRfqSupplierCandidates' => $createRfqSupplierCandidates,
+            'createRfqProductCount' => $createRfqProductCount,
         ];
     }
 
@@ -208,6 +227,28 @@ trait BuildsInquiryPageData
         $canViewInquiryProducts = $access->can($user, 'catalog_products', 'view');
         $canViewTasks = $user->canModule('tasks', 'view')
             || Inquiry::query()->whereKey($this->selectedInquiryId)->where('created_by', $user->id)->exists();
+        $detailSectionsReady = array_merge([
+            'products' => false,
+            'taskflow' => false,
+            'documents' => false,
+            'activity' => false,
+        ], $this->inquiryDetailSectionsReady ?? []);
+        if ($this->showAddInquiryProductForm || $this->editingInquiryProducts || $this->editInquiryProductItemId) {
+            $detailSectionsReady['products'] = true;
+        }
+        if ($this->selectedTaskId || $this->showTaskDocumentModal || $this->showAddTaskForm || $this->showTaskAttentionModal || $this->taskLinkFormTaskId) {
+            $detailSectionsReady['taskflow'] = true;
+        }
+        if ($this->showInquiryDocumentPicker || count($this->inquiryUploads ?? []) > 0) {
+            $detailSectionsReady['documents'] = true;
+        }
+        if ($this->inquiryActivityTab !== 'all') {
+            $detailSectionsReady['activity'] = true;
+        }
+        if ($this->detailTab === 'activity') {
+            $detailSectionsReady['activity'] = true;
+        }
+        $rfqContext = in_array($this->detailTab, ['rfq', 'comparison'], true) || $this->showRfqEmailPreview;
         $with = [
             'client:id,name,logo_path',
             'creator:id,name,profile_image_path',
@@ -217,20 +258,30 @@ trait BuildsInquiryPageData
             'currentTask:id,inquiry_id,assignee_id,title,due_date,status,needs_attention,attention_reason,started_at,completed_at',
             'currentTask.assignee:id,name,profile_image_path',
         ];
-        if ($canViewInquiryProducts) {
+        if (($canViewInquiryProducts && $detailSectionsReady['products']) || $rfqContext) {
             $with[] = 'items:id,inquiry_id,category,item_name,quantity,unit,unit_price,notes,sort_order,created_at,updated_at';
         }
         if ($this->detailTab === 'overview' && $canViewTasks) {
-            // Overview owns the fully interactive Inquiry Taskflow. Load only tasks allowed by the Tasks matrix.
-            $with['tasks'] = fn ($query) => app(AccessControlService::class)->applyInquiryTaskScope($query, $user)
-                ->with([
-                    'assignee:id,name,profile_image_path',
-                    'sourceTaskPackItem:id,color',
-                    'documents:id,inquiry_id,inquiry_task_id,name,note,mime_type,created_at',
-                    'links:id,inquiry_task_id,url,created_at',
-                ])
-                ->withCount(['documents', 'comments'])
-                ->orderBy('sequence');
+            if ($detailSectionsReady['taskflow']) {
+                // The interactive Taskflow is the expensive task graph: people,
+                // submission evidence, links and counts load only near the section.
+                $with['tasks'] = fn ($query) => app(AccessControlService::class)->applyInquiryTaskScope($query, $user)
+                    ->with([
+                        'assignee:id,name,profile_image_path',
+                        'sourceTaskPackItem:id,color',
+                        'documents:id,inquiry_id,inquiry_task_id,name,note,mime_type,created_at',
+                        'links:id,inquiry_task_id,url,created_at',
+                    ])
+                    ->withCount(['documents', 'comments'])
+                    ->orderBy('sequence');
+            } else {
+                // Keep only the small task state needed by the header/properties.
+                // This avoids hydrating the full Taskflow while preserving dates,
+                // attention state and the current-workflow summary above the fold.
+                $with['tasks'] = fn ($query) => app(AccessControlService::class)->applyInquiryTaskScope($query, $user)
+                    ->select(['id','inquiry_id','assignee_id','title','due_date','status','needs_attention','attention_reason','started_at','completed_at','sequence'])
+                    ->orderBy('sequence');
+            }
         }
 
         $inquiry = $detailQuery->detail($user, (int) $this->selectedInquiryId, $with, [
@@ -247,7 +298,8 @@ trait BuildsInquiryPageData
         }
 
         $inquiryProductMasters = collect();
-        if ($canViewInquiryProducts) {
+        $inquiryProductSuppliers = collect();
+        if ($canViewInquiryProducts && $detailSectionsReady['products'] && $inquiry->relationLoaded('items')) {
             $productNames = $inquiry->items
                 ->pluck('item_name')
                 ->filter(fn ($name) => filled($name))
@@ -262,6 +314,12 @@ trait BuildsInquiryPageData
                     ->with('parent')
                     ->get()
                     ->keyBy(fn ($record) => mb_strtolower(trim((string) $record->name)));
+
+                // Resolve Product Master suppliers in one bounded query so the
+                // Inquiry and Order detail cards can share the same Supplier column
+                // without introducing any relationship queries inside Blade.
+                $inquiryProductSuppliers = app(\App\Services\ProductCatalogService::class)
+                    ->suppliersForProducts($inquiryProductMasters->values()->keyBy('id'));
             }
         }
 
@@ -275,31 +333,63 @@ trait BuildsInquiryPageData
         };
 
         $inquiryProductSearchResults = collect();
+        $inquiryProductSearchSuppliers = collect();
         $inquiryProductResultTotal = 0;
         $inquiryProductSelectedProduct = null;
-        if ($this->detailTab === 'overview' && $this->showAddInquiryProductForm && $canViewInquiryProducts) {
+        $inquiryProductSelectedSupplier = null;
+        if ($this->detailTab === 'overview' && $detailSectionsReady['products'] && $this->showAddInquiryProductForm && $canViewInquiryProducts) {
             $catalog = app(\App\Services\ProductCatalogService::class);
             $productSearch = trim($this->inquiryProductSearch);
             $inquiryProductResultTotal = $catalog->orderSearchCount($productSearch, null);
             $resultLimit = $this->inquiryProductShowAllResults || $inquiryProductResultTotal <= 20 ? 20 : 3;
             $inquiryProductSearchResults = $catalog->searchForOrderCreation($productSearch, null, $resultLimit);
+            $inquiryProductSearchSuppliers = $catalog->suppliersForProducts($inquiryProductSearchResults->keyBy('id'));
             if ($this->inquiryProductSelectedId) {
                 $inquiryProductSelectedProduct = $catalog->selectedProducts([$this->inquiryProductSelectedId])->first();
+                $inquiryProductSelectedSupplier = $inquiryProductSelectedProduct
+                    ? $catalog->supplierForProduct($inquiryProductSelectedProduct)
+                    : null;
+            }
+        }
+
+        $editInquiryProductSearchResults = collect();
+        $editInquiryProductSearchSuppliers = collect();
+        $editInquiryProductResultTotal = 0;
+        $editInquiryProductSelectedProduct = null;
+        $editInquiryProductSelectedSupplier = null;
+        if (
+            $this->detailTab === 'overview'
+            && $detailSectionsReady['products']
+            && $this->editInquiryProductItemId
+            && $canViewInquiryProducts
+        ) {
+            $catalog = app(\App\Services\ProductCatalogService::class);
+            $productSearch = trim($this->editInquiryProductSearch);
+            $editInquiryProductResultTotal = $catalog->orderSearchCount($productSearch, null);
+            $resultLimit = $this->editInquiryProductShowAllResults || $editInquiryProductResultTotal <= 20 ? 20 : 3;
+            $editInquiryProductSearchResults = $catalog->searchForOrderCreation($productSearch, null, $resultLimit);
+            $editInquiryProductSearchSuppliers = $catalog->suppliersForProducts($editInquiryProductSearchResults->keyBy('id'));
+            if ($this->editInquiryProductSelectedId) {
+                $editInquiryProductSelectedProduct = $catalog->selectedProducts([$this->editInquiryProductSelectedId])->first();
+                $editInquiryProductSelectedSupplier = $editInquiryProductSelectedProduct
+                    ? $catalog->supplierForProduct($editInquiryProductSelectedProduct)
+                    : null;
             }
         }
 
         // Documents and Activity remain part of Overview, but no longer have separate tabs.
-        $documents = $this->detailTab === 'overview' && $user->canModule('documents', 'view') ? $detailQuery->documents($user, $inquiry) : null;
-        $activities = $this->detailTab === 'overview' ? $detailQuery->activity($user, $inquiry, 30, $this->inquiryActivityTab) : null;
-        $mentionUsers = $this->detailTab === 'overview' ? app(MentionService::class)->optionsForCreate($user) : collect();
-        $availableInquiryDocuments = $this->showInquiryDocumentPicker && $this->detailTab === 'overview'
+        $documents = $this->detailTab === 'overview' && $detailSectionsReady['documents'] && $user->canModule('documents', 'view') ? $detailQuery->documents($user, $inquiry) : null;
+        $activities = in_array($this->detailTab, ['overview', 'activity'], true) && $detailSectionsReady['activity'] ? $detailQuery->activity($user, $inquiry, 30, $this->inquiryActivityTab) : null;
+        $needsMentionUsers = $detailSectionsReady['activity'] || $this->showInquiryAttentionModal || $this->showTaskAttentionModal;
+        $mentionUsers = in_array($this->detailTab, ['overview', 'activity'], true) && $needsMentionUsers ? app(MentionService::class)->optionsForCreate($user) : collect();
+        $availableInquiryDocuments = $detailSectionsReady['documents'] && $this->showInquiryDocumentPicker && $this->detailTab === 'overview'
             ? app(AccessControlService::class)->applyDocumentScope(Document::query(), $user)
                 ->where('client_id', $inquiry->client_id)
                 ->latest('id')
                 ->limit(60)
                 ->get(['id','name','flow_job_id','task_id','client_id'])
             : collect();
-        $taskDocumentModalTask = $this->showTaskDocumentModal && $this->taskDocumentModalTaskId
+        $taskDocumentModalTask = $detailSectionsReady['taskflow'] && $this->showTaskDocumentModal && $this->taskDocumentModalTaskId
             ? $inquiry->tasks->firstWhere('id', (int) $this->taskDocumentModalTaskId)
             : null;
         $availableTaskDocuments = $this->showTaskDocumentModal
@@ -322,26 +412,53 @@ trait BuildsInquiryPageData
         $canEditActiveTask = $activeTask ? $detailQuery->canEditTask($user, $activeTask) : false;
         $workflowQuery = app(\App\Queries\Inquiries\InquiryWorkflowQuery::class);
         $inquiryTaskUi = [];
-        foreach ($inquiry->tasks as $taskRow) {
-            $inquiryTaskUi[(int) $taskRow->id] = [
-                'canEdit' => $detailQuery->canEditTask($user, $taskRow),
-                'statusNeedsAttention' => $detailQuery->taskStatusNeedsAttention((string) $taskRow->status),
-            ];
-        }
         $inquiryTaskStatusCompletion = [];
-        $taskStatusNames = $detailQuery->taskStatusOptions()
-            ->merge($inquiry->tasks->pluck('status'))
-            ->filter()
-            ->unique(fn ($status) => mb_strtolower(trim((string) $status)));
-        foreach ($taskStatusNames as $taskStatusName) {
-            $name = (string) $taskStatusName;
-            $inquiryTaskStatusCompletion[$name] = $workflowQuery->isCompletionStatus($name);
+        if ($detailSectionsReady['taskflow']) {
+            foreach ($inquiry->tasks as $taskRow) {
+                $inquiryTaskUi[(int) $taskRow->id] = [
+                    'canEdit' => $detailQuery->canEditTask($user, $taskRow),
+                    'statusNeedsAttention' => $detailQuery->taskStatusNeedsAttention((string) $taskRow->status),
+                ];
+            }
+            $taskStatusNames = $detailQuery->taskStatusOptions()
+                ->merge($inquiry->tasks->pluck('status'))
+                ->filter()
+                ->unique(fn ($status) => mb_strtolower(trim((string) $status)));
+            foreach ($taskStatusNames as $taskStatusName) {
+                $name = (string) $taskStatusName;
+                $inquiryTaskStatusCompletion[$name] = $workflowQuery->isCompletionStatus($name);
+            }
         }
+
+        $rfq = app(\App\Services\Inquiries\InquiryRfqService::class);
+        $inquiryRfqSummary = $rfq->summary($inquiry);
+        $rfqInvitations = collect();
+        $rfqDefaultSuppliers = collect();
+        $rfqSupplierCandidates = collect();
+        $rfqEmailPreviews = [];
+        if ($rfqContext) {
+            $rfqInvitations = $rfq->invitations($inquiry);
+            if ($this->detailTab === 'rfq') {
+                $rfqDefaultSuppliers = $rfq->defaultSuppliersAwaitingSend($inquiry);
+                $rfqSupplierCandidates = $rfq->candidateSuppliers($inquiry, $this->rfqSupplierSearch, 100);
+            }
+            if ($this->showRfqEmailPreview) {
+                $rfqEmailPreviews = $rfq->previewHtml($inquiry);
+            }
+        }
+        $canManageInquiryRfq = $canManageInquiryRecord;
 
         return [
             'mode' => 'detail',
+            'inquiryDetailSectionsReady' => $detailSectionsReady,
             'selectedInquiry' => $inquiry,
             'selectedTask' => $task,
+            'inquiryRfqSummary' => $inquiryRfqSummary,
+            'rfqInvitations' => $rfqInvitations,
+            'rfqDefaultSuppliers' => $rfqDefaultSuppliers,
+            'rfqSupplierCandidates' => $rfqSupplierCandidates,
+            'rfqEmailPreviews' => $rfqEmailPreviews,
+            'canManageInquiryRfq' => $canManageInquiryRfq,
             'inquiryDocuments' => $documents,
             'inquiryActivities' => $activities,
             'inquiryMentionUsers' => $mentionUsers,
@@ -359,10 +476,18 @@ trait BuildsInquiryPageData
             'canEditInquiryProducts' => $canManageInquiryRecord && $canViewInquiryProducts && $access->can($user, 'catalog_products', 'edit'),
             'canDeleteInquiryProducts' => $canManageInquiryRecord && $canViewInquiryProducts && $access->can($user, 'catalog_products', 'delete'),
             'inquiryProductMasters' => $inquiryProductMasters,
+            'inquiryProductSuppliers' => $inquiryProductSuppliers,
             'inquiryCurrencySymbol' => $inquiryCurrencySymbol,
             'inquiryProductSearchResults' => $inquiryProductSearchResults,
+            'inquiryProductSearchSuppliers' => $inquiryProductSearchSuppliers,
             'inquiryProductResultTotal' => $inquiryProductResultTotal,
             'inquiryProductSelectedProduct' => $inquiryProductSelectedProduct,
+            'inquiryProductSelectedSupplier' => $inquiryProductSelectedSupplier,
+            'editInquiryProductSearchResults' => $editInquiryProductSearchResults,
+            'editInquiryProductSearchSuppliers' => $editInquiryProductSearchSuppliers,
+            'editInquiryProductResultTotal' => $editInquiryProductResultTotal,
+            'editInquiryProductSelectedProduct' => $editInquiryProductSelectedProduct,
+            'editInquiryProductSelectedSupplier' => $editInquiryProductSelectedSupplier,
             'canEditActiveTask' => $canEditActiveTask,
             'detailStatusColor' => $detailQuery->statusColor((string) $inquiry->status, (string) ($activeTask?->status ?: '')),
             'inquiryTaskUi' => $inquiryTaskUi,
@@ -371,7 +496,7 @@ trait BuildsInquiryPageData
             'inquiryDefaultStatus' => $workflowQuery->defaultInquiryStatus(),
             'canAddInquiryTask' => app(AccessControlService::class)->canCreateInquiryTask($user, $inquiry) && !$inquiry->result,
             'inquiryPriorities' => $this->detailTab === 'overview' ? app(\App\Services\MasterDataService::class)->active('priority') : collect(),
-            'inquiryTaskStatusOptions' => $this->detailTab === 'overview' ? $detailQuery->taskStatusOptions() : collect(),
+            'inquiryTaskStatusOptions' => $this->detailTab === 'overview' && $detailSectionsReady['taskflow'] ? $detailQuery->taskStatusOptions() : collect(),
             'canCreateOrder' => $user->canModule('jobs', 'create'),
             'selectedTaskIsActive' => false,
             'selectedTaskCanEdit' => false,

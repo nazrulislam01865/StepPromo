@@ -47,3 +47,23 @@ export const setMyWorkCount = (count) => {
     }
     badge.textContent = String(value);
 };
+
+export const setCancelledOrderCount = (count) => {
+    const value = Math.max(0, Number.parseInt(String(count ?? 0), 10) || 0);
+    const cancelledLink = [...document.querySelectorAll('#sidebar .nav-btn')]
+        .find((link) => link.getAttribute('href')?.includes('/orders/cancelled'));
+    if (!cancelledLink) return;
+
+    let badge = cancelledLink.querySelector('.nav-badge');
+    if (value === 0) {
+        badge?.remove();
+        return;
+    }
+    if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'nav-badge';
+        cancelledLink.appendChild(badge);
+    }
+    badge.textContent = String(value);
+};
+

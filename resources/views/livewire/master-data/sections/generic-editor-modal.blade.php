@@ -1,6 +1,6 @@
     @if($showModal && !in_array($group, ['product', 'product_category'], true))
         <div class="overlay livewire-overlay" wire:click.self="close"></div>
-        <div class="modal livewire-modal ft-master-modal">
+        <div class="modal livewire-modal ft-master-modal" data-ft-feedback-scope="form">
             <div class="modal-head">
                 <div>
                     <h2>{{ $editId ? 'Edit' : 'Add' }} {{ ucfirst($singularLabel) }}</h2>

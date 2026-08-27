@@ -26,7 +26,7 @@ class FilterOptionService
         'clients', 'jobs', 'users', 'product-categories', 'products', 'workflows',
         'priorities', 'task-statuses', 'document-categories', 'document-category-records',
         'department-records', 'departments', 'suppliers', 'countries', 'phone-country-codes',
-        'job-statuses', 'job-healths', 'phases',
+        'job-statuses', 'phases',
     ];
 
     public function supports(string $type): bool
@@ -152,7 +152,6 @@ class FilterOptionService
             'countries' => $this->countries($user, $context, $search, $limit, $offset),
             'phone-country-codes' => $this->phoneCountryCodes($search, $limit, $offset),
             'job-statuses' => $this->jobStatuses($user, $search, $limit, $offset),
-            'job-healths' => $this->jobHealths($user, $search, $limit, $offset),
             'phases' => $this->phases($context, $search, $limit, $offset),
         };
     }
@@ -181,7 +180,6 @@ class FilterOptionService
             'countries' => $this->countryByName($user, $context, (string) $selectedId),
             'phone-country-codes' => $this->phoneCountryCodeByValue((string) $selectedId),
             'job-statuses' => $this->jobStatusByName($user, (string) $selectedId),
-            'job-healths' => $this->jobHealthByName($user, (string) $selectedId),
             'phases' => $this->phaseById($context, $selectedId),
         };
     }
@@ -786,27 +784,6 @@ class FilterOptionService
         if ($status === '') return null;
         $exists = app(JobService::class)->visibleQuery($user)->where('status', $status)->exists();
         return $exists ? ['id' => $status, 'label' => $status, 'meta' => ''] : null;
-    }
-
-    private function jobHealths(User $user, string $search, int $limit, int $offset = 0): Collection
-    {
-        return app(JobService::class)->visibleQuery($user)
-            ->whereNotNull('health')
-            ->where('health', '!=', '')
-            ->when(strlen($search) >= 2, fn ($q) => $q->whereLike('health', $search.'%'))
-            ->distinct()
-            ->orderBy('health')
-            ->offset($offset)
-            ->limit($limit)
-            ->pluck('health')
-            ->map(fn ($health) => ['id' => (string) $health, 'label' => (string) $health, 'meta' => '']);
-    }
-
-    private function jobHealthByName(User $user, string $health): ?array
-    {
-        if ($health === '') return null;
-        $exists = app(JobService::class)->visibleQuery($user)->where('health', $health)->exists();
-        return $exists ? ['id' => $health, 'label' => $health, 'meta' => ''] : null;
     }
 
     private function phases(string $context, string $search, int $limit, int $offset = 0): Collection

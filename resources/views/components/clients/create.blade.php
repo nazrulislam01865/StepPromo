@@ -27,6 +27,7 @@
     'clientLogoUpload' => null,
     'existingClientLogoUrl' => '',
     'removeClientLogo' => false,
+    'addressOptionsReady' => true,
 ])
 @php
     $isEdit = $mode === 'edit';
@@ -49,7 +50,7 @@
         ? sha1((string) json_encode($errors->getMessages(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES))
         : '';
 @endphp
-<div class="{{ $isEdit ? 'ft-client-inline-edit ft-client-create-prototype ft-reusable-form-theme' : 'ft-create-client-page ft-client-create-prototype ft-reusable-form-theme' }}" data-client-validation-signature="{{ $clientValidationSignature }}">
+<div class="{{ $isEdit ? 'ft-client-inline-edit ft-client-create-prototype ft-reusable-form-theme' : 'ft-create-client-page ft-client-create-prototype ft-reusable-form-theme ft-form-standard ft-form-standard--client' }}" data-ft-feedback-scope="form" data-client-validation-signature="{{ $clientValidationSignature }}">
     <div class="ft-client-create-shell">
         @unless($isEdit)
             <div class="ft-client-create-top">
@@ -187,6 +188,7 @@
                 @error('contacts')<small class="validation-error ft-client-contacts-error">{{ $message }}</small>@enderror
             </section>
 
+            @if($isEdit || $addressOptionsReady)
             <section class="ft-client-prototype-section ft-client-shipping-aligned-section">
                 <div class="ft-client-section-title ft-client-section-title-spread">
                     <div class="ft-section-title-left">
@@ -320,6 +322,21 @@
                     </div>
                 </article>
             </section>
+
+            @else
+                <section class="ft-client-prototype-section ft-client-shipping-aligned-section" wire:key="create-client-addresses-placeholder">
+                    <div class="ft-client-section-title ft-client-section-title-spread">
+                        <div class="ft-section-title-left">
+                            <span>3</span>
+                            <div>
+                                <h3>Shipping &amp; billing addresses</h3>
+                                <p>Country and state options load only when you approach the address section.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <x-ui.progressive-section-loader section="addresses" :rows="5" />
+                </section>
+            @endif
 
             <section class="ft-client-prototype-section">
                 <div class="ft-client-section-title"><span>5</span><div><h3>Business &amp; billing preferences</h3></div></div>

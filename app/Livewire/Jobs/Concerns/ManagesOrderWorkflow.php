@@ -79,7 +79,7 @@ trait ManagesOrderWorkflow
         $this->orderWorkflowActionComment = '';
         $this->orderWorkflowActionStep = 'main';
         $this->orderWorkflowActionPayload = $workflowActions->initialPayload($task, $task->job);
-        $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionPayload']);
+        $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
         $this->showOrderWorkflowActionModal = true;
     }
 
@@ -90,7 +90,7 @@ trait ManagesOrderWorkflow
         $this->orderWorkflowActionComment = '';
         $this->orderWorkflowActionStep = 'main';
         $this->orderWorkflowActionPayload = [];
-        $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionPayload']);
+        $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
     }
 
     public function submitOrderWorkflowAction(string $decision = 'confirm'): void
@@ -111,14 +111,14 @@ trait ManagesOrderWorkflow
             && in_array($key, ['ART_INTERNAL_REVIEW', 'ART_CLIENT_ERP_DECISION'], true)) {
             $this->orderWorkflowActionStep = 'revision';
             $this->orderWorkflowActionComment = '';
-            $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionPayload']);
+            $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
             return;
         }
         if ($this->orderWorkflowActionStep === 'main' && $decision === 'issue'
             && in_array($key, ['PROD_ISSUE', 'QC_CHECK'], true)) {
             $this->orderWorkflowActionStep = 'issue';
             $this->orderWorkflowActionComment = '';
-            $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionPayload']);
+            $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
             return;
         }
 
@@ -127,7 +127,7 @@ trait ManagesOrderWorkflow
         if ($key === 'ART_CLIENT_ERP_DECISION' && $decision === 'approved' && $this->orderWorkflowActionStep === 'main') {
             $this->orderWorkflowActionStep = 'sample';
             $this->orderWorkflowActionComment = '';
-            $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionPayload']);
+            $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
             return;
         }
         if ($key === 'ART_CLIENT_ERP_DECISION' && $this->orderWorkflowActionStep === 'sample') {
@@ -142,10 +142,16 @@ trait ManagesOrderWorkflow
             $this->orderWorkflowActionPayload,
         );
 
+        $successMessage = match ($key) {
+            'NEW_SEND_PO_ARTWORK' => 'Purchase Order emailed to the Artwork Team.',
+            'ART_SEND_ORDER_TEAM' => 'Artwork emailed to the Order Team.',
+            default => 'Order workflow updated.',
+        };
+
         $this->closeOrderWorkflowAction();
         $currentPhaseId = FlowJob::query()->whereKey($this->selectedJobId)->value('workflow_phase_id');
         if ($currentPhaseId) $this->overviewPhaseId = (int) $currentPhaseId;
-        session()->flash('success', 'Order workflow updated.');
+        session()->flash('success', $successMessage);
     }
 
 }

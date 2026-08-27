@@ -5,6 +5,10 @@ namespace App\Livewire\MasterData;
 use App\Livewire\MasterData\Concerns\ManagesMasterNavigation;
 use App\Livewire\MasterData\Concerns\ManagesMasterEditor;
 use App\Livewire\MasterData\Concerns\ManagesProductTaxonomy;
+use App\Livewire\MasterData\Concerns\ManagesSupplierCreation;
+use App\Livewire\MasterData\Concerns\ManagesSupplierDetails;
+use App\Livewire\MasterData\Concerns\ManagesSupplierList;
+use App\Livewire\MasterData\Concerns\ManagesProductSupplierAssignments;
 use App\Livewire\MasterData\Concerns\ManagesProductCatalog;
 use App\Livewire\MasterData\Concerns\BuildsMasterDataPageData;
 use App\Livewire\Concerns\UsesPagePlaceholder;
@@ -34,6 +38,10 @@ class Index extends Component
     use ManagesMasterEditor;
     use ManagesProductTaxonomy;
     use ManagesProductCatalog;
+    use ManagesSupplierCreation;
+    use ManagesSupplierDetails;
+    use ManagesSupplierList;
+    use ManagesProductSupplierAssignments;
     use BuildsMasterDataPageData;
 
     use RefreshesFromWorkspace;
@@ -51,6 +59,8 @@ class Index extends Component
     public string $productStatus = '';
     public string $productReferenceCode = '';
     public ?int $productSupplierId = null;
+    public ?int $productSupplierFilterId = null;
+    public string $productSupplierState = '';
     public string $productFormMainCategory = '';
     public string $productSize = '';
     public string $productPriceTable = '';
@@ -72,7 +82,14 @@ class Index extends Component
     public int $productPerPage = 10;
     public bool $recordsReady = false;
     public bool $showModal = false;
+    public bool $productTaxonomyReady = false;
+    public bool $productShipmentOptionsReady = false;
     public bool $showProductView = false;
+    public array $productDetailSectionsReady = [
+        'pricing' => false,
+        'options' => false,
+        'documents' => false,
+    ];
 
     #[Url(as: 'open', history: true)]
     public ?int $viewProductId = null;
@@ -118,6 +135,7 @@ class Index extends Component
     public string $bulkProductMainCategory = '';
     public ?int $bulkProductCategoryId = null;
     public string $bulkProductSubcategory = '';
+    public ?int $bulkProductSupplierId = null;
 
     // Product Category hierarchy page state.
     public string $categoryLevelFilter = '';
@@ -154,6 +172,8 @@ class Index extends Component
         }
 
         $this->authorizeGroupAction('view');
+        $this->mountSupplierCreation();
+        $this->mountSupplierDetails();
 
         // Dashboard Active products KPI opens the catalogue already filtered
         // to the same active records counted by the card.
@@ -162,6 +182,9 @@ class Index extends Component
             if (in_array($requestedProductStatus, ['active', 'inactive'], true)) {
                 $this->productStatus = $requestedProductStatus;
             }
+
+            $requestedSupplierId = request()->integer('supplier_id');
+            $this->productSupplierFilterId = $requestedSupplierId > 0 ? $requestedSupplierId : null;
         }
 
         // Allow other workflows (for example Create Inquiry) to send the user
@@ -178,11 +201,13 @@ class Index extends Component
             $this->showProductView = true;
         }
 
-        // Sidebar shortcut: open the standalone Product Category creator directly
-        // on the Product Categories page. The parent Main Category is selected
-        // inside the existing reusable category editor.
+        // Sidebar shortcut: open the standalone Product Category creator directly.
+        // Do not run the legacy taxonomy synchronizer in the navigation request:
+        // it scans the full product catalogue and can block wire:navigate for seconds.
+        // The editor render path already loads only the active Main Category options
+        // it needs, while the hierarchy list remains deferred until requested.
         if ($this->group === 'product_category' && request()->boolean('create')) {
-            app(\App\Services\ProductTaxonomyService::class)->synchronizeLegacyTaxonomy();
+            $this->recordsReady = false;
             $this->openCategoryEditor('product');
         }
     }

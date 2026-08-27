@@ -209,6 +209,7 @@ trait ManagesOrderTasks
 
         $this->selectedJobId = (int) $task->flow_job_id;
         $this->selectedTaskId = $task->id;
+        $this->resetTaskDetailProgressiveSections();
         $this->focusComment = null;
         $this->taskEditMode = $editMode;
         $this->resetOverviewTaskResourceUi();
@@ -228,7 +229,7 @@ trait ManagesOrderTasks
         }
     }
 
-    public function closeTask(): void { $this->selectedTaskId = null; $this->focusComment = null; $this->taskEditMode = false; $this->taskComment = ''; $this->newChecklistItem = ''; $this->taskActivityTab = 'all'; $this->taskActivityPage = 1; $this->taskDocumentUploads = []; $this->taskExistingDocumentId = null; $this->showTaskDocumentPicker = false; }
+    public function closeTask(): void { $this->selectedTaskId = null; $this->focusComment = null; $this->taskEditMode = false; $this->taskComment = ''; $this->newChecklistItem = ''; $this->taskActivityTab = 'all'; $this->taskActivityPage = 1; $this->taskDocumentUploads = []; $this->taskExistingDocumentId = null; $this->showTaskDocumentPicker = false; $this->resetTaskDetailProgressiveSections(); }
 
     public function markTaskComplete(): void
     {

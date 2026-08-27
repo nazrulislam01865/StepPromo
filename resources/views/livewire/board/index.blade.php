@@ -102,7 +102,6 @@
                             </span>
                             <span class="order-client">{{ $group['client'] }}</span>
                             <span class="order-stage">{{ $group['stage'] }}</span>
-                            <span class="health {{ $group['healthTone'] }}">{{ $group['health'] }}</span>
                             <span class="order-progress"><i class="progress-track"><i style="width:{{ $group['progress'] }}%"></i></i>{{ $group['progress'] }}%</span>
                             <span class="task-count">{{ $group['taskCount'] }} {{ $group['taskCount'] === 1 ? 'task' : 'tasks' }}</span>
                         </header>

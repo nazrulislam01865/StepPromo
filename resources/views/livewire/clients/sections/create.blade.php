@@ -26,4 +26,5 @@
         :client-logo-upload="$clientLogoUpload"
         :existing-client-logo-url="$existingClientLogoUrl"
         :remove-client-logo="$removeClientLogo"
+        :address-options-ready="$clientAddressOptionsReady"
     />

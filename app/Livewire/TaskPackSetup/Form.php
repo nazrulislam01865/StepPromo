@@ -85,8 +85,19 @@ class Form extends Component
 
     public function loadTaskPackOptions(): void
     {
+        if ($this->optionsReady) return;
         app(TaskPackService::class)->ensureTaskPackMasterDataDefaults();
         $this->optionsReady = true;
+    }
+
+    public function loadCreateSection(string $section): void
+    {
+        if ($section === 'task-options') {
+            $this->loadTaskPackOptions();
+            return;
+        }
+
+        abort(422, 'Unknown Create Task Pack section.');
     }
 
     public function setTaskPackAssignee(string $property, mixed $value): void
@@ -201,9 +212,10 @@ class Form extends Component
 
     public function save(): void
     {
+        // If the user submits before the below-the-fold option area reached the
+        // viewport, hydrate the bounded reference sets just-in-time and continue.
         if (!$this->optionsReady) {
-            $this->addError('options', 'Please wait for Task Pack options to finish loading.');
-            return;
+            $this->loadTaskPackOptions();
         }
 
         $workspaceId = app(TaskPackService::class)->workspaceId();

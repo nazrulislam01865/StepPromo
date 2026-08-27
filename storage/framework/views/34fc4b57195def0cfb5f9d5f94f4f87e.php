@@ -30,9 +30,7 @@
         if ((bool) ($job->attention_requested ?? false) || (bool) ($job->needs_attention ?? false)) return ['Needs attention', 'red'];
         $label = $taskFlagService->labelForOrder($job);
         if ($label) return [$label, $badgeTone($label)];
-        $health = trim((string) ($job->health ?? ''));
-        if ($health !== '' && !in_array(mb_strtolower($health), ['on track', 'healthy'], true)) return [$health, $badgeTone($health)];
-        return ['On track', 'green'];
+        return ['No flag', 'gray'];
     };
 
     $inquiryFlag = static function ($inquiry) use ($today): array {
@@ -453,7 +451,7 @@
                         $headline = trim((string) ($isOrder ? ($record->tasks?->first()?->title ?: $record->title) : ($record->currentTask?->title ?: $record->subject)));
                         $ownerName = $isOrder ? ($record->owner?->name ?? 'Unassigned') : ($record->owner?->name ?? 'Unassigned');
                         $reason = trim((string) ($isOrder
-                            ? ($record->attention_reason ?: $record->tasks?->first()?->attention_reason ?: $record->flaggedTasks?->first()?->attention_reason ?: $record->health)
+                            ? ($record->attention_reason ?: $record->tasks?->first()?->attention_reason ?: $record->flaggedTasks?->first()?->attention_reason ?: 'Attention required')
                             : ($record->currentTask?->attention_reason ?: ($record->needs_attention ? 'Attention required' : $record->currentTask?->status))));
                         $rowRoute = $isOrder
                             ? route('jobs.index', ['open' => $record->id])
@@ -486,7 +484,7 @@
 $__split = function ($name, $params = []) {
     return [$name, $params];
 };
-[$__name, $__params] = $__split('dashboard.tagged-comments', ['range-days' => $rangeDays,'client-filter' => $clientFilter,'team-filter' => $teamFilter,'search' => $search]);
+[$__name, $__params] = $__split('dashboard.tagged-comments', ['range-days' => $rangeDays,'client-filter' => $clientFilter,'team-filter' => $teamFilter,'search' => $search,'lazy' => true]);
 
 $__keyOuter = $__key ?? null;
 

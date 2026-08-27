@@ -4,6 +4,7 @@
                 :can-edit="$canEditMaster"
                 :can-delete="$canDeleteMaster"
                 :display-timezone="$displayTimezone"
+                :detail-sections-ready="$productDetailSectionsReady ?? []"
             />
         @elseif($showModal)
             <x-catalog.product-form
@@ -36,6 +37,8 @@
                 :shipment-urgency-picker-selection="$productShipmentUrgencyPickerSelection"
                 :new-product-category-main="$newProductCategoryMain"
                 :new-subcategory-product-category-id="$newSubcategoryProductCategoryId"
+                :taxonomy-ready="$productTaxonomyReady || (bool) $editProduct"
+                :shipment-options-ready="$productShipmentOptionsReady || (bool) $editProduct"
             />
         @else
         <div class="ft-product-list-head">
@@ -44,6 +47,10 @@
                 <p>Manage the product catalog, client availability and supporting documents.</p>
             </div>
             <div class="ft-product-list-head-actions">
+                @if($canEditMaster)
+                    <button type="button" class="ft-product-page-btn is-secondary ft-product-supplier-filter-btn" wire:click="showProductsWithoutSupplier">Show products without supplier</button>
+                    <button type="button" class="ft-product-page-btn is-primary ft-product-assign-supplier-btn" wire:click="openProductSupplierAssignment" @disabled($productSelectionCount < 1)>Assign supplier</button>
+                @endif
                 @if($canCreateMaster)
                     <button type="button" class="ft-product-add-button" wire:click="open">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
@@ -141,6 +148,13 @@
                 <button type="button" class="ft-product-clear" wire:click="clearProductFilters">Clear</button>
             </div>
 
+            @if($productSupplierState === 'unassigned')
+                <div class="ft-product-supplier-filter-state">
+                    <span>Showing products without a supplier</span>
+                    <button type="button" wire:click="clearProductFilters">Clear</button>
+                </div>
+            @endif
+
             @if(!$recordsReady)
                 @include('livewire.shared.table-rows-placeholder', ['columns' => 9, 'rows' => 8])
             @else
@@ -163,7 +177,7 @@
                     />
                 @endif
 
-                <div class="ft-product-table-card" wire:key="product-catalog-{{ $productMainCategory }}-{{ $productCategory }}-{{ $productClientAvailability }}-{{ $productStatus }}-{{ $productPerPage }}">
+                <div class="ft-product-table-card" wire:key="product-catalog-{{ $productMainCategory }}-{{ $productCategory }}-{{ $productClientAvailability }}-{{ $productStatus }}-{{ $productSupplierState }}-{{ $productSupplierFilterId }}-{{ $productPerPage }}">
                     <div class="ft-product-table-scroll">
                         <table class="ft-product-list-table">
                             <thead>
@@ -179,6 +193,7 @@
                                     <th>Product</th>
                                     <th>Product code</th>
                                     <th>Classification</th>
+                                    <th>Supplier</th>
                                     <th>Size</th>
                                     <th>Availability</th>
                                     <th>Documents</th>
@@ -231,6 +246,12 @@
                                             <span>{{ $classificationPath ?: '—' }}</span>
                                         </div>
                                     </td>
+                                    <td>
+                                        <x-suppliers.product-supplier-links
+                                            :suppliers="$productSuppliersByProduct->get((int) $r->id, collect())"
+                                            :default-supplier-id="$r->productSupplierId()"
+                                        />
+                                    </td>
                                     <td><x-catalog.product-size :value="$r->productSize()" /></td>
                                     <td><x-catalog.availability :labels="$r->productAvailabilityLabels()" /></td>
                                     <td>
@@ -258,7 +279,7 @@
                                     </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="10"><div class="empty-state">No products found.</div></td></tr>
+                                <tr><td colspan="11"><div class="empty-state">No products found.</div></td></tr>
                             @endforelse
                             </tbody>
                         </table>
@@ -302,7 +323,14 @@
                     </div>
                 </div>
 
-                @if($bulkProductPanel === 'clients')
+                @if($bulkProductPanel === 'supplier')
+                    <x-suppliers.assign-products-modal
+                        :suppliers="$bulkProductSupplierOptions"
+                        :product-counts="$bulkProductSupplierProductCounts"
+                        :selected-supplier-id="$bulkProductSupplierId"
+                        :selection-count="$productSelectionCount"
+                    />
+                @elseif($bulkProductPanel === 'clients')
                     <x-catalog.bulk-modal
                         title="Assign clients"
                         subtitle="Choose who can find and use the selected products."

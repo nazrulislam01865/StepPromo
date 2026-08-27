@@ -7,6 +7,26 @@ use Tests\Support\OrderPhase5Source;
 
 class InlineEditingMechanismTest extends TestCase
 {
+    public function test_livewire_methods_never_repeat_the_renderless_attribute(): void
+    {
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator(app_path('Livewire'), \FilesystemIterator::SKIP_DOTS)
+        );
+
+        foreach ($iterator as $file) {
+            if (!$file->isFile() || $file->getExtension() !== 'php') {
+                continue;
+            }
+
+            $source = file_get_contents($file->getPathname());
+            $this->assertDoesNotMatchRegularExpression(
+                '/(#\[Renderless\]\s*){2,}/',
+                $source,
+                'Duplicate #[Renderless] attribute found in '.$file->getPathname()
+            );
+        }
+    }
+
     public function test_inline_save_actions_are_renderless_so_the_page_is_not_requeried_after_each_field_save(): void
     {
         $jobs = OrderPhase5Source::livewire();
@@ -20,7 +40,6 @@ class InlineEditingMechanismTest extends TestCase
             'updateJobCoordinator',
             'updateJobDeliveryDate',
             'updateJobPriority',
-            'updateJobHealth',
             'updateJobTextField',
             'updateJobShippingField',
             'updateJobShippingPhone',

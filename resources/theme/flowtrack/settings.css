@@ -114,6 +114,64 @@
     --ft-theme-line-height-normal: 1.5;
     --ft-theme-line-height-relaxed: 1.7;
 
+    /* Standard create-form typography and controls.
+     * Create Order is the reference. Create Inquiry and Create Client consume
+     * these same values through the modular forms/ theme adapters. */
+    --ft-theme-form-page-title-size: 1.625rem;
+    --ft-theme-form-page-title-weight: var(--ft-theme-font-weight-bold);
+    --ft-theme-form-page-title-color: #071831;
+    --ft-theme-form-page-copy-size: 0.8125rem;
+    --ft-theme-form-page-copy-weight: var(--ft-theme-font-weight-regular);
+    --ft-theme-form-page-copy-color: #536985;
+    --ft-theme-form-breadcrumb-size: 0.75rem;
+    --ft-theme-form-breadcrumb-weight: var(--ft-theme-font-weight-medium);
+    --ft-theme-form-breadcrumb-color: #5e718c;
+    --ft-theme-form-section-title-size: 1.0625rem;
+    --ft-theme-form-section-title-weight: var(--ft-theme-font-weight-bold);
+    --ft-theme-form-section-title-color: #172235;
+    --ft-theme-form-label-size: 0.75rem;
+    --ft-theme-form-label-weight: var(--ft-theme-font-weight-bold);
+    --ft-theme-form-label-color: #1a2d48;
+    --ft-theme-form-control-size: 0.8125rem;
+    --ft-theme-form-control-weight: var(--ft-theme-font-weight-regular);
+    --ft-theme-form-control-color: #172235;
+    --ft-theme-form-placeholder-color: #8996a8;
+    --ft-theme-form-helper-size: 0.625rem;
+    --ft-theme-form-helper-weight: var(--ft-theme-font-weight-regular);
+    --ft-theme-form-helper-color: #6c7e94;
+    --ft-theme-form-button-size: 0.71875rem;
+    --ft-theme-form-button-weight: var(--ft-theme-font-weight-bold);
+    --ft-theme-form-control-height: 44px;
+    --ft-theme-form-control-radius: 8px;
+    --ft-theme-form-control-border: #d8e2ed;
+    --ft-theme-form-section-border: #d9e3ef;
+    --ft-theme-form-step-size: 26px;
+
+
+    /* Central async feedback (main content only; sidebar intentionally excluded). */
+    --ft-theme-feedback-font-size: 0.625rem;
+    --ft-theme-feedback-font-size-compact: 0.5625rem;
+    --ft-theme-feedback-font-weight: var(--ft-theme-font-weight-bold);
+    --ft-theme-feedback-height: 22px;
+    --ft-theme-feedback-height-compact: 20px;
+    --ft-theme-feedback-radius: 6px;
+    --ft-theme-feedback-shadow: 0 1px 3px rgb(15 35 65 / 0.05);
+    --ft-theme-feedback-hud-shadow: 0 8px 24px rgb(15 35 65 / 0.12);
+    --ft-theme-feedback-neutral-text: #60718a;
+    --ft-theme-feedback-neutral-bg: #ffffff;
+    --ft-theme-feedback-loading-text: #176f68;
+    --ft-theme-feedback-loading-bg: #eef9f7;
+    --ft-theme-feedback-loading-border: #c8e9e3;
+    --ft-theme-feedback-saving-text: #9a5d00;
+    --ft-theme-feedback-saving-bg: #fff7e6;
+    --ft-theme-feedback-saving-border: #efd08a;
+    --ft-theme-feedback-saved-text: #167451;
+    --ft-theme-feedback-saved-bg: #e8f7ef;
+    --ft-theme-feedback-saved-border: #bfe2d1;
+    --ft-theme-feedback-error-text: #b8322d;
+    --ft-theme-feedback-error-bg: #fff0ef;
+    --ft-theme-feedback-error-border: #f2c8c5;
+
     /* Spacing / geometry */
     --ft-theme-radius-xs: 4px;
     --ft-theme-radius-sm: 6px;

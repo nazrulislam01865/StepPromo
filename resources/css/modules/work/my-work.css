@@ -3005,3 +3005,18 @@ body:has(#my-work-app) .lang-btn {
         height: 42px
     }
 }
+
+
+/* Order Health removed from My Task group summaries. */
+#my-work-app .order-head {
+    grid-template-columns: 22px minmax(180px,1.3fr) minmax(130px,.8fr) minmax(110px,.7fr) minmax(120px,.8fr) auto;
+}
+@media (max-width:1180px) {
+    #my-work-app .order-head { grid-template-columns:22px minmax(170px,1fr) minmax(110px,.7fr) minmax(100px,.7fr) auto; }
+}
+@media (max-width:820px) {
+    #my-work-app .order-head {
+        grid-template-columns:22px minmax(0,1fr) auto;
+        grid-template-areas:"toggle order count" "toggle client client";
+    }
+}

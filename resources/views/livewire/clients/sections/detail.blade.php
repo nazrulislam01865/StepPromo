@@ -14,6 +14,8 @@
         :client-order-range="$clientOrderRange"
         :document-count="$clientDocumentCount"
         :order-metrics="$clientOrderMetrics"
+        :order-count="$clientOrderCount ?? 0"
+        :detail-sections-ready="$clientDetailSectionsReady ?? []"
         :client-code="$clientCode"
         :client-countries="$clientCountries ?? []"
         :client-country-flags="$clientCountryFlags ?? []"

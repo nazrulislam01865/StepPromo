@@ -163,6 +163,33 @@ class ProductCatalogService
             ->filter();
     }
 
+    /**
+     * Resolve the supplier currently selected on create rows, keyed by Product id.
+     * This supports an Order-only supplier override without introducing row-level queries.
+     *
+     * @return Collection<int, MasterRecord>
+     */
+    public function suppliersForSelectionRows(iterable $rows): Collection
+    {
+        $productSupplierIds = collect($rows)
+            ->filter(fn ($row) => (int) data_get($row, 'product_id', 0) > 0 && (int) data_get($row, 'supplier_id', 0) > 0)
+            ->mapWithKeys(fn ($row) => [(int) data_get($row, 'product_id') => (int) data_get($row, 'supplier_id')]);
+
+        if ($productSupplierIds->isEmpty()) return collect();
+
+        $suppliers = MasterRecord::query()
+            ->forWorkspace($this->workspaceId())
+            ->ofType('supplier')
+            ->active()
+            ->whereIn('id', $productSupplierIds->values()->unique()->all())
+            ->get(['id', 'name', 'code', 'status'])
+            ->keyBy('id');
+
+        return $productSupplierIds
+            ->map(fn ($supplierId) => $suppliers->get((int) $supplierId))
+            ->filter();
+    }
+
     private function filteredOrderProductQuery(string $search, int $categoryId): Builder
     {
         return $this->activeProductsQuery()

@@ -32,7 +32,6 @@ class LegacyDashboardService
         'summary',
         'mentions',
         'mention-count',
-        'health',
         'inquiries',
         'assignees',
         'attention-tasks',
@@ -108,9 +107,9 @@ class LegacyDashboardService
     public function attentionJobs(User $user): Collection
     {
         return app(JobService::class)->activeQuery($user)
-            ->select(['flow_jobs.id', 'flow_jobs.job_number', 'flow_jobs.client_id', 'flow_jobs.workflow_phase_id', 'flow_jobs.owner_id', 'flow_jobs.title', 'flow_jobs.health', 'flow_jobs.needs_attention', 'flow_jobs.attention_requested'])
+            ->select(['flow_jobs.id', 'flow_jobs.job_number', 'flow_jobs.client_id', 'flow_jobs.workflow_phase_id', 'flow_jobs.owner_id', 'flow_jobs.title', 'flow_jobs.needs_attention', 'flow_jobs.attention_requested'])
             ->with(['client:id,name,logo_path', 'phase:id,short_name,color'])
-            ->where(fn ($query) => $query->where('flow_jobs.attention_requested', true)->orWhere('flow_jobs.needs_attention', true)->orWhereIn('flow_jobs.health', ['At Risk', 'Delayed', 'Blocked', 'Needs Attention']))
+            ->where(fn ($query) => $query->where('flow_jobs.attention_requested', true)->orWhere('flow_jobs.needs_attention', true))
             ->latest('flow_jobs.id')
             ->limit(6)
             ->get();
@@ -141,7 +140,7 @@ class LegacyDashboardService
 
             $jobRow = (clone $jobs)
                 ->selectRaw('count(*) as active_jobs')
-                ->selectRaw("sum(case when flow_jobs.attention_requested = 1 or flow_jobs.needs_attention = 1 or flow_jobs.health in ('At Risk','Delayed','Blocked','Needs Attention') then 1 else 0 end) as attention_jobs")
+                ->selectRaw("sum(case when flow_jobs.attention_requested = 1 or flow_jobs.needs_attention = 1  then 1 else 0 end) as attention_jobs")
                 ->selectRaw("sum(case when exists (select 1 from workflow_phases where (workflow_phases.id = flow_jobs.workflow_phase_id or workflow_phases.id = flow_jobs.source_workflow_phase_id) and (lower(workflow_phases.name) like '%ship%' or lower(workflow_phases.short_name) like '%ship%')) then 1 else 0 end) as shipping_jobs")
                 ->first();
 
@@ -209,7 +208,7 @@ class LegacyDashboardService
 
                 $jobRow = (clone $jobs)
                     ->selectRaw('count(*) as active_jobs')
-                    ->selectRaw("sum(case when flow_jobs.attention_requested = 1 or flow_jobs.needs_attention = 1 or flow_jobs.health in ('At Risk','Delayed','Blocked','Needs Attention') then 1 else 0 end) as attention_jobs")
+                    ->selectRaw("sum(case when flow_jobs.attention_requested = 1 or flow_jobs.needs_attention = 1  then 1 else 0 end) as attention_jobs")
                     ->selectRaw("sum(case when exists (select 1 from workflow_phases where (workflow_phases.id = flow_jobs.workflow_phase_id or workflow_phases.id = flow_jobs.source_workflow_phase_id) and (lower(workflow_phases.name) like '%ship%' or lower(workflow_phases.short_name) like '%ship%')) then 1 else 0 end) as shipping_jobs")
                     ->first();
 
@@ -585,63 +584,6 @@ class LegacyDashboardService
         return $query;
     }
 
-    public function operationalHealth(User $user): array
-    {
-        return $this->remember($user, 'health', function () use ($user): array {
-            $today = app(WorkspaceSettingsService::class)->localToday()->toDateString();
-            $jobs = app(JobService::class)->activeQuery($user)->reorder();
-            $tasks = $this->activeTaskQuery($user)->reorder();
-
-            $jobRow = (clone $jobs)
-                ->selectRaw('count(*) as total')
-                ->selectRaw("sum(case when flow_jobs.health in ('On Track','Healthy') then 1 else 0 end) as healthy")
-                ->selectRaw("sum(case when flow_jobs.health in ('At Risk','Needs Attention') then 1 else 0 end) as watch_count")
-                ->selectRaw("sum(case when flow_jobs.health in ('Delayed','Blocked') then 1 else 0 end) as at_risk")
-                ->first();
-
-            $flagRow = (clone $tasks)
-                ->selectRaw('sum(case when tasks.due_date < ? then 1 else 0 end) as overdue', [$today])
-                ->selectRaw("sum(case when tasks.status = 'Waiting for Client' then 1 else 0 end) as waiting_client")
-                ->selectRaw("sum(case when tasks.status = 'Revision Required' then 1 else 0 end) as revision_required")
-                ->selectRaw("sum(case when tasks.status = 'Blocked' then 1 else 0 end) as blocked")
-                ->selectRaw('sum(case when tasks.assignee_id is null then 1 else 0 end) as unassigned')
-                ->first();
-
-            $flags = [
-                ['key' => 'overdue', 'label' => 'Overdue', 'count' => (int) ($flagRow?->overdue ?? 0), 'tone' => 'red'],
-                ['key' => 'waiting-client', 'label' => 'Waiting for Client', 'count' => (int) ($flagRow?->waiting_client ?? 0), 'tone' => 'amber'],
-                ['key' => 'revision', 'label' => 'Revision Required', 'count' => (int) ($flagRow?->revision_required ?? 0), 'tone' => 'purple'],
-                ['key' => 'blocked', 'label' => 'Blocked', 'count' => (int) ($flagRow?->blocked ?? 0), 'tone' => 'blue'],
-                ['key' => 'unassigned', 'label' => 'Unassigned', 'count' => (int) ($flagRow?->unassigned ?? 0), 'tone' => 'gray'],
-            ];
-            $maxFlag = max(1, ...array_column($flags, 'count'));
-            foreach ($flags as &$flag) {
-                $flag['width'] = $flag['count'] > 0 ? max(12, (int) round(($flag['count'] / $maxFlag) * 100)) : 0;
-            }
-            unset($flag);
-
-            $total = (int) ($jobRow?->total ?? 0);
-            $healthy = (int) ($jobRow?->healthy ?? 0);
-            $watch = (int) ($jobRow?->watch_count ?? 0);
-            $atRisk = max(0, $total - $healthy - $watch);
-            $healthyPct = $total > 0 ? (int) round(($healthy / $total) * 100) : 0;
-            $watchPct = $total > 0 ? (int) round(($watch / $total) * 100) : 0;
-            $riskStart = min(100, $healthyPct + $watchPct);
-
-            return [
-                'totalJobs' => $total,
-                'healthy' => $healthy,
-                'watch' => $watch,
-                'atRisk' => $atRisk,
-                'healthyPct' => $healthyPct,
-                'watchPct' => $watchPct,
-                'riskStart' => $riskStart,
-                'flags' => $flags,
-                'flaggedTotal' => array_sum(array_column($flags, 'count')),
-            ];
-        });
-    }
-
     public function dashboardReportingPeriod(int $rangeDays = 7): array
     {
         $rangeDays = in_array($rangeDays, [1, 7, 30], true) ? $rangeDays : 7;
@@ -982,7 +924,7 @@ class LegacyDashboardService
             ->select([
                 'flow_jobs.id', 'flow_jobs.job_number', 'flow_jobs.client_id',
                 'flow_jobs.workflow_phase_id', 'flow_jobs.owner_id', 'flow_jobs.title',
-                'flow_jobs.health', 'flow_jobs.needs_attention', 'flow_jobs.attention_requested',
+                'flow_jobs.needs_attention', 'flow_jobs.attention_requested',
                 'flow_jobs.attention_reason', 'flow_jobs.order_flag_id', 'flow_jobs.priority',
                 'flow_jobs.progress', 'flow_jobs.delivery_date', 'flow_jobs.updated_at',
             ])
@@ -1009,7 +951,7 @@ class LegacyDashboardService
             ->where(function (Builder $query) use ($today): void {
                 $query->where('flow_jobs.attention_requested', true)
                     ->orWhere('flow_jobs.needs_attention', true)
-                    ->orWhereIn('flow_jobs.health', ['At Risk', 'Delayed', 'Blocked', 'Needs Attention'])
+                    
                     ->orWhere('flow_jobs.delivery_date', '<', $today)
                     ->orWhereHas('tasks', function (Builder $tasks) use ($today): void {
                         $tasks->whereNull('tasks.completed_at')
@@ -1021,7 +963,7 @@ class LegacyDashboardService
                             });
                     });
             })
-            ->orderByRaw("case when flow_jobs.delivery_date is not null and flow_jobs.delivery_date < ? then 0 when flow_jobs.attention_requested = 1 or flow_jobs.needs_attention = 1 then 1 when flow_jobs.health in ('At Risk','Delayed','Blocked','Needs Attention') then 2 else 3 end", [$today])
+            ->orderByRaw("case when flow_jobs.delivery_date is not null and flow_jobs.delivery_date < ? then 0 when flow_jobs.attention_requested = 1 or flow_jobs.needs_attention = 1 then 1 else 2 end", [$today])
             ->orderByRaw('flow_jobs.delivery_date is null, flow_jobs.delivery_date asc')
             ->orderByDesc('flow_jobs.updated_at')
             ->get();
@@ -1125,7 +1067,7 @@ class LegacyDashboardService
             ->select([
                 'flow_jobs.id', 'flow_jobs.job_number', 'flow_jobs.client_id',
                 'flow_jobs.workflow_phase_id', 'flow_jobs.owner_id', 'flow_jobs.title',
-                'flow_jobs.health', 'flow_jobs.needs_attention', 'flow_jobs.attention_requested',
+                'flow_jobs.needs_attention', 'flow_jobs.attention_requested',
                 'flow_jobs.attention_reason', 'flow_jobs.order_flag_id', 'flow_jobs.priority',
                 'flow_jobs.progress', 'flow_jobs.delivery_date', 'flow_jobs.updated_at',
             ])
@@ -1138,7 +1080,7 @@ class LegacyDashboardService
                 'flaggedTasks.orderTaskFlag:id,type,name,status,sort_order,color,metadata',
             ])
             ->withCount('flaggedTasks as dashboard_flagged_task_count')
-            ->orderByRaw("case when flow_jobs.attention_requested = 1 or flow_jobs.needs_attention = 1 or flow_jobs.health in ('At Risk','Delayed','Blocked','Needs Attention') then 0 when flow_jobs.delivery_date is not null and flow_jobs.delivery_date < ? then 1 else 2 end", [$today])
+            ->orderByRaw("case when flow_jobs.attention_requested = 1 or flow_jobs.needs_attention = 1  then 0 when flow_jobs.delivery_date is not null and flow_jobs.delivery_date < ? then 1 else 2 end", [$today])
             ->orderByDesc('dashboard_flagged_task_count')
             ->orderByRaw("case lower(trim(flow_jobs.priority)) when 'critical' then 6 when 'urgent' then 5 when 'high' then 4 when 'medium' then 3 when 'normal' then 3 when 'low' then 2 else 1 end desc")
             ->orderByRaw('flow_jobs.delivery_date is null, flow_jobs.delivery_date asc')
@@ -1224,7 +1166,7 @@ class LegacyDashboardService
     public function ongoingJobs(User $user): Collection
     {
         return app(JobService::class)->activeQuery($user)
-            ->select(['flow_jobs.id', 'flow_jobs.job_number', 'flow_jobs.client_id', 'flow_jobs.workflow_phase_id', 'flow_jobs.owner_id', 'flow_jobs.title', 'flow_jobs.health', 'flow_jobs.needs_attention', 'flow_jobs.attention_requested', 'flow_jobs.attention_reason', 'flow_jobs.order_flag_id', 'flow_jobs.progress', 'flow_jobs.delivery_date', 'flow_jobs.updated_at'])
+            ->select(['flow_jobs.id', 'flow_jobs.job_number', 'flow_jobs.client_id', 'flow_jobs.workflow_phase_id', 'flow_jobs.owner_id', 'flow_jobs.title', 'flow_jobs.needs_attention', 'flow_jobs.attention_requested', 'flow_jobs.attention_reason', 'flow_jobs.order_flag_id', 'flow_jobs.progress', 'flow_jobs.delivery_date', 'flow_jobs.updated_at'])
             ->with([
                 'client:id,name,logo_path',
                 'phase:id,name,short_name,color',
@@ -1451,13 +1393,12 @@ class LegacyDashboardService
                 'jobs as active_jobs_count' => fn ($jobs) => $applyJobFilters($jobs)
                     ->whereNull('flow_jobs.completed_at')
                     ->whereNotIn('flow_jobs.status', JobService::INACTIVE_STATUSES),
-                'jobs as at_risk_jobs_count' => fn ($jobs) => $applyJobFilters($jobs)
+                'jobs as attention_jobs_count' => fn ($jobs) => $applyJobFilters($jobs)
                     ->whereNull('flow_jobs.completed_at')
                     ->whereNotIn('flow_jobs.status', JobService::INACTIVE_STATUSES)
                     ->where(fn ($query) => $query
                         ->where('flow_jobs.attention_requested', true)
-                        ->orWhere('flow_jobs.needs_attention', true)
-                        ->orWhereIn('flow_jobs.health', ['At Risk', 'Delayed', 'Blocked', 'Needs Attention'])),
+                        ->orWhere('flow_jobs.needs_attention', true)),
                 'tasks as open_tasks_count' => fn ($tasks) => $applyTaskFilters($tasks)
                     ->whereNull('tasks.completed_at'),
                 'tasks as overdue_tasks_count' => fn ($tasks) => $applyTaskFilters($tasks)
@@ -1520,7 +1461,7 @@ class LegacyDashboardService
             $attentionInquiries = (int) ($stats?->attention_inquiries_count ?? 0);
             $orders = (int) ($client->orders_count ?? 0);
             $completedOrders = (int) ($client->completed_orders_count ?? 0);
-            $attentionOrders = (int) ($client->at_risk_jobs_count ?? 0);
+            $attentionOrders = (int) ($client->attention_jobs_count ?? 0);
 
             $client->setAttribute('inquiries_count', $inquiries);
             $client->setAttribute('completed_inquiries_count', $completedInquiries);

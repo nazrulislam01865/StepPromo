@@ -10,6 +10,264 @@ use Livewire\Attributes\Renderless;
 
 trait ManagesInquiryProducts
 {
+    public function openEditInquiryProduct(int $itemId): void
+    {
+        if ($this->showAddInquiryProductForm) {
+            $this->closeAddInquiryProductForm();
+        }
+        $user = auth()->user();
+        $inquiry = $this->selectedInquiry();
+
+        abort_unless(
+            $user->canModule('catalog_products', 'edit')
+            && app(\App\Queries\Inquiries\InquiryDetailQuery::class)->canEdit($user, $inquiry)
+            && ! $inquiry->result,
+            403
+        );
+
+        $item = InquiryItem::query()
+            ->where('inquiry_id', $inquiry->id)
+            ->findOrFail($itemId);
+
+        $catalog = app(\App\Services\ProductCatalogService::class);
+        $product = null;
+        if (filled($item->item_name)) {
+            $productQuery = $catalog->activeProductsQuery()
+                ->with(['parent' => fn ($parent) => $parent->where('type', 'product_category')])
+                ->where('name', trim((string) $item->item_name));
+            if (filled($item->category)) {
+                $productQuery->whereHas('parent', fn ($parent) => $parent
+                    ->where('type', 'product_category')
+                    ->where('name', trim((string) $item->category)));
+            }
+            $product = $productQuery->first();
+        }
+
+        $quantity = max(1, (int) round((float) ($item->quantity ?? 1)));
+        $basePrice = $product?->productPriceForQuantity($quantity);
+
+        $this->editInquiryProductItemId = (int) $item->id;
+        $this->editInquiryProductSelectedId = $product ? (int) $product->id : null;
+        $this->editInquiryProductSearch = '';
+        $this->editInquiryProductShowAllResults = false;
+        $this->editInquiryProductCategory = $product
+            ? $this->inquiryEditProductCategory($product)
+            : (string) ($item->category ?? '');
+        $this->editInquiryProductName = (string) ($product?->name ?: $item->item_name ?: '');
+        $this->editInquiryProductQuantity = (string) $quantity;
+        $this->editInquiryProductUnitPrice = number_format(
+            $basePrice !== null ? (float) $basePrice : (float) ($item->unit_price ?? 0),
+            2,
+            '.',
+            ''
+        );
+        $this->editInquiryProductNotes = (string) ($item->notes ?? '');
+        $this->resetValidation([
+            'editInquiryProductSelectedId',
+            'editInquiryProductQuantity',
+            'editInquiryProductUnitPrice',
+            'editInquiryProductNotes',
+        ]);
+    }
+
+    public function closeEditInquiryProduct(): void
+    {
+        $this->editInquiryProductItemId = null;
+        $this->editInquiryProductSelectedId = null;
+        $this->editInquiryProductSearch = '';
+        $this->editInquiryProductShowAllResults = false;
+        $this->editInquiryProductCategory = '';
+        $this->editInquiryProductName = '';
+        $this->editInquiryProductQuantity = '1';
+        $this->editInquiryProductUnitPrice = '0.00';
+        $this->editInquiryProductNotes = '';
+        $this->resetValidation([
+            'editInquiryProductSelectedId',
+            'editInquiryProductQuantity',
+            'editInquiryProductUnitPrice',
+            'editInquiryProductNotes',
+        ]);
+    }
+
+    public function showAllEditInquiryProductResults(): void
+    {
+        abort_unless($this->editInquiryProductItemId, 422);
+        $this->editInquiryProductShowAllResults = true;
+    }
+
+    public function updatedEditInquiryProductSearch(): void
+    {
+        if (!$this->editInquiryProductItemId) {
+            return;
+        }
+
+        $this->editInquiryProductShowAllResults = false;
+
+        // Product is the source of truth for the dependent detail fields. Once
+        // the user searches for a replacement, hide stale category/price data
+        // until a Product Master search result is explicitly selected.
+        if (
+            $this->editInquiryProductSelectedId
+            && strcasecmp(trim($this->editInquiryProductSearch), trim($this->editInquiryProductName)) !== 0
+        ) {
+            $this->editInquiryProductSelectedId = null;
+            $this->editInquiryProductCategory = '';
+            $this->editInquiryProductName = '';
+            $this->editInquiryProductUnitPrice = '0.00';
+            $this->resetValidation([
+                'editInquiryProductSelectedId',
+                'editInquiryProductUnitPrice',
+            ]);
+        }
+    }
+
+    public function selectEditInquiryProduct(int $productId): void
+    {
+        abort_unless($this->editInquiryProductItemId && $this->selectedInquiryId, 422);
+
+        $user = auth()->user();
+        $inquiry = $this->selectedInquiry();
+        abort_unless(
+            $user->canModule('catalog_products', 'edit')
+            && app(\App\Queries\Inquiries\InquiryDetailQuery::class)->canEdit($user, $inquiry)
+            && ! $inquiry->result,
+            403
+        );
+
+        $product = app(\App\Services\ProductCatalogService::class)->findActiveProductOrFail($productId);
+        $quantity = max(1, (int) $this->editInquiryProductQuantity);
+        $basePrice = $product->productPriceForQuantity($quantity);
+
+        $this->editInquiryProductSelectedId = (int) $product->id;
+        $this->editInquiryProductSearch = (string) $product->name;
+        $this->editInquiryProductShowAllResults = false;
+        $this->editInquiryProductCategory = $this->inquiryEditProductCategory($product);
+        $this->editInquiryProductName = (string) $product->name;
+        $this->editInquiryProductUnitPrice = $basePrice !== null
+            ? number_format((float) $basePrice, 2, '.', '')
+            : '0.00';
+
+        $this->resetValidation([
+            'editInquiryProductSelectedId',
+            'editInquiryProductQuantity',
+            'editInquiryProductUnitPrice',
+        ]);
+        $this->dispatch('detail-product-edit-selected');
+    }
+
+    public function updatedEditInquiryProductQuantity(): void
+    {
+        if (!$this->editInquiryProductItemId || !$this->editInquiryProductSelectedId) {
+            return;
+        }
+
+        $quantity = (int) $this->editInquiryProductQuantity;
+        if ($quantity <= 0) {
+            $this->editInquiryProductUnitPrice = '0.00';
+            return;
+        }
+
+        $product = app(\App\Services\ProductCatalogService::class)
+            ->findActiveProductOrFail((int) $this->editInquiryProductSelectedId);
+        $basePrice = $product->productPriceForQuantity($quantity);
+        $this->editInquiryProductUnitPrice = $basePrice !== null
+            ? number_format((float) $basePrice, 2, '.', '')
+            : '0.00';
+        $this->resetValidation('editInquiryProductUnitPrice');
+    }
+
+    public function saveEditInquiryProduct(): void
+    {
+        abort_unless($this->editInquiryProductItemId, 422);
+
+        $user = auth()->user();
+        $inquiry = $this->selectedInquiry();
+        abort_unless(
+            $user->canModule('catalog_products', 'edit')
+            && app(\App\Queries\Inquiries\InquiryDetailQuery::class)->canEdit($user, $inquiry)
+            && ! $inquiry->result,
+            403
+        );
+
+        $data = $this->validate([
+            'editInquiryProductSelectedId' => ['required', 'integer', 'min:1'],
+            'editInquiryProductQuantity' => ['required', 'integer', 'min:1', 'max:999999999'],
+            'editInquiryProductUnitPrice' => ['required', 'numeric', 'min:0', 'max:999999999999.99'],
+            'editInquiryProductNotes' => ['nullable', 'string', 'max:2000'],
+        ], [
+            'editInquiryProductSelectedId.required' => 'Search for and select a product first.',
+            'editInquiryProductQuantity.required' => 'Enter a quantity.',
+        ]);
+
+        $product = app(\App\Services\ProductCatalogService::class)
+            ->findActiveProductOrFail((int) $data['editInquiryProductSelectedId']);
+        $category = $this->inquiryEditProductCategory($product);
+        if ($category === 'Uncategorized') {
+            $this->addError('editInquiryProductSelectedId', 'This product does not have an active product category.');
+            return;
+        }
+
+        $item = InquiryItem::query()
+            ->where('inquiry_id', $inquiry->id)
+            ->findOrFail($this->editInquiryProductItemId);
+
+        $duplicate = $inquiry->items()
+            ->where('id', '!=', $item->id)
+            ->whereRaw('LOWER(item_name) = ?', [mb_strtolower((string) $product->name)])
+            ->exists();
+        if ($duplicate) {
+            $this->addError('editInquiryProductSelectedId', 'This product is already added to the Inquiry.');
+            return;
+        }
+
+        $action = app(\App\Actions\Inquiries\UpdateInquiryItem::class);
+        $originalCategory = (string) ($item->category ?? '');
+        $originalProduct = (string) ($item->item_name ?? '');
+
+        if ($category !== $originalCategory) {
+            $action->handle($inquiry, $item, 'category', $category, $user);
+            $item = $item->refresh();
+        }
+        if ($category !== $originalCategory || $product->name !== $originalProduct) {
+            $action->handle($inquiry, $item, 'item_name', (string) $product->name, $user);
+            $item = $item->refresh();
+        }
+
+        $quantity = (int) $data['editInquiryProductQuantity'];
+        if ($quantity !== (int) round((float) ($item->quantity ?? 0))) {
+            $action->handle($inquiry, $item, 'quantity', $quantity, $user);
+            $item = $item->refresh();
+        }
+
+        $basePrice = $product->productPriceForQuantity($quantity);
+        $unitPrice = round((float) ($basePrice ?? $data['editInquiryProductUnitPrice']), 2);
+        $currentUnitPrice = $item->unit_price !== null ? round((float) $item->unit_price, 2) : null;
+        if ($unitPrice !== $currentUnitPrice) {
+            $action->handle($inquiry, $item, 'unit_price', $unitPrice, $user);
+            $item = $item->refresh();
+        }
+
+        $notes = trim((string) ($data['editInquiryProductNotes'] ?? ''));
+        $currentNotes = trim((string) ($item->notes ?? ''));
+        if ($notes !== $currentNotes) {
+            $action->handle($inquiry, $item, 'notes', $notes, $user);
+        }
+
+        $this->closeEditInquiryProduct();
+        session()->flash('success', 'Inquiry product updated.');
+    }
+
+    private function inquiryEditProductCategory(\App\Models\MasterRecord $product): string
+    {
+        $category = trim((string) ($product->parent?->name ?? ''));
+        if ($category === '') {
+            $legacy = trim((string) $product->description);
+            $category = trim(explode(' ·', $legacy, 2)[0]);
+        }
+
+        return $category !== '' ? $category : 'Uncategorized';
+    }
+
     #[Renderless]
     public function updateInquiryItem(int $itemId, string $field, mixed $value): array
     {
@@ -55,6 +313,9 @@ trait ManagesInquiryProducts
 
     public function openAddInquiryProductForm(): void
     {
+        if ($this->editInquiryProductItemId) {
+            $this->closeEditInquiryProduct();
+        }
         $user = auth()->user();
         $inquiry = $this->selectedInquiry();
         $access = app(AccessControlService::class);
@@ -74,7 +335,7 @@ trait ManagesInquiryProducts
         $this->inquiryProductShowAllResults = false;
         $this->inquiryProductSelectedId = null;
         $this->inquiryProductCategory = '';
-        $this->inquiryProductQuantity = '1';
+        $this->inquiryProductQuantity = '1000';
         $this->inquiryProductUnitPrice = '0.00';
         $this->showAddInquiryProductForm = true;
     }
@@ -86,7 +347,7 @@ trait ManagesInquiryProducts
         $this->inquiryProductShowAllResults = false;
         $this->inquiryProductSelectedId = null;
         $this->inquiryProductCategory = '';
-        $this->inquiryProductQuantity = '1';
+        $this->inquiryProductQuantity = '1000';
         $this->inquiryProductUnitPrice = '0.00';
         $this->resetValidation([
             'inquiryProductSelectedId', 'inquiryProductCategory', 'inquiryProductQuantity', 'inquiryProductUnitPrice',
@@ -121,10 +382,39 @@ trait ManagesInquiryProducts
             $category = trim(explode(' ·', $legacy, 2)[0]);
         }
 
+        $defaultQuantity = 1000;
+        $basePrice = $product->productPriceForQuantity($defaultQuantity);
+
         $this->inquiryProductSelectedId = (int) $product->id;
         $this->inquiryProductCategory = $category !== '' ? $category : 'Uncategorized';
         $this->inquiryProductSearch = (string) $product->name;
-        $this->resetValidation(['inquiryProductSelectedId', 'inquiryProductCategory']);
+        $this->inquiryProductQuantity = (string) $defaultQuantity;
+        $this->inquiryProductUnitPrice = $basePrice !== null ? number_format((float) $basePrice, 2, '.', '') : '0.00';
+        $this->resetValidation(['inquiryProductSelectedId', 'inquiryProductCategory', 'inquiryProductQuantity', 'inquiryProductUnitPrice']);
+    }
+
+    public function updatedInquiryProductQuantity(): void
+    {
+        if (!$this->showAddInquiryProductForm || !$this->inquiryProductSelectedId) return;
+        $this->syncDetailInquiryProductBasePrice();
+    }
+
+    private function syncDetailInquiryProductBasePrice(): void
+    {
+        $quantity = (int) $this->inquiryProductQuantity;
+        if (!$this->inquiryProductSelectedId || $quantity <= 0) {
+            $this->inquiryProductUnitPrice = '0.00';
+            $this->resetValidation('inquiryProductUnitPrice');
+            return;
+        }
+
+        $product = app(\App\Services\ProductCatalogService::class)
+            ->findActiveProductOrFail((int) $this->inquiryProductSelectedId);
+        $basePrice = $product->productPriceForQuantity($quantity);
+        $this->inquiryProductUnitPrice = $basePrice !== null
+            ? number_format((float) $basePrice, 2, '.', '')
+            : '0.00';
+        $this->resetValidation('inquiryProductUnitPrice');
     }
 
     public function saveInquiryProduct(): void
@@ -172,13 +462,18 @@ trait ManagesInquiryProducts
             return;
         }
 
+        $basePrice = $product->productPriceForQuantity((int) $data['inquiryProductQuantity']);
+        $resolvedUnitPrice = $basePrice !== null
+            ? (float) $basePrice
+            : (float) $data['inquiryProductUnitPrice'];
+
         app(\App\Actions\Inquiries\AddInquiryItem::class)->handle(
             $inquiry,
             $category,
             (string) $product->name,
             (int) $data['inquiryProductQuantity'],
             $user,
-            (float) $data['inquiryProductUnitPrice'],
+            $resolvedUnitPrice,
         );
 
         $this->closeAddInquiryProductForm();
@@ -201,6 +496,9 @@ trait ManagesInquiryProducts
             ->findOrFail($itemId);
 
         app(\App\Actions\Inquiries\RemoveInquiryItem::class)->handle($inquiry, $item, $user);
+        if ((int) ($this->editInquiryProductItemId ?? 0) === $itemId) {
+            $this->closeEditInquiryProduct();
+        }
     }
 
     public function beginInquiryProductEdit(): void

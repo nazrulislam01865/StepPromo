@@ -14,6 +14,8 @@
     color: var(--ft-order-stage-text);
     box-shadow: var(--ft-order-stage-shadow);
     font-family: var(--ft-theme-font-family);
+    container-name: ft-order-stage-overview;
+    container-type: inline-size;
 }
 
 .ft-order-workflow-stage-overview *,
@@ -78,14 +80,18 @@
 .ft-order-workflow-stage-strip {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
+    width: 100%;
+    min-width: 0;
     gap: 12px;
     padding: 18px;
+    overflow: hidden;
 }
 
 .ft-order-workflow-stage-card {
     appearance: none;
     position: relative;
     display: flex;
+    width: 100%;
     min-width: 0;
     min-height: 0;
     flex-direction: column;
@@ -174,29 +180,27 @@
 
 .ft-order-workflow-stage-selected {
     position: absolute;
-    top: 10px;
-    right: 10px;
+    top: 8px;
+    right: 8px;
     display: inline-flex;
-    min-height: 21px;
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    min-height: 24px;
     align-items: center;
-    gap: 3px;
-    padding: 3px 7px;
+    justify-content: center;
+    padding: 0;
     border-radius: 999px;
     background: var(--stage);
     color: var(--stage-text);
     box-shadow: 0 3px 8px color-mix(in srgb, var(--stage) 20%, transparent);
-    font-size: .5625rem;
-    font-weight: 850;
-    letter-spacing: 0;
-    line-height: 1;
-    text-transform: none;
-}
-
-.ft-order-workflow-stage-selected i {
-    font-size: .625rem;
-    font-style: normal;
+    font-size: .75rem;
     font-weight: 950;
     line-height: 1;
+}
+
+.ft-order-workflow-stage-card.active .ft-order-workflow-stage-kicker {
+    padding-right: 26px;
 }
 
 @media (max-width: 1240px) {
@@ -225,5 +229,82 @@
 @media (max-width: 460px) {
     .ft-order-workflow-stage-strip {
         grid-template-columns: 1fr;
+    }
+}
+
+/* CHANGE 2026-08-26: account for the persistent desktop sidebar on tablets
+   and small laptops. The usable content width is much smaller than viewport. */
+.ft-order-workflow-stage-overview,
+.ft-order-workflow-stage-strip,
+.ft-order-workflow-stage-card {
+    min-width: 0;
+    max-width: 100%;
+}
+
+@media (max-width:1180px) and (min-width:901px) {
+    .ft-order-workflow-stage-strip {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        padding: 14px;
+    }
+}
+
+@media (max-width:560px) {
+    .ft-order-workflow-stage-strip {
+        gap: 8px;
+        padding: 10px;
+    }
+
+    .ft-order-workflow-stage-card {
+        padding: 9px 10px;
+    }
+
+    .ft-order-workflow-stage-card.active {
+        padding: 8px 9px;
+    }
+
+    .ft-order-workflow-stage-selected {
+        top: 7px;
+        right: 7px;
+    }
+}
+
+
+/* CHANGE 2026-08-26: make workflow-stage cards respond to their real content
+   width (including layouts with a persistent sidebar), not only viewport width. */
+@container ft-order-stage-overview (max-width: 1240px) {
+    .ft-order-workflow-stage-strip {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        padding: 14px;
+    }
+}
+
+@container ft-order-stage-overview (max-width: 900px) {
+    .ft-order-workflow-stage-strip {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@container ft-order-stage-overview (max-width: 620px) {
+    .ft-order-workflow-stage-head {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .ft-order-workflow-stage-show-all {
+        align-self: flex-start;
+    }
+
+    .ft-order-workflow-stage-strip {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        padding: 10px;
+    }
+}
+
+@container ft-order-stage-overview (max-width: 360px) {
+    .ft-order-workflow-stage-strip {
+        grid-template-columns: minmax(0, 1fr);
     }
 }

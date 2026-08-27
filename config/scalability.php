@@ -30,7 +30,7 @@ return [
     ],
 
     'queues' => [
-        'names' => array_values(array_filter(array_map('trim', explode(',', (string) env('FLOWTRACK_QUEUE_NAMES', 'realtime,notifications,default'))))),
+        'names' => array_values(array_filter(array_map('trim', explode(',', (string) env('FLOWTRACK_QUEUE_NAMES', 'realtime,notifications,emails,default'))))),
         'max_depth' => (int) env('FLOWTRACK_QUEUE_MAX_DEPTH', 100),
         'slow_delay_seconds' => (int) env('FLOWTRACK_QUEUE_SLOW_DELAY_SECONDS', 15),
         'monitor_enabled' => (bool) env('FLOWTRACK_QUEUE_MONITOR_ENABLED', true),

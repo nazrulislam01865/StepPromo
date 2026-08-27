@@ -43,12 +43,16 @@
     @vite('resources/css/application/after-dashboard.css')
     @vite('resources/css/application/shared-components.css')
 
+    {{--
+        Order details can be opened through Livewire navigation from Dashboard,
+        My Tasks, Clients and other modules. Keep the scoped Order bundle in the
+        persistent shell so the detail DOM never renders before its CSS arrives.
+    --}}
+    @vite('resources/css/modules/orders/index.css')
+
     {{-- CSS extracted from Blade style blocks; loaded after compatibility CSS to preserve cascade. --}}
 
     {{-- Incremental feature batches. Keep each route family independently reversible. --}}
-    @if(request()->routeIs('jobs.index'))
-        @vite('resources/css/modules/orders/index.css')
-    @endif
     @if(request()->routeIs('all-tasks'))
         @vite('resources/css/modules/work/index.css')
     @endif
@@ -71,13 +75,42 @@
     @livewireStyles
     {{-- Central dashboard-derived theme package. Keep after Livewire CSS so it is the final static typography/theme authority. --}}
     @vite('resources/theme/flowtrack/theme.css')
+
+    {{--
+        Livewire tracks query-string changes on data-navigate-track assets.
+        Vite normally changes hashed filenames (the URI), so an old SPA tab can
+        survive a deployment with stale CSS/JS. This stable tracker uses the
+        Vite manifest fingerprint as ?v= and forces Livewire to do a real page
+        reload whenever a new frontend build is deployed.
+    --}}
+    <script
+        src="{{ asset('js/flowtrack-build-track.js') }}?v={{ \App\Support\FrontendBuildVersion::current() }}"
+        data-flowtrack-build-track
+        data-navigate-track
+        defer
+    ></script>
+    <script
+        src="{{ asset('js/flowtrack-sidebar-navigation.js') }}?v={{ \App\Support\FrontendBuildVersion::current() }}"
+        data-navigate-once
+        defer
+    ></script>
 </head>
 <body class="{{ request()->routeIs('dashboard', 'team-performance.report') ? 'ft-management-dashboard-page' : '' }}">
 <div class="app">
-    @include('layouts.partials.sidebar')
+    {{--
+        The sidebar is part of the persistent application shell. Livewire
+        wire:navigate normally replaces the entire BODY on every visit, which
+        caused the dark navigation to be destroyed/repainted and visibly flash.
+        Persisting it keeps the existing DOM, event listeners and scroll state
+        in place while only the destination page is swapped.
+    --}}
+    @persist('flowtrack-sidebar')
+        @include('layouts.partials.sidebar')
+    @endpersist
     <div id="sidebarShade" class="mobile-sidebar-shade"></div>
     <main class="main">
         @include('layouts.partials.topbar')
+        <x-ui.async-feedback />
         <div class="content {{ request()->routeIs('dashboard', 'team-performance.report') ? 'ft-dashboard-content-shell' : '' }} {{ request()->routeIs('reports') ? 'ft-inquiry-intelligence-content-shell' : '' }}">
             @if(session('success') && !request()->routeIs('task-pack.setup','master-data','financial-master-data','profile','inquiries.*','company.setup'))<div class="flash">{{ session('success') }}</div>@endif
             @yield('content')

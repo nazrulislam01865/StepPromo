@@ -11,7 +11,7 @@
     $orderCreate = $user->canAccess('jobs.create');
     $taskView = $user->canAccess('tasks.view');
     $orderGroupActive = request()->routeIs('jobs.*', 'orders.*', 'all-tasks', 'my-work');
-    $cancelledOrderCount = $orderView ? app(\App\Services\CancelledOrderService::class)->sidebarCount($user) : 0;
+    $cancelledOrderCount = $orderView ? (int) ($shellData['cancelled_orders'] ?? 0) : 0;
 
     $clientView = $user->canAccess('clients.view');
     $clientCreate = $user->canAccess('clients.create');
@@ -30,9 +30,11 @@
     $productCategoryView = $user->canModule('product_categories', 'view');
     $productCategoryCreate = $user->canModule('product_categories', 'create');
     $supplierView = $user->canModule('suppliers', 'view');
+    $supplierCreate = $user->canModule('suppliers', 'create');
     $financeMasterView = $user->canModule('finance', 'view');
     $catalogueGroupActive = request()->routeIs('master-data') && in_array($masterGroup, $catalogueGroups, true);
     $productMenuActive = request()->routeIs('master-data') && in_array($masterGroup, ['product', 'product_category'], true);
+    $supplierMenuActive = request()->routeIs('master-data') && $masterGroup === 'supplier';
     $financialGroupActive = request()->routeIs('financial-master-data')
         || (request()->routeIs('master-data') && in_array($masterGroup, $financialGroups, true));
     $taskPackMasterGroupActive = request()->routeIs('master-data')
@@ -61,7 +63,7 @@
         @endif
     </a>
 
-    <nav class="ft-sidebar-nav" aria-label="Primary navigation">
+    <nav class="ft-sidebar-nav" aria-label="Primary navigation" wire:navigate:scroll>
         @if($user->canAccess('dashboard.view'))
             <x-ui.nav-link route="dashboard" label="Dashboard" icon="dashboard" :active="request()->routeIs('dashboard')" />
         @endif
@@ -161,8 +163,24 @@
                 </div>
             </details>
         @endif
-        @if($supplierView)
-            <x-ui.nav-link route="master-data" label="Suppliers" icon="suppliers" :params="['group' => 'supplier']" :active="$catalogueGroupActive && $masterGroup === 'supplier'" />
+        @if($supplierView || $supplierCreate)
+            <details class="ft-sidebar-group" @if($supplierMenuActive) open @endif>
+                <summary class="ft-sidebar-group-toggle {{ $supplierMenuActive ? 'is-active' : '' }}">
+                    <span class="ft-sidebar-group-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h11v10H3zM14 10h4l3 3v4h-7z"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
+                    </span>
+                    <span>Suppliers</span>
+                    <svg class="ft-sidebar-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m8 10 4 4 4-4"/></svg>
+                </summary>
+                <div class="ft-sidebar-children">
+                    @if($supplierView)
+                        <x-ui.nav-link route="master-data" label="Supplier list" icon="suppliers" child :params="['group' => 'supplier']" :active="$supplierMenuActive && !request()->boolean('create')" />
+                    @endif
+                    @if($supplierCreate)
+                        <x-ui.nav-link route="master-data" label="Create supplier" icon="plus" child :params="['group' => 'supplier', 'create' => 1]" :active="$supplierMenuActive && request()->boolean('create')" />
+                    @endif
+                </div>
+            </details>
         @endif
 
         @if($user->canAccess('document_archive.view'))

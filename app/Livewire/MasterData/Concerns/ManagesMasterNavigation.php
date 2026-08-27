@@ -26,10 +26,12 @@ trait ManagesMasterNavigation
         $this->group = $group;
         $this->recordsReady = true;
         $this->search = '';
+        $this->supplierStatus = '';
         $this->productMainCategory = '';
         $this->productCategory = '';
         $this->productClientAvailability = '';
         $this->productStatus = '';
+        $this->productSupplierFilterId = null;
         $this->categoryLevelFilter = '';
         $this->categoryParentFilter = '';
         $this->categoryStatusFilter = '';

@@ -14,7 +14,7 @@
         if ($route === 'jobs.index') $isActive = $isActive || request()->routeIs('orders.bulk-import*');
     }
 @endphp
-<a href="{{ route($route, $params) }}" wire:navigate class="nav-btn {{ $child ? 'ft-sidebar-child-link' : '' }} {{ $isActive ? 'active' : '' }}" @if($isActive) aria-current="page" @endif>
+<a href="{{ route($route, $params) }}" wire:navigate data-ft-nav-route="{{ $route }}" class="nav-btn {{ $child ? 'ft-sidebar-child-link' : '' }} {{ $isActive ? 'active' : '' }}" @if($isActive) aria-current="page" @endif>
     @switch($icon)
         @case('dashboard')<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>@break
         @case('work')<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>@break

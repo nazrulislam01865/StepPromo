@@ -31,10 +31,6 @@ trait ManagesClientList
     {
         $this->activateSingleListFilter('manager');
     }
-    public function updatedJobHealth(): void
-    {
-        $this->activateSingleListFilter('jobHealth');
-    }
     public function updatedOutstanding(): void
     {
         $this->activateSingleListFilter('outstanding');
@@ -121,7 +117,7 @@ trait ManagesClientList
     }
     private function activateSingleListFilter(string $activeFilter): void
     {
-        $allowed = ['search','country','manager','jobHealth','outstanding','archivedDate','createdBy'];
+        $allowed = ['search','country','manager','outstanding','archivedDate','createdBy'];
         abort_unless(in_array($activeFilter, $allowed, true), 422);
 
         $value = $this->{$activeFilter};
@@ -136,14 +132,14 @@ trait ManagesClientList
     }
     private function clearClientListFilterValues(?string $except = null): void
     {
-        foreach (['search','country','manager','jobHealth','outstanding','archivedDate','createdBy'] as $filter) {
+        foreach (['search','country','manager','outstanding','archivedDate','createdBy'] as $filter) {
             if ($filter === $except) continue;
             $this->{$filter} = '';
         }
     }
     public function clearFilter(string $filter): void
     {
-        abort_unless(in_array($filter, ['search','country','manager','jobHealth','outstanding','archivedDate','createdBy'], true), 422);
+        abort_unless(in_array($filter, ['search','country','manager','outstanding','archivedDate','createdBy'], true), 422);
         $this->{$filter} = '';
         $this->resetPage();
     }

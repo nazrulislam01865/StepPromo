@@ -95,7 +95,7 @@
                     aria-pressed="{{ $isSelectedStage ? 'true' : 'false' }}"
                 >
                     @if($isSelectedStage)
-                        <span class="ft-order-workflow-stage-selected" aria-hidden="true"><i>✓</i> Selected</span>
+                        <span class="ft-order-workflow-stage-selected" aria-hidden="true" title="Selected">✓</span>
                     @endif
 
                     <span class="ft-order-workflow-stage-kicker">Stage {{ (int) data_get($stage, 'sequence') }}</span>
@@ -114,7 +114,7 @@
                     aria-pressed="{{ $isSelectedStage ? 'true' : 'false' }}"
                 >
                     @if($isSelectedStage)
-                        <span class="ft-order-workflow-stage-selected" aria-hidden="true"><i>✓</i> Selected</span>
+                        <span class="ft-order-workflow-stage-selected" aria-hidden="true" title="Selected">✓</span>
                     @endif
 
                     <span class="ft-order-workflow-stage-kicker">Stage {{ (int) data_get($stage, 'sequence') }}</span>

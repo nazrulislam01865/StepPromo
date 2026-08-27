@@ -2,11 +2,12 @@
 
 namespace App\Actions\Orders;
 
+use App\DTOs\Email\EmailMessage;
 use App\Models\Invoice;
 use App\Models\User;
 use App\Queries\Orders\VisibleOrderQuery;
 use App\Services\AccessControlService;
-use Illuminate\Support\Facades\Mail;
+use App\Services\Email\EmailService;
 
 /** Send the existing Order invoice email and mark the invoice as emailed. */
 final class EmailOrderInvoice
@@ -14,6 +15,7 @@ final class EmailOrderInvoice
     public function __construct(
         private readonly VisibleOrderQuery $orders,
         private readonly AccessControlService $access,
+        private readonly EmailService $email,
     ) {
     }
 
@@ -32,7 +34,18 @@ final class EmailOrderInvoice
             .'<strong>Due date:</strong> '.e($invoice->due_date?->format('M j, Y') ?: '—').'</p>'
             .'<p>'.nl2br(e((string) ($invoice->notes ?: 'Please include the invoice number with your payment.'))).'</p>';
 
-        Mail::html($html, fn ($message) => $message->to($invoice->billing_contact_email)->subject($subject));
+        // Synchronous on purpose: emailed_at must only be written after the
+        // provider has accepted this invoice email.
+        $this->email->sendNow(EmailMessage::html(
+            $invoice->billing_contact_email,
+            $subject,
+            $html,
+            [
+                'type' => 'order_invoice',
+                'order_id' => (int) $job->id,
+                'invoice_id' => (int) $invoice->id,
+            ],
+        ));
         $invoice->update(['emailed_at' => now()]);
     }
 }

@@ -44,11 +44,11 @@
     <?php echo app('Illuminate\Foundation\Vite')('resources/css/application/shared-components.css'); ?>
 
     
+    <?php echo app('Illuminate\Foundation\Vite')('resources/css/modules/orders/index.css'); ?>
 
     
-    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(request()->routeIs('jobs.index')): ?>
-        <?php echo app('Illuminate\Foundation\Vite')('resources/css/modules/orders/index.css'); ?>
-    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+
+    
     <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(request()->routeIs('all-tasks')): ?>
         <?php echo app('Illuminate\Foundation\Vite')('resources/css/modules/work/index.css'); ?>
     <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
@@ -72,6 +72,14 @@
 
     
     <?php echo app('Illuminate\Foundation\Vite')('resources/theme/flowtrack/theme.css'); ?>
+
+    
+    <script
+        src="<?php echo e(asset('js/flowtrack-build-track.js')); ?>?v=<?php echo e(\App\Support\FrontendBuildVersion::current()); ?>"
+        data-flowtrack-build-track
+        data-navigate-track
+        defer
+    ></script>
 </head>
 <body class="<?php echo e(request()->routeIs('dashboard', 'team-performance.report') ? 'ft-management-dashboard-page' : ''); ?>">
 <div class="app">
@@ -79,6 +87,28 @@
     <div id="sidebarShade" class="mobile-sidebar-shade"></div>
     <main class="main">
         <?php echo $__env->make('layouts.partials.topbar', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+        <?php if (isset($component)) { $__componentOriginald3006faa8aaaa46125e3ed862ca54da4 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginald3006faa8aaaa46125e3ed862ca54da4 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.async-feedback','data' => []] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.async-feedback'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes([]); ?>
+<?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::processComponentKey($component); ?>
+
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginald3006faa8aaaa46125e3ed862ca54da4)): ?>
+<?php $attributes = $__attributesOriginald3006faa8aaaa46125e3ed862ca54da4; ?>
+<?php unset($__attributesOriginald3006faa8aaaa46125e3ed862ca54da4); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginald3006faa8aaaa46125e3ed862ca54da4)): ?>
+<?php $component = $__componentOriginald3006faa8aaaa46125e3ed862ca54da4; ?>
+<?php unset($__componentOriginald3006faa8aaaa46125e3ed862ca54da4); ?>
+<?php endif; ?>
         <div class="content <?php echo e(request()->routeIs('dashboard', 'team-performance.report') ? 'ft-dashboard-content-shell' : ''); ?> <?php echo e(request()->routeIs('reports') ? 'ft-inquiry-intelligence-content-shell' : ''); ?>">
             <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(session('success') && !request()->routeIs('task-pack.setup','master-data','financial-master-data','profile','inquiries.*','company.setup')): ?><div class="flash"><?php echo e(session('success')); ?></div><?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
             <?php echo $__env->yieldContent('content'); ?>

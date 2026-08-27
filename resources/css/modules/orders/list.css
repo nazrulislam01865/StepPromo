@@ -3752,3 +3752,809 @@ body:has(.ft-order-list-v5) .ft-shell-order-export:hover {
         min-width: 0;
     }
 }
+
+/* CHANGE 2026-08-26: Orders list responsive hardening for tablet/small-laptop
+   widths where the desktop sidebar still occupies part of the viewport. */
+.ft-order-list-v5,
+.ft-order-list-v5 .list-head,
+.ft-order-list-v5 .list-card,
+.ft-order-list-v5 .filter-toolbar,
+.ft-order-list-v5 .stage-inline-controls,
+.ft-order-list-v5 .table-scroll {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.ft-order-list-v5 .table-scroll {
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+.ft-order-list-v5 .filter-toolbar > *,
+.ft-order-list-v5 .stage-inline-controls > * {
+    min-width: 0;
+}
+
+.ft-order-list-v5 .ft-order-v5-search-select .ft-search-select__menu,
+.ft-order-list-v5 .ft-order-v5-stage-search-select .ft-search-select__menu {
+    max-width: calc(100vw - 24px);
+}
+
+@media (max-width:1180px) and (min-width:901px) {
+    .ft-order-list-v5 .list-head {
+        flex-wrap: wrap;
+    }
+
+    .ft-order-list-v5 .top-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .ft-order-list-v5 .filter-toolbar {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .ft-order-list-v5 .search-box {
+        grid-column: 1 / -1;
+    }
+
+    .ft-order-list-v5 .filter-toolbar > .ft-order-list-date-range {
+        grid-column: 1 / -1;
+    }
+
+    .ft-order-list-v5 .filter-toolbar > .btn {
+        width: 100%;
+    }
+
+    .ft-order-list-v5 .stage-inline-controls {
+        align-items: flex-start;
+    }
+
+    .ft-order-list-v5 .stage-inline-label,
+    .ft-order-list-v5 .stage-view-note {
+        flex: 0 0 100%;
+    }
+
+    .ft-order-list-v5 .stage-inline-quick {
+        width: 100%;
+    }
+
+    .ft-order-list-v5 .stage-inline-selects {
+        width: 100%;
+        margin-left: 0;
+    }
+}
+
+@media (max-width:900px) {
+    .ft-order-list-v5 .filter-toolbar {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .ft-order-list-v5 .search-box,
+    .ft-order-list-v5 .filter-toolbar > .ft-order-list-date-range {
+        grid-column: 1 / -1;
+    }
+
+    .ft-order-list-v5 .filter-toolbar > .btn {
+        width: 100%;
+    }
+
+    .ft-order-list-v5 .stage-inline-label,
+    .ft-order-list-v5 .stage-view-note,
+    .ft-order-list-v5 .stage-inline-quick,
+    .ft-order-list-v5 .stage-inline-selects {
+        width: 100%;
+    }
+
+    .ft-order-list-v5 .stage-inline-selects {
+        margin-left: 0;
+    }
+}
+
+@media (max-width:760px) {
+    .ft-order-list-v5 .filter-toolbar {
+        grid-template-columns: 1fr;
+    }
+
+    .ft-order-list-v5 .search-box,
+    .ft-order-list-v5 .filter-toolbar > .ft-order-list-date-range {
+        grid-column: 1;
+    }
+
+    .ft-order-list-v5 .top-actions {
+        display: grid;
+        width: 100%;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .ft-order-list-v5 .top-actions .btn {
+        width: 100%;
+        min-width: 0;
+        text-align: center;
+    }
+
+    .ft-order-list-v5 .stage-inline-quick {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .ft-order-list-v5 .stage-inline-chip {
+        width: 100%;
+        min-width: 0;
+        justify-content: flex-start;
+        white-space: normal;
+    }
+
+    .ft-order-list-v5 .orders-modern-table {
+        min-width: 920px;
+    }
+}
+
+@media (max-width:520px) {
+    .ft-order-list-v5 .top-actions,
+    .ft-order-list-v5 .stage-inline-quick {
+        grid-template-columns: 1fr;
+    }
+
+    .ft-order-list-v5 .filter-toolbar > .ft-order-list-date-range .ft-date-range-fields {
+        grid-template-columns: 1fr !important;
+    }
+
+    .ft-order-list-v5 .orders-modern-table {
+        min-width: 860px;
+    }
+}
+
+
+/* CHANGE 2026-08-26: container-friendly Order list filters + mobile card list.
+   The Orders page content area can be narrower than the viewport because of the
+   shell/sidebar. The older viewport-only breakpoints let the filter bar break
+   on tablets and small laptops. The rules below make the toolbar adapt to the
+   available content width and turn the table into stacked cards on small
+   screens for a more user-friendly mobile experience. */
+.ft-order-list-v5 .filter-toolbar {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    align-items: stretch;
+}
+
+.ft-order-list-v5 .filter-toolbar > .search-box {
+    grid-column: span 2;
+}
+
+.ft-order-list-v5 .filter-toolbar > .ft-order-list-date-range {
+    grid-column: span 2;
+}
+
+.ft-order-list-v5 .filter-toolbar > .btn {
+    min-width: 112px;
+}
+
+@media (min-width: 1200px) {
+    .ft-order-list-v5 .filter-toolbar {
+        grid-template-columns: minmax(240px, 1.75fr) repeat(3, minmax(150px, .95fr)) minmax(250px, 1.1fr) minmax(112px, auto);
+    }
+
+    .ft-order-list-v5 .filter-toolbar > .search-box,
+    .ft-order-list-v5 .filter-toolbar > .ft-order-list-date-range {
+        grid-column: auto;
+    }
+}
+
+@media (max-width: 980px) {
+    .ft-order-list-v5 .filter-toolbar {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .ft-order-list-v5 .filter-toolbar > .search-box,
+    .ft-order-list-v5 .filter-toolbar > .ft-order-list-date-range,
+    .ft-order-list-v5 .filter-toolbar > .btn {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (max-width: 760px) {
+    .ft-order-list-v5 .filter-toolbar {
+        grid-template-columns: 1fr;
+        gap: 10px;
+        padding: 12px;
+    }
+
+    .ft-order-list-v5 .filter-toolbar > .search-box,
+    .ft-order-list-v5 .filter-toolbar > .ft-order-list-date-range,
+    .ft-order-list-v5 .filter-toolbar > .btn {
+        grid-column: 1;
+    }
+
+    .ft-order-list-v5 .filter-toolbar > .btn {
+        width: 100%;
+    }
+}
+
+@media (max-width: 860px) {
+    .ft-order-list-v5 .active-filter-line {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    .ft-order-list-v5 .table-scroll {
+        overflow-x: visible;
+    }
+
+    .ft-order-list-v5 .orders-modern-table {
+        min-width: 0 !important;
+        border-collapse: separate;
+        border-spacing: 0 12px;
+        background: transparent;
+    }
+
+    .ft-order-list-v5 .orders-modern-table thead {
+        display: none;
+    }
+
+    .ft-order-list-v5 .orders-modern-table,
+    .ft-order-list-v5 .orders-modern-table tbody,
+    .ft-order-list-v5 .orders-modern-table tr,
+    .ft-order-list-v5 .orders-modern-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .ft-order-list-v5 .orders-modern-table tbody {
+        padding: 12px;
+    }
+
+    .ft-order-list-v5 .orders-modern-table tbody tr.order-row {
+        margin: 0 0 12px;
+        border: 1px solid #d9e3ec;
+        border-radius: 16px;
+        overflow: hidden;
+        background: #fff;
+        box-shadow: 0 10px 26px rgba(15, 31, 52, .06);
+    }
+
+    .ft-order-list-v5 .orders-modern-table tbody tr.order-row:last-child {
+        margin-bottom: 0;
+    }
+
+    .ft-order-list-v5 .orders-modern-table tbody tr.order-row > td {
+        display: grid;
+        grid-template-columns: minmax(96px, 120px) minmax(0, 1fr);
+        align-items: start;
+        gap: 10px;
+        padding: 12px 14px;
+        border-top: 1px solid rgba(212, 223, 234, .9);
+        background-clip: padding-box;
+    }
+
+    .ft-order-list-v5 .orders-modern-table tbody tr.order-row > td:first-child {
+        border-top: 0;
+    }
+
+    .ft-order-list-v5 .orders-modern-table tbody tr.order-row > td::before {
+        content: attr(data-label);
+        display: block;
+        color: #6b8097;
+        font-size: .59375rem;
+        font-weight: 850;
+        line-height: 1.35;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+    }
+
+    .ft-order-list-v5 .orders-modern-table tbody tr.order-row > td > * {
+        min-width: 0;
+    }
+
+    .ft-order-list-v5 .orders-modern-table tbody tr.order-row > td .client-product-cell,
+    .ft-order-list-v5 .orders-modern-table tbody tr.order-row > td .owner-delivery,
+    .ft-order-list-v5 .orders-modern-table tbody tr.order-row > td .row-progress {
+        width: 100%;
+    }
+
+    .ft-order-list-v5 .orders-modern-table tbody tr.order-row > td .cell-controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 8px;
+    }
+
+    .ft-order-list-v5 .orders-modern-table tbody tr.order-row > td .cell-link,
+    .ft-order-list-v5 .orders-modern-table tbody tr.order-row > td .cell-action {
+        min-height: 34px;
+    }
+
+    .ft-order-list-v5 .orders-modern-table tbody tr.order-row > td .owner-delivery,
+    .ft-order-list-v5 .orders-modern-table tbody tr.order-row > td .client-product-cell {
+        align-items: flex-start;
+    }
+
+    .ft-order-list-v5 .orders-modern-table tbody tr.order-row > td .row-progress {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .ft-order-list-v5 .orders-modern-table tbody tr.order-row > td .stage-chip,
+    .ft-order-list-v5 .orders-modern-table tbody tr.order-row > td .urgency-badge,
+    .ft-order-list-v5 .orders-modern-table tbody tr.order-row > td .row-status {
+        justify-self: start;
+    }
+
+    .ft-order-list-v5 .orders-modern-table tbody tr:not(.order-row) td.empty-list {
+        display: block;
+        border-radius: 16px;
+        border: 1px dashed #d9e3ec;
+        background: #fff;
+        box-shadow: none;
+    }
+}
+
+@media (max-width: 560px) {
+    .ft-order-list-v5 .orders-modern-table tbody {
+        padding: 10px;
+    }
+
+    .ft-order-list-v5 .orders-modern-table tbody tr.order-row > td {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        padding: 12px;
+    }
+
+    .ft-order-list-v5 .orders-modern-table tbody tr.order-row > td::before {
+        margin-bottom: 2px;
+    }
+
+    .ft-order-list-v5 .orders-modern-table tbody tr.order-row > td .order-cell-ref,
+    .ft-order-list-v5 .orders-modern-table tbody tr.order-row > td .stage-table-note {
+        line-height: 1.45;
+    }
+}
+
+/* CHANGE 2026-08-26: definitive Orders filter responsiveness.
+   Use the actual Orders card width, not only viewport width. This matters when
+   the desktop sidebar reduces the content column on tablets/small laptops. */
+.ft-order-list-v5 .orders-table-card {
+    container-type: inline-size;
+    container-name: ft-orders-filter-card;
+}
+
+/* Safe default: never require every filter to remain on one row. */
+.ft-order-list-v5 .orders-table-card > .filter-toolbar {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    align-items: stretch;
+    overflow: visible;
+}
+
+.ft-order-list-v5 .orders-table-card > .filter-toolbar > * {
+    width: 100%;
+    min-width: 0 !important;
+    max-width: 100%;
+}
+
+.ft-order-list-v5 .orders-table-card > .filter-toolbar > .search-box {
+    grid-column: span 2;
+}
+
+.ft-order-list-v5 .orders-table-card > .filter-toolbar > .ft-order-list-date-range {
+    grid-column: span 2;
+    min-width: 0 !important;
+    overflow: hidden;
+}
+
+.ft-order-list-v5 .orders-table-card > .filter-toolbar > .ft-order-list-date-range .ft-date-range-fields {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    gap: 10px !important;
+}
+
+.ft-order-list-v5 .orders-table-card > .filter-toolbar > .ft-order-list-date-range .ft-date-range-field,
+.ft-order-list-v5 .orders-table-card > .filter-toolbar > .ft-order-list-date-range .ft-date-range-field input {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+}
+
+.ft-order-list-v5 .orders-table-card > .filter-toolbar > .btn {
+    min-width: 0 !important;
+    width: 100%;
+}
+
+/* Plenty of real content width: keep the compact one-row desktop toolbar. */
+@container ft-orders-filter-card (min-width: 1460px) {
+    .ft-order-list-v5 .orders-table-card > .filter-toolbar {
+        grid-template-columns:
+            minmax(260px, 1.7fr)
+            minmax(160px, .9fr)
+            minmax(160px, .9fr)
+            minmax(160px, .9fr)
+            minmax(340px, 1.15fr)
+            minmax(110px, .55fr);
+    }
+
+    .ft-order-list-v5 .orders-table-card > .filter-toolbar > .search-box,
+    .ft-order-list-v5 .orders-table-card > .filter-toolbar > .ft-order-list-date-range {
+        grid-column: auto;
+    }
+}
+
+/* Small laptop / tablet content width. */
+@container ft-orders-filter-card (max-width: 1080px) {
+    .ft-order-list-v5 .orders-table-card > .filter-toolbar {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .ft-order-list-v5 .orders-table-card > .filter-toolbar > .search-box,
+    .ft-order-list-v5 .orders-table-card > .filter-toolbar > .ft-order-list-date-range,
+    .ft-order-list-v5 .orders-table-card > .filter-toolbar > .btn {
+        grid-column: 1 / -1;
+    }
+}
+
+/* Phones / narrow split-screen windows. */
+@container ft-orders-filter-card (max-width: 620px) {
+    .ft-order-list-v5 .orders-table-card > .filter-toolbar {
+        grid-template-columns: 1fr;
+        padding: 12px;
+    }
+
+    .ft-order-list-v5 .orders-table-card > .filter-toolbar > .search-box,
+    .ft-order-list-v5 .orders-table-card > .filter-toolbar > .ft-order-list-date-range,
+    .ft-order-list-v5 .orders-table-card > .filter-toolbar > .btn {
+        grid-column: 1;
+    }
+
+    .ft-order-list-v5 .orders-table-card > .filter-toolbar > .ft-order-list-date-range .ft-date-range-fields {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+/* Card-style Orders list whenever the Orders card itself is narrow. */
+@container ft-orders-filter-card (max-width: 820px) {
+    .ft-order-list-v5 .orders-table-card .active-filter-line {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    .ft-order-list-v5 .orders-table-card .table-scroll {
+        overflow-x: visible;
+    }
+
+    .ft-order-list-v5 .orders-table-card .orders-modern-table {
+        min-width: 0 !important;
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0 12px;
+        background: transparent;
+    }
+
+    .ft-order-list-v5 .orders-table-card .orders-modern-table thead {
+        display: none;
+    }
+
+    .ft-order-list-v5 .orders-table-card .orders-modern-table,
+    .ft-order-list-v5 .orders-table-card .orders-modern-table tbody,
+    .ft-order-list-v5 .orders-table-card .orders-modern-table tr,
+    .ft-order-list-v5 .orders-table-card .orders-modern-table td {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .ft-order-list-v5 .orders-table-card .orders-modern-table tbody {
+        padding: 12px;
+    }
+
+    .ft-order-list-v5 .orders-table-card .orders-modern-table tbody tr.order-row {
+        margin: 0 0 12px;
+        border: 1px solid #d9e3ec;
+        border-radius: 14px;
+        overflow: hidden;
+        background: #fff;
+        box-shadow: 0 8px 22px rgba(15, 31, 52, .06);
+    }
+
+    .ft-order-list-v5 .orders-table-card .orders-modern-table tbody tr.order-row > td {
+        display: grid;
+        grid-template-columns: minmax(100px, 120px) minmax(0, 1fr);
+        align-items: start;
+        gap: 10px;
+        padding: 12px 14px;
+        border-top: 1px solid rgba(212, 223, 234, .9);
+    }
+
+    .ft-order-list-v5 .orders-table-card .orders-modern-table tbody tr.order-row > td:first-child {
+        border-top: 0;
+    }
+
+    .ft-order-list-v5 .orders-table-card .orders-modern-table tbody tr.order-row > td::before {
+        content: attr(data-label);
+        color: #6b8097;
+        font-size: .59375rem;
+        font-weight: 850;
+        line-height: 1.35;
+        letter-spacing: .05em;
+        text-transform: uppercase;
+    }
+
+    .ft-order-list-v5 .orders-table-card .orders-modern-table tbody tr.order-row > td > * {
+        min-width: 0;
+    }
+
+    .ft-order-list-v5 .orders-table-card .orders-modern-table .client-product-cell,
+    .ft-order-list-v5 .orders-table-card .orders-modern-table .owner-delivery,
+    .ft-order-list-v5 .orders-table-card .orders-modern-table .row-progress {
+        width: 100%;
+    }
+
+    .ft-order-list-v5 .orders-table-card .orders-modern-table .cell-controls {
+        flex-wrap: wrap;
+    }
+}
+
+@container ft-orders-filter-card (max-width: 520px) {
+    .ft-order-list-v5 .orders-table-card .orders-modern-table tbody {
+        padding: 10px;
+    }
+
+    .ft-order-list-v5 .orders-table-card .orders-modern-table tbody tr.order-row > td {
+        grid-template-columns: 1fr;
+        gap: 7px;
+        padding: 11px 12px;
+    }
+}
+
+/* CHANGE 2026-08-27: Order list toolbar now follows the Inquiry filter layout:
+   one full-width search row, then one compact filter row. Stage-specific
+   controls remain below this panel exactly as before. */
+.ft-order-list-v5 .orders-table-card > .ft-order-filter-layout {
+    display: block;
+    padding: 12px 14px;
+    overflow: visible;
+    border-bottom: 1px solid var(--ftol-line);
+    background: #fff;
+}
+
+.ft-order-list-v5 .ft-order-filter-search-row {
+    width: 100%;
+    min-width: 0;
+}
+
+.ft-order-list-v5 .ft-order-filter-search-row .search-box,
+.ft-order-list-v5 .ft-order-filter-search-row .search-box input {
+    width: 100%;
+    min-width: 0;
+}
+
+.ft-order-list-v5 .ft-order-filter-search-row .search-box input {
+    height: 40px;
+    min-height: 40px;
+    padding: 0 12px 0 34px;
+    border: 1px solid #ccd8e4;
+    border-radius: 9px;
+    background: #fff;
+    color: #263950;
+    font-size: .6875rem;
+}
+
+.ft-order-list-v5 .ft-order-filter-controls-row {
+    display: grid;
+    grid-template-columns:
+        minmax(110px, .65fr)
+        minmax(180px, 1fr)
+        minmax(180px, 1fr)
+        minmax(190px, 1.05fr)
+        minmax(360px, 1.5fr)
+        minmax(180px, 1fr);
+    gap: 8px;
+    align-items: stretch;
+    width: 100%;
+    min-width: 0;
+    margin-top: 8px;
+}
+
+.ft-order-list-v5 .ft-order-filter-controls-row > * {
+    width: 100%;
+    min-width: 0 !important;
+    max-width: 100%;
+}
+
+.ft-order-list-v5 .ft-order-filter-chip,
+.ft-order-list-v5 .ft-order-filter-reset,
+.ft-order-list-v5 .ft-order-filter-controls-row .ft-order-native-filter,
+.ft-order-list-v5 .ft-order-filter-controls-row .ft-search-select__trigger {
+    height: 40px;
+    min-height: 40px;
+    border: 1px solid #ccd8e4;
+    border-radius: 8px;
+    background: #fff;
+    color: #42556e;
+    font: 750 .625rem/1 var(--ft-theme-font-family);
+}
+
+.ft-order-list-v5 .ft-order-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 0 12px;
+    white-space: nowrap;
+}
+
+.ft-order-list-v5 .ft-order-filter-chip:hover,
+.ft-order-list-v5 .ft-order-filter-chip.active {
+    border-color: var(--ft-theme-primary-300);
+    background: var(--ft-theme-primary-soft, #edf8f5);
+    color: var(--ft-theme-primary);
+}
+
+.ft-order-list-v5 .ft-order-attention-filter > span {
+    color: #d97706;
+    font-size: .75rem;
+}
+
+.ft-order-list-v5 .ft-order-attention-filter.attention-active {
+    border-color: #f2c57c;
+    background: #fff8ec;
+    color: #9a6208;
+}
+
+.ft-order-list-v5 .ft-order-filter-controls-row .ft-order-native-filter {
+    padding: 0 30px 0 11px;
+    outline: 0;
+}
+
+.ft-order-list-v5 .ft-order-filter-controls-row .ft-order-v5-search-select {
+    margin: 0 !important;
+}
+
+.ft-order-list-v5 .ft-order-filter-controls-row .ft-order-list-date-range {
+    display: block !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    overflow: visible !important;
+}
+
+.ft-order-list-v5 .ft-order-filter-controls-row .ft-order-list-date-range .ft-date-range-fields {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    width: 100% !important;
+}
+
+.ft-order-list-v5 .ft-order-filter-controls-row .ft-order-list-date-range .ft-date-range-field {
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 7px !important;
+    width: 100%;
+    min-width: 0;
+}
+
+.ft-order-list-v5 .ft-order-filter-controls-row .ft-order-list-date-range .ft-date-range-field > span {
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    clip: auto !important;
+    color: #65758a;
+    font-size: .5625rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.ft-order-list-v5 .ft-order-filter-controls-row .ft-order-list-date-range input {
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    padding: 0 9px !important;
+    border: 1px solid #ccd8e4 !important;
+    border-radius: 8px !important;
+    background: #fff !important;
+    color: #263950;
+    font-size: .625rem;
+}
+
+.ft-order-list-v5 .ft-order-filter-reset {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 0 11px;
+    white-space: nowrap;
+}
+
+.ft-order-list-v5 .ft-order-filter-reset:disabled {
+    cursor: default;
+    opacity: .42;
+}
+
+@media (max-width: 1500px) {
+    .ft-order-list-v5 .ft-order-filter-controls-row {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .ft-order-list-v5 .ft-order-filter-controls-row .ft-order-list-date-range,
+    .ft-order-list-v5 .ft-order-filter-controls-row .ft-order-filter-reset {
+        grid-column: span 2;
+    }
+}
+
+@media (max-width: 980px) {
+    .ft-order-list-v5 .ft-order-filter-controls-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .ft-order-list-v5 .ft-order-filter-controls-row .ft-order-list-date-range,
+    .ft-order-list-v5 .ft-order-filter-controls-row .ft-order-filter-reset {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (max-width: 620px) {
+    .ft-order-list-v5 .orders-table-card > .ft-order-filter-layout {
+        padding: 10px;
+    }
+
+    .ft-order-list-v5 .ft-order-filter-controls-row {
+        grid-template-columns: 1fr;
+    }
+
+    .ft-order-list-v5 .ft-order-filter-controls-row .ft-order-list-date-range,
+    .ft-order-list-v5 .ft-order-filter-controls-row .ft-order-filter-reset {
+        grid-column: 1;
+    }
+
+    .ft-order-list-v5 .ft-order-filter-controls-row .ft-order-list-date-range .ft-date-range-fields {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+
+/* Order Health is intentionally not part of the product UI. Keep the list grid
+   aligned to the visible columns only, and defensively hide legacy health cells
+   if stale cached markup is ever hydrated during navigation. */
+.ft-orders-prototype .ft-health-cell { display: none !important; }
+.ft-orders-prototype .ft-job-head,
+.ft-orders-prototype .ft-job-row {
+    grid-template-columns: 150px 185px 155px 300px 185px 125px 195px 110px 38px;
+    min-width: 1620px;
+}
+@media (max-width: 1380px) {
+    .ft-orders-prototype .ft-job-row {
+        min-width: 0;
+        grid-template-columns: minmax(140px,1fr) minmax(125px,.8fr) minmax(130px,.9fr) 32px;
+        grid-template-areas:
+            "identity created inquiry actions"
+            "brief brief owner progress"
+            "stage flag flag progress";
+    }
+}
+@media (max-width: 680px) {
+    .ft-orders-prototype .ft-job-row,
+    .ft-orders-prototype .ft-job-row.ft-client-row-iid,
+    .ft-orders-prototype .ft-job-row.ft-client-row-nep {
+        grid-template-columns: repeat(6,minmax(0,1fr));
+        grid-template-areas:
+            "identity identity identity identity identity identity"
+            "created created created inquiry inquiry inquiry"
+            "brief brief brief brief brief brief"
+            "stage stage flag flag flag flag"
+            "owner owner owner owner owner owner"
+            "progress progress progress progress progress progress";
+    }
+}

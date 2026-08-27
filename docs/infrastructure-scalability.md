@@ -71,7 +71,7 @@ Run a final short maintenance-window sync before enabling the new paths. Do not 
 
 ## Queue topology
 
-`deploy/flowtrack-workers-horizontal.conf.example` creates independent Supervisor pools for realtime, notifications and default work. Equivalent systemd units are under `deploy/systemd/`.
+`deploy/flowtrack-workers-horizontal.conf.example` creates independent Supervisor pools for realtime, notifications, outbound email and default work. Equivalent systemd units are under `deploy/systemd/`; the templated queue unit can be instantiated for the `emails` queue as well.
 
 Owned queue jobs have explicit retries/backoff/timeouts. Realtime jobs also use unique dispatch identities; duplicate realtime signals are harmless because the browser re-reads database state/notification IDs. Queue delay above the configured threshold is logged as `flowtrack.queue.delay`; failed jobs and queue-depth alarms are logged centrally.
 

@@ -18,7 +18,7 @@ Optional S3-compatible `flowtrack_object` and `flowtrack_object_quarantine` disk
 
 ## Workers, Reverb and scheduler
 
-Supervisor examples provide separate Redis worker pools for `realtime`, `notifications` and `default`; Reverb and the scheduler remain separate long-running processes. Equivalent systemd examples are included.
+Supervisor examples provide separate Redis worker pools for `realtime`, `notifications`, `emails` and `default`; Reverb and the scheduler remain separate long-running processes. Equivalent systemd examples are included.
 
 Owned realtime queue jobs now expose explicit timeout/failure behavior, queue-delay telemetry and unique dispatch identities. Laravel queue failures and queue-depth alerts are logged centrally. The scheduler runs `queue:monitor` when enabled.
 

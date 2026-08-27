@@ -4,6 +4,7 @@ namespace App\Livewire\Inquiries;
 
 use App\Livewire\Inquiries\Concerns\ManagesInquiryList;
 use App\Livewire\Inquiries\Concerns\ManagesInquiryCreation;
+use App\Livewire\Inquiries\Concerns\ManagesInquiryCreateRfq;
 use App\Livewire\Inquiries\Concerns\ManagesInquiryCreateProducts;
 use App\Livewire\Inquiries\Concerns\ManagesInquiryProducts;
 use App\Livewire\Inquiries\Concerns\ManagesInquiryDetail;
@@ -12,6 +13,7 @@ use App\Livewire\Inquiries\Concerns\ManagesInquiryDocuments;
 use App\Livewire\Inquiries\Concerns\ManagesInquiryActivity;
 use App\Livewire\Inquiries\Concerns\ManagesInquiryWorkflow;
 use App\Livewire\Inquiries\Concerns\ManagesInquiryFinalDecision;
+use App\Livewire\Inquiries\Concerns\ManagesInquiryRfq;
 use App\Livewire\Inquiries\Concerns\BuildsInquiryPageData;
 
 use App\Livewire\Concerns\HandlesInlineEdits;
@@ -26,6 +28,7 @@ class Index extends Component
 {
     use ManagesInquiryList;
     use ManagesInquiryCreation;
+    use ManagesInquiryCreateRfq;
     use ManagesInquiryCreateProducts;
     use ManagesInquiryProducts;
     use ManagesInquiryDetail;
@@ -34,6 +37,7 @@ class Index extends Component
     use ManagesInquiryActivity;
     use ManagesInquiryWorkflow;
     use ManagesInquiryFinalDecision;
+    use ManagesInquiryRfq;
     use BuildsInquiryPageData;
 
     use RefreshesFromWorkspace;
@@ -88,12 +92,27 @@ class Index extends Component
     public ?int $createWorkflowId = null;
     public string $selectedWorkflowLabel = '';
     public array $createAttachments = [];
+
+    // Optional RFQ setup on Create Inquiry. Supplier invitations are only sent
+    // after a non-draft Inquiry has been created successfully.
+    public string $createRfqSupplierSearch = '';
+    public array $createRfqSupplierIds = [];
+    public string $createRfqDueDate = '';
+    public string $createRfqMessage = 'Please quote your best unit price, lead time, shipping and sample options.';
     public array $createProductRows = [];
     public array $createProductCategoryOptions = [];
     public string $createProductSearch = '';
     public string $createProductCategoryFilter = '';
     public bool $createProductShowAllResults = false;
     public bool $showCreateOrderProductModal = false;
+    public bool $createCatalogReady = false;
+    public bool $createWorkflowReady = false;
+    public array $inquiryDetailSectionsReady = [
+        'products' => false,
+        'taskflow' => false,
+        'documents' => false,
+        'activity' => false,
+    ];
     public string $newProductCode = '';
     public ?int $newProductCategoryId = null;
     public string $newProductCategorySearch = '';
@@ -115,6 +134,17 @@ class Index extends Component
     public string $inquiryProductCategory = '';
     public string $inquiryProductQuantity = '1';
     public string $inquiryProductUnitPrice = '0.00';
+
+    // Compact inline editor used from the Inquiry Details product table.
+    public ?int $editInquiryProductItemId = null;
+    public ?int $editInquiryProductSelectedId = null;
+    public string $editInquiryProductSearch = '';
+    public bool $editInquiryProductShowAllResults = false;
+    public string $editInquiryProductCategory = '';
+    public string $editInquiryProductName = '';
+    public string $editInquiryProductQuantity = '1';
+    public string $editInquiryProductUnitPrice = '';
+    public string $editInquiryProductNotes = '';
 
     // Options are loaded only when create/workflow management is opened.
     public array $userOptions = [];
@@ -173,7 +203,6 @@ class Index extends Component
     public function mount(): void
     {
         abort_unless(auth()->user()->canModule('inquiries', 'view'), 403);
-        $this->metrics = app(\App\Queries\Inquiries\InquiryListQuery::class)->metrics(auth()->user());
         $this->metricFilter = trim((string) request('metric', $this->metricFilter));
         if (! in_array($this->metricFilter, ['', 'createdToday', 'notStarted', 'inProgress', 'dueThisWeek', 'completedThisWeek', 'attention', 'dashboardOpen'], true)) {
             $this->metricFilter = '';
@@ -197,20 +226,27 @@ class Index extends Component
                     // Task deep-links now highlight the row in the inline workflow.
                     // No task-detail modal or heavy task relationship hydration is needed.
                     $this->selectedTaskId = $taskId;
+                    $this->inquiryDetailSectionsReady['taskflow'] = true;
                 }
             }
+
+            return;
         }
+
+        // List metrics are not needed while creating or viewing one Inquiry.
+        // Avoid running the aggregate query on those routes.
+        $this->metrics = app(\App\Queries\Inquiries\InquiryListQuery::class)->metrics(auth()->user());
     }
 
     #[On('flowtrack-notification')]
     public function refreshRealtime(): void
     {
-        if (!$this->showCreate) $this->metrics = app(\App\Queries\Inquiries\InquiryListQuery::class)->metrics(auth()->user());
+        if (!$this->showCreate && !$this->selectedInquiryId) $this->metrics = app(\App\Queries\Inquiries\InquiryListQuery::class)->metrics(auth()->user());
     }
 
     protected function prepareForWorkspaceRefresh(): void
     {
-        if (! $this->showCreate) {
+        if (! $this->showCreate && ! $this->selectedInquiryId) {
             $this->metrics = app(\App\Queries\Inquiries\InquiryListQuery::class)->metrics(auth()->user());
         }
     }

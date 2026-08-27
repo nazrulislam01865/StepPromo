@@ -612,3 +612,18 @@
     border-color:var(--ft-focus-border);
     box-shadow:0 0 0 2px color-mix(in srgb, var(--ft-theme-primary) 10%, transparent);
 }
+
+/* Create Order workflow preview responsive polish. */
+.ft-create-job-page .ft-create-workflow-preview-toggle{
+    border-color:#c9e1dd;
+    color:var(--ft-order-create-accent);
+}
+.ft-create-job-page .ft-create-workflow-preview-toggle:hover,
+.ft-create-job-page .ft-create-workflow-preview-toggle:focus-visible{
+    border-color:var(--ft-order-create-accent-border);
+    background:var(--ft-order-create-accent-soft);
+    color:var(--ft-order-create-accent);
+}
+.ft-create-job-page .ft-create-workflow-preview{
+    border-top-color:#d7e9e6;
+}

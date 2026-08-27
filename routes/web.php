@@ -32,9 +32,11 @@ use App\Http\Controllers\ProductImageController;
 use App\Http\Controllers\ProductOptionImageController;
 use App\Http\Controllers\RichTextImageController;
 use App\Http\Controllers\ReportsController;
+use App\Http\Controllers\Rfq\PublicInquiryRfqController;
 use App\Http\Controllers\WorkflowSetupController;
 use App\Http\Controllers\TaskPackSetupController;
 use App\Http\Controllers\TeamPerformanceReportController;
+use App\Http\Controllers\UserCreateController;
 use App\Http\Controllers\UserEditController;
 use App\Models\Document;
 use App\Support\StoredFileResponse;
@@ -46,6 +48,16 @@ Route::get('/branding-assets/{type}/{filename}', BrandingAssetController::class)
     ->where('type', 'logo|favicon')
     ->where('filename', '[A-Za-z0-9_-]+\.(?:jpg|jpeg|png|webp|ico)')
     ->name('branding-assets.show');
+
+
+Route::get('/rfq/{token}', [PublicInquiryRfqController::class, 'show'])
+    ->middleware('throttle:60,1')
+    ->where('token', '[A-Za-z0-9]{32,100}')
+    ->name('rfq.public.show');
+Route::post('/rfq/{token}', [PublicInquiryRfqController::class, 'respond'])
+    ->middleware('throttle:30,1')
+    ->where('token', '[A-Za-z0-9]{32,100}')
+    ->name('rfq.public.respond');
 
 Route::get('/session/recover', function (\Illuminate\Http\Request $request) {
     // Recovery is intentionally a GET: it is the safe landing point after a
@@ -192,6 +204,7 @@ Route::middleware('auth')->group(function () {
         return response()->json([
             'count' => (int) ($shell['unread_notifications'] ?? 0),
             'my_work_count' => (int) ($shell['open_my_work'] ?? 0),
+            'cancelled_order_count' => (int) ($shell['cancelled_orders'] ?? 0),
             'data_version' => app(\App\Services\WorkspaceRefreshService::class)->version(),
             'latest' => $latest ? [
                 'id' => $latest->id,
@@ -234,6 +247,7 @@ Route::middleware('auth')->group(function () {
         ->where('filename', '[A-Za-z0-9-]+\.(?:jpg|jpeg|png|webp|gif)')
         ->name('rich-text-images.show');
     Route::get('/profile', ProfileController::class)->name('profile');
+    Route::get('/users/create', UserCreateController::class)->middleware('super.admin')->name('users.create');
     Route::get('/users/{user}/edit', UserEditController::class)->whereNumber('user')->name('users.edit');
     Route::post('/logout', [AuthController::class, 'destroy'])->name('logout');
 

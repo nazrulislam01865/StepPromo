@@ -58,6 +58,23 @@ trait ManagesProductListFilters
         $this->resetPage('masterPage');
     }
 
+    public function updatedProductSupplierState(): void
+    {
+        $this->recordsReady = true;
+        $this->clearProductSelection();
+        $this->resetPage('masterPage');
+    }
+
+    public function showProductsWithoutSupplier(): void
+    {
+        abort_unless($this->group === 'product', 404);
+        $this->productSupplierFilterId = null;
+        $this->productSupplierState = 'unassigned';
+        $this->recordsReady = true;
+        $this->clearProductSelection();
+        $this->resetPage('masterPage');
+    }
+
     public function updatedProductPerPage($value): void
     {
         $value = (int) $value;
@@ -73,6 +90,8 @@ trait ManagesProductListFilters
         $this->productCategory = '';
         $this->productClientAvailability = '';
         $this->productStatus = '';
+        $this->productSupplierFilterId = null;
+        $this->productSupplierState = '';
         $this->recordsReady = true;
         $this->clearProductSelection();
         $this->resetPage('masterPage');
@@ -85,6 +104,8 @@ trait ManagesProductListFilters
             'parent_id' => $this->productCategory,
             'client_availability' => $this->productClientAvailability,
             'status' => $this->productStatus,
+            'supplier_id' => $this->productSupplierFilterId,
+            'supplier_state' => $this->productSupplierState,
         ];
     }
 

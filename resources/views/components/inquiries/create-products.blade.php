@@ -14,19 +14,19 @@
 
 @if($catalogReady)
     <x-catalog.create-product-quantity
+        context="inquiry"
         :rows="$createProductRows"
         rows-property="createProductRows"
         remove-method="removeCreateProductRow"
         :required="false"
         :active-product-count="$activeProductCount"
         :product-search-results="$productSearchResults"
+        :product-search-suppliers="$productSearchSuppliers"
         :product-result-total="$productResultTotal"
         :create-product-search="$createProductSearch"
-        :create-product-category-filter="$createProductCategoryFilter"
         :create-product-show-all-results="$createProductShowAllResults"
-        :product-categories="$productCategories"
         :selected-product-details="$selectedProductDetails"
-        :can-view-product-categories="$canViewProductCategories"
+        :selected-product-suppliers="$selectedProductSuppliers"
         :can-create-catalog-product="$canCreateCatalogProduct"
         wire-key="create-inquiry-products-ready"
         row-key-prefix="selected-inquiry-product"

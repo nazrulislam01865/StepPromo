@@ -34,6 +34,9 @@ trait ManagesOrderProducts
     public function openEditOrderProductModal(int $itemId): void
     {
         abort_unless($this->selectedJobId && $this->detailTab === 'overview', 422);
+        if ($this->showAddJobProductForm) {
+            $this->closeAddJobProductForm();
+        }
 
         $user = auth()->user();
         $job = app(VisibleOrderQuery::class)->base($user, $this->selectedJobId);
@@ -41,20 +44,54 @@ trait ManagesOrderProducts
 
         $item = FlowJobItem::query()
             ->where('flow_job_id', $job->id)
-            ->with(['supplier:id,name,code,type,status', 'catalogProduct:id,name,code'])
+            ->with(['supplier:id,name,code,type,status'])
             ->findOrFail($itemId);
         abort_if((bool) ($item->is_removed ?? false), 422, 'Restore this product before editing it.');
 
+        $catalog = app(\App\Services\ProductCatalogService::class);
+        $product = null;
+        if ((int) ($item->catalog_product_id ?? 0) > 0) {
+            $product = $catalog->selectedProducts([(int) $item->catalog_product_id])->first();
+        }
+        if (!$product && filled($item->product_name)) {
+            $productQuery = $catalog->activeProductsQuery()
+                ->with(['parent' => fn ($parent) => $parent->where('type', 'product_category')])
+                ->where('name', trim((string) $item->product_name));
+            if (filled($item->category_name)) {
+                $productQuery->whereHas('parent', fn ($parent) => $parent
+                    ->where('type', 'product_category')
+                    ->where('name', trim((string) $item->category_name)));
+            }
+            $product = $productQuery->first();
+        }
+
+        $quantity = max(1, (int) ($item->quantity ?? 1));
+        $defaultSupplier = $product ? $catalog->supplierForProduct($product) : null;
+        $selectedSupplier = $item->supplier ?: $defaultSupplier;
+        $basePrice = $product?->productPriceForQuantity($quantity);
+
         $this->editOrderProductItemId = (int) $item->id;
-        $this->editOrderProductName = (string) ($item->product_name ?: $item->catalogProduct?->name ?: '');
-        $this->editOrderProductCode = (string) ($item->catalogProduct?->code ?: '');
-        $this->editOrderProductSupplierId = $item->supplier_id ? (int) $item->supplier_id : null;
-        $this->editOrderProductSupplierLabel = (string) ($item->supplier?->name ?: 'Select supplier');
-        $this->editOrderProductQuantity = (string) max(1, (int) ($item->quantity ?? 1));
-        $this->editOrderProductUnitPrice = number_format((float) ($item->unit_price ?? 0), 2, '.', '');
+        $this->editOrderProductSelectedId = $product ? (int) $product->id : null;
+        $this->editOrderProductSearch = '';
+        $this->editOrderProductShowAllResults = false;
+        $this->editOrderProductName = (string) ($product?->name ?: $item->product_name ?: '');
+        $this->editOrderProductCode = (string) ($product?->productDisplayCode() ?: '');
+        $this->editOrderProductCategory = $product
+            ? $this->orderEditProductCategory($product)
+            : (string) ($item->category_name ?? '');
+        $this->editOrderProductSupplierId = $selectedSupplier ? (int) $selectedSupplier->id : null;
+        $this->editOrderProductSupplierLabel = (string) ($selectedSupplier?->name ?: '');
+        $this->editOrderProductQuantity = (string) $quantity;
+        $this->editOrderProductUnitPrice = number_format(
+            $basePrice !== null ? (float) $basePrice : (float) ($item->unit_price ?? 0),
+            2,
+            '.',
+            ''
+        );
         $this->editOrderProductNotes = (string) ($item->notes ?? '');
         $this->showEditOrderProductModal = true;
         $this->resetValidation([
+            'editOrderProductSelectedId',
             'editOrderProductSupplierId',
             'editOrderProductQuantity',
             'editOrderProductUnitPrice',
@@ -66,14 +103,19 @@ trait ManagesOrderProducts
     {
         $this->showEditOrderProductModal = false;
         $this->editOrderProductItemId = null;
+        $this->editOrderProductSelectedId = null;
+        $this->editOrderProductSearch = '';
+        $this->editOrderProductShowAllResults = false;
         $this->editOrderProductName = '';
         $this->editOrderProductCode = '';
+        $this->editOrderProductCategory = '';
         $this->editOrderProductSupplierId = null;
         $this->editOrderProductSupplierLabel = '';
         $this->editOrderProductQuantity = '1';
         $this->editOrderProductUnitPrice = '0.00';
         $this->editOrderProductNotes = '';
         $this->resetValidation([
+            'editOrderProductSelectedId',
             'editOrderProductSupplierId',
             'editOrderProductQuantity',
             'editOrderProductUnitPrice',
@@ -81,10 +123,103 @@ trait ManagesOrderProducts
         ]);
     }
 
+    public function showAllEditOrderProductResults(): void
+    {
+        abort_unless($this->showEditOrderProductModal && $this->editOrderProductItemId, 422);
+        $this->editOrderProductShowAllResults = true;
+    }
+
+    public function updatedEditOrderProductSearch(): void
+    {
+        if (!$this->showEditOrderProductModal || !$this->editOrderProductItemId) {
+            return;
+        }
+
+        $this->editOrderProductShowAllResults = false;
+
+        // As soon as the user starts searching for a replacement product, the
+        // dependent Product Master fields must not keep showing stale values.
+        // They are populated again only after a search result is selected.
+        if (
+            $this->editOrderProductSelectedId
+            && strcasecmp(trim($this->editOrderProductSearch), trim($this->editOrderProductName)) !== 0
+        ) {
+            $this->editOrderProductSelectedId = null;
+            $this->editOrderProductName = '';
+            $this->editOrderProductCode = '';
+            $this->editOrderProductCategory = '';
+            $this->editOrderProductSupplierId = null;
+            $this->editOrderProductSupplierLabel = '';
+            $this->editOrderProductUnitPrice = '0.00';
+            $this->resetValidation([
+                'editOrderProductSelectedId',
+                'editOrderProductSupplierId',
+                'editOrderProductUnitPrice',
+            ]);
+        }
+    }
+
+    public function selectEditOrderProduct(int $productId): void
+    {
+        abort_unless($this->showEditOrderProductModal && $this->selectedJobId && $this->editOrderProductItemId, 422);
+
+        $user = auth()->user();
+        $job = app(VisibleOrderQuery::class)->base($user, $this->selectedJobId);
+        abort_unless(app(AccessControlService::class)->can($user, 'catalog_products', 'edit'), 403);
+
+        $catalog = app(\App\Services\ProductCatalogService::class);
+        $product = $catalog->findActiveProductOrFail($productId);
+        $supplier = $catalog->supplierForProduct($product);
+        $quantity = max(1, (int) $this->editOrderProductQuantity);
+        $basePrice = $product->productPriceForQuantity($quantity);
+
+        $this->editOrderProductSelectedId = (int) $product->id;
+        $this->editOrderProductSearch = (string) $product->name;
+        $this->editOrderProductShowAllResults = false;
+        $this->editOrderProductName = (string) $product->name;
+        $this->editOrderProductCode = (string) $product->productDisplayCode();
+        $this->editOrderProductCategory = $this->orderEditProductCategory($product);
+        $this->editOrderProductSupplierId = $supplier ? (int) $supplier->id : null;
+        $this->editOrderProductSupplierLabel = (string) ($supplier?->name ?: '');
+        $this->editOrderProductUnitPrice = $basePrice !== null
+            ? number_format((float) $basePrice, 2, '.', '')
+            : '0.00';
+
+        $this->resetValidation([
+            'editOrderProductSelectedId',
+            'editOrderProductSupplierId',
+            'editOrderProductQuantity',
+            'editOrderProductUnitPrice',
+        ]);
+        $this->dispatch('detail-product-edit-selected');
+    }
+
+    public function updatedEditOrderProductQuantity(): void
+    {
+        if (!$this->showEditOrderProductModal || !$this->editOrderProductSelectedId) {
+            return;
+        }
+
+        $quantity = (int) $this->editOrderProductQuantity;
+        if ($quantity <= 0) {
+            $this->editOrderProductUnitPrice = '0.00';
+            return;
+        }
+
+        $product = app(\App\Services\ProductCatalogService::class)
+            ->findActiveProductOrFail((int) $this->editOrderProductSelectedId);
+        $basePrice = $product->productPriceForQuantity($quantity);
+        $this->editOrderProductUnitPrice = $basePrice !== null
+            ? number_format((float) $basePrice, 2, '.', '')
+            : '0.00';
+        $this->resetValidation('editOrderProductUnitPrice');
+    }
+
     #[Renderless]
     public function updateEditOrderProductSupplierFromSelector(string $property, mixed $supplierId): array
     {
         abort_unless($property === 'editOrderProductSupplierId', 422, 'Invalid supplier target.');
+        abort_unless($this->showEditOrderProductModal && $this->editOrderProductSelectedId, 422, 'Select a product first.');
         $supplierId = filled($supplierId) ? (int) $supplierId : null;
         abort_unless($supplierId, 422, 'Select a supplier for this product.');
 
@@ -96,6 +231,8 @@ trait ManagesOrderProducts
 
         $this->editOrderProductSupplierId = (int) $supplier->id;
         $this->editOrderProductSupplierLabel = (string) $supplier->name;
+        $this->resetValidation('editOrderProductSupplierId');
+        $this->dispatch('detail-product-edit-supplier-selected');
 
         return ['ok' => true, 'value' => (string) $supplier->id, 'label' => (string) $supplier->name];
     }
@@ -105,25 +242,62 @@ trait ManagesOrderProducts
         abort_unless($this->selectedJobId && $this->editOrderProductItemId, 422);
 
         $data = $this->validate([
+            'editOrderProductSelectedId' => ['required', 'integer', 'min:1'],
             'editOrderProductSupplierId' => ['required', 'integer', 'min:1'],
-            'editOrderProductQuantity' => ['required', 'integer', 'min:1'],
+            'editOrderProductQuantity' => ['required', 'integer', 'min:1', 'max:999999999'],
             'editOrderProductUnitPrice' => ['required', 'numeric', 'min:0', 'max:999999999999.99'],
             'editOrderProductNotes' => ['nullable', 'string', 'max:2000'],
+        ], [
+            'editOrderProductSelectedId.required' => 'Search for and select a product first.',
+            'editOrderProductSupplierId.required' => 'Select a supplier for this product.',
+            'editOrderProductQuantity.required' => 'Enter a quantity.',
         ]);
 
         $user = auth()->user();
         $job = app(VisibleOrderQuery::class)->base($user, $this->selectedJobId);
         $item = FlowJobItem::query()->where('flow_job_id', $job->id)->findOrFail($this->editOrderProductItemId);
+        $product = app(\App\Services\ProductCatalogService::class)
+            ->findActiveProductOrFail((int) $data['editOrderProductSelectedId']);
+
+        $duplicate = $job->items()
+            ->where('id', '!=', $item->id)
+            ->where('is_removed', false)
+            ->where(function ($query) use ($product): void {
+                $query->where('catalog_product_id', (int) $product->id)
+                    ->orWhereRaw('LOWER(product_name) = ?', [mb_strtolower((string) $product->name)]);
+            })
+            ->exists();
+        if ($duplicate) {
+            $this->addError('editOrderProductSelectedId', 'This product is already added to the Order.');
+            return;
+        }
+
+        $basePrice = $product->productPriceForQuantity((int) $data['editOrderProductQuantity']);
+        $resolvedUnitPrice = $basePrice !== null
+            ? (float) $basePrice
+            : (float) $data['editOrderProductUnitPrice'];
 
         app(UpdateOrderItemDetails::class)->handle($job, $item, [
+            'catalog_product_id' => (int) $product->id,
             'supplier_id' => (int) $data['editOrderProductSupplierId'],
             'quantity' => (int) $data['editOrderProductQuantity'],
-            'unit_price' => (float) $data['editOrderProductUnitPrice'],
+            'unit_price' => $resolvedUnitPrice,
             'notes' => trim((string) ($data['editOrderProductNotes'] ?? '')),
         ], $user);
 
         $this->closeEditOrderProductModal();
         session()->flash('success', 'Order product updated.');
+    }
+
+    private function orderEditProductCategory(MasterRecord $product): string
+    {
+        $category = trim((string) ($product->parent?->name ?? ''));
+        if ($category === '') {
+            $legacy = trim((string) $product->description);
+            $category = trim(explode(' ·', $legacy, 2)[0]);
+        }
+
+        return $category !== '' ? $category : 'Uncategorized';
     }
 
     #[Renderless]
@@ -173,6 +347,9 @@ trait ManagesOrderProducts
 
     public function openAddJobProductForm(int $jobId): void
     {
+        if ($this->showEditOrderProductModal) {
+            $this->closeEditOrderProductModal();
+        }
         $user = auth()->user();
         $job = app(VisibleOrderQuery::class)->detail($user, $jobId);
         abort_unless(
@@ -189,7 +366,7 @@ trait ManagesOrderProducts
         $this->jobProductShowAllResults = false;
         $this->jobProductSelectedId = null;
         $this->jobProductCategory = '';
-        $this->jobProductQuantity = '1';
+        $this->jobProductQuantity = '1000';
         $this->jobProductUnitPrice = '0.00';
         $this->jobProductSupplierId = null;
         $this->jobProductSupplierLabel = '';
@@ -204,7 +381,7 @@ trait ManagesOrderProducts
         $this->jobProductShowAllResults = false;
         $this->jobProductSelectedId = null;
         $this->jobProductCategory = '';
-        $this->jobProductQuantity = '1';
+        $this->jobProductQuantity = '1000';
         $this->jobProductUnitPrice = '0.00';
         $this->jobProductSupplierId = null;
         $this->jobProductSupplierLabel = '';
@@ -241,13 +418,20 @@ trait ManagesOrderProducts
 
         $linkedSupplier = app(\App\Services\ProductCatalogService::class)->supplierForProduct($product);
 
+        $defaultQuantity = 1000;
+        $basePrice = $product->productPriceForQuantity($defaultQuantity);
+
         $this->jobProductSelectedId = (int) $product->id;
         $this->jobProductCategory = $category !== '' ? $category : 'Uncategorized';
         $this->jobProductSearch = (string) $product->name;
+        $this->jobProductQuantity = (string) $defaultQuantity;
+        $this->jobProductUnitPrice = $basePrice !== null ? number_format((float) $basePrice, 2, '.', '') : '0.00';
         $this->jobProductSupplierId = $linkedSupplier ? (int) $linkedSupplier->id : null;
         $this->jobProductSupplierLabel = $linkedSupplier ? (string) $linkedSupplier->name : '';
-        $this->jobProductSupplierLocked = (bool) $linkedSupplier;
-        $this->resetValidation(['jobProductSelectedId', 'jobProductCategory', 'jobProductSupplierId']);
+        // Match Create Order: a linked supplier is the default for this row,
+        // but the user may change the supplier for this Order only.
+        $this->jobProductSupplierLocked = false;
+        $this->resetValidation(['jobProductSelectedId', 'jobProductCategory', 'jobProductSupplierId', 'jobProductQuantity', 'jobProductUnitPrice']);
     }
 
     #[Renderless]
@@ -265,21 +449,8 @@ trait ManagesOrderProducts
             403
         );
 
-        $product = app(\App\Services\ProductCatalogService::class)
-            ->findActiveProductOrFail((int) $this->jobProductSelectedId);
-        $linkedSupplier = app(\App\Services\ProductCatalogService::class)->supplierForProduct($product);
-
-        // Product Master remains authoritative. A manual supplier is available
-        // only when the selected Product has no supplier linked in Product Master.
-        if ($linkedSupplier) {
-            $this->jobProductSupplierId = (int) $linkedSupplier->id;
-            $this->jobProductSupplierLabel = (string) $linkedSupplier->name;
-            $this->jobProductSupplierLocked = true;
-            $this->resetValidation('jobProductSupplierId');
-
-            return ['ok' => true, 'value' => (string) $linkedSupplier->id, 'label' => (string) $linkedSupplier->name];
-        }
-
+        // The Product Master supplier is only the default. Match Create Order
+        // by allowing a per-Order supplier override without modifying Product Master.
         $supplierId = filled($supplierId) ? (int) $supplierId : null;
         abort_unless($supplierId, 422, 'Select a supplier for this product.');
 
@@ -293,8 +464,37 @@ trait ManagesOrderProducts
         $this->jobProductSupplierLabel = (string) $supplier->name;
         $this->jobProductSupplierLocked = false;
         $this->resetValidation('jobProductSupplierId');
+        $this->dispatch('create-order-product-supplier-selected');
 
         return ['ok' => true, 'value' => (string) $supplier->id, 'label' => (string) $supplier->name];
+    }
+
+    public function updatedJobProductQuantity(): void
+    {
+        if (!$this->showAddJobProductForm || !$this->jobProductSelectedId) return;
+        $this->syncDetailOrderProductBasePrice();
+    }
+
+    private function syncDetailOrderProductBasePrice(): void
+    {
+        $quantity = (int) $this->jobProductQuantity;
+        if (!$this->jobProductSelectedId || $quantity <= 0) {
+            $this->jobProductUnitPrice = '0.00';
+            $this->resetValidation('jobProductUnitPrice');
+            return;
+        }
+
+        $product = MasterRecord::query()
+            ->forWorkspace(app(MasterDataService::class)->workspaceId())
+            ->ofType('product')
+            ->active()
+            ->find((int) $this->jobProductSelectedId);
+
+        $basePrice = $product?->productPriceForQuantity($quantity);
+        $this->jobProductUnitPrice = $basePrice !== null
+            ? number_format((float) $basePrice, 2, '.', '')
+            : '0.00';
+        $this->resetValidation('jobProductUnitPrice');
     }
 
     public function saveJobProduct(int $jobId): void
@@ -347,10 +547,11 @@ trait ManagesOrderProducts
             return;
         }
 
-        $linkedSupplier = app(\App\Services\ProductCatalogService::class)->supplierForProduct($product);
-        $supplierId = $linkedSupplier
-            ? (int) $linkedSupplier->id
-            : (int) $data['jobProductSupplierId'];
+        $supplierId = (int) $data['jobProductSupplierId'];
+        $basePrice = $product->productPriceForQuantity((int) $data['jobProductQuantity']);
+        $resolvedUnitPrice = $basePrice !== null
+            ? (float) $basePrice
+            : (float) $data['jobProductUnitPrice'];
 
         app(AddOrderItem::class)->handle(
             $job,
@@ -358,7 +559,7 @@ trait ManagesOrderProducts
             (string) $product->name,
             (int) $data['jobProductQuantity'],
             $user,
-            (float) $data['jobProductUnitPrice'],
+            $resolvedUnitPrice,
             (int) $data['jobProductSelectedId'],
             $supplierId,
         );

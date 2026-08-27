@@ -15,6 +15,7 @@
 
 @if($catalogReady && $canUseOrderProductSelector)
     <x-catalog.create-product-quantity
+        context="order"
         :rows="$jobItems"
         rows-property="jobItems"
         remove-method="removeProductRow"
@@ -23,16 +24,14 @@
         required-error-field="jobItems"
         :active-product-count="$activeProductCount"
         :product-search-results="$productSearchResults"
+        :product-search-suppliers="$productSearchSuppliers"
         :product-result-total="$productResultTotal"
         :create-product-search="$createProductSearch"
-        :create-product-category-filter="$createProductCategoryFilter"
         :create-product-show-all-results="$createProductShowAllResults"
-        :product-categories="$productCategories"
         :selected-product-details="$selectedProductDetails"
         :selected-product-suppliers="$selectedProductSuppliers"
         :supplier-skipped-product-ids="$createOrderSupplierSkipProductIds"
         :supplier-required="true"
-        :can-view-product-categories="$canViewProductCategories"
         :can-create-catalog-product="$canCreateCatalogProduct"
         wire-key="create-order-products-ready"
         row-key-prefix="selected-order-product"

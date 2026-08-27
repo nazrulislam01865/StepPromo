@@ -201,12 +201,71 @@
                             </td>
 
                             <td class="ft-cancelled-action-cell">
-                                <details class="ft-cancelled-row-menu">
-                                    <summary aria-label="Cancelled order actions">•••</summary>
-                                    <div>
-                                        <a href="{{ $row['open_url'] }}" wire:navigate>Open order</a>
-                                    </div>
-                                </details>
+                                <div
+                                    class="ft-cancelled-row-menu"
+                                    x-data="{
+                                        open: false,
+                                        top: 0,
+                                        left: 0,
+                                        toggle() {
+                                            if (this.open) {
+                                                this.open = false;
+                                                return;
+                                            }
+
+                                            const trigger = this.$refs.trigger;
+                                            if (!trigger) return;
+
+                                            const rect = trigger.getBoundingClientRect();
+                                            const menuWidth = 148;
+                                            const menuHeight = 44;
+                                            const gap = 6;
+                                            const edge = 12;
+
+                                            this.left = Math.max(
+                                                edge,
+                                                Math.min(window.innerWidth - menuWidth - edge, rect.right - menuWidth)
+                                            );
+
+                                            this.top = window.innerHeight - rect.bottom >= menuHeight + gap + edge
+                                                ? rect.bottom + gap
+                                                : Math.max(edge, rect.top - menuHeight - gap);
+
+                                            this.open = true;
+                                        }
+                                    }"
+                                    x-on:keydown.escape.window="open = false"
+                                    x-on:resize.window="open = false"
+                                    x-on:scroll.window="open = false"
+                                >
+                                    <button
+                                        x-ref="trigger"
+                                        type="button"
+                                        class="ft-cancelled-row-menu-trigger"
+                                        aria-label="Cancelled order actions"
+                                        aria-haspopup="menu"
+                                        x-bind:aria-expanded="open ? 'true' : 'false'"
+                                        x-on:click.stop="toggle()"
+                                    >
+                                        <span aria-hidden="true">•••</span>
+                                    </button>
+
+                                    <template x-teleport="body">
+                                        <div
+                                            x-cloak
+                                            x-show="open"
+                                            x-transition.opacity.duration.120ms
+                                            class="ft-cancelled-row-menu-popover"
+                                            role="menu"
+                                            x-bind:style="`top: ${top}px; left: ${left}px;`"
+                                            x-on:click.outside="open = false"
+                                        >
+                                            <a href="{{ $row['open_url'] }}" wire:navigate role="menuitem" x-on:click="open = false">
+                                                Open order
+                                            </a>
+                                        </div>
+                                    </template>
+                                </div>
                             </td>
                         </tr>
                     @empty

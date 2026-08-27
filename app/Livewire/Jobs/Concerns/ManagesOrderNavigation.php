@@ -23,7 +23,6 @@ trait ManagesOrderNavigation
 
     public function updatedPhase(): void { $this->resetJobSelection(); }
 
-    public function updatedHealth(): void { $this->resetJobSelection(); }
 
     public function updatedClient(): void { $this->resetJobSelection(); }
 
@@ -43,14 +42,14 @@ trait ManagesOrderNavigation
 
     public function clearFilters(): void
     {
-        $this->reset(['search','phase','health','client','owner','assignee','delivery','invoice','priorityFilter','jobStatusFilter']);
+        $this->reset(['search','phase','client','owner','assignee','delivery','invoice','priorityFilter','jobStatusFilter']);
         $this->sort = 'updated_desc';
         $this->resetJobSelection();
     }
 
     public function clearFilter(string $filter): void
     {
-        $allowed = ['search','phase','health','client','owner','assignee','delivery','invoice','priorityFilter','jobStatusFilter'];
+        $allowed = ['search','phase','client','owner','assignee','delivery','invoice','priorityFilter','jobStatusFilter'];
         abort_unless(in_array($filter, $allowed, true), 422);
         $this->{$filter} = '';
         $this->resetJobSelection();
@@ -99,6 +98,8 @@ trait ManagesOrderNavigation
     {
         $this->selectedJobId = $id;
         $this->selectedTaskId = null;
+        $this->resetOrderDetailProgressiveSections();
+        $this->resetTaskDetailProgressiveSections();
         $this->focusComment = null;
         $this->taskEditMode = false;
         $this->detailTab = 'overview';
@@ -142,6 +143,8 @@ trait ManagesOrderNavigation
     {
         $this->selectedJobId = null;
         $this->selectedTaskId = null;
+        $this->resetOrderDetailProgressiveSections();
+        $this->resetTaskDetailProgressiveSections();
         $this->focusComment = null;
         $this->taskEditMode = false;
         $this->expandedPhaseIds = [];

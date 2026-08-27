@@ -164,12 +164,11 @@ class MasterRecord extends Model
     }
 
     /**
-     * Supplier configured on the Product master record.
+     * Default supplier configured on the Product master record.
      *
-     * The supplier stays in Product metadata so the catalogue remains on the
-     * shared master_records table without introducing a product-only column.
-     * Older imports may use default_supplier_id, so keep that as a read-only
-     * compatibility fallback while supplier_id is the canonical key.
+     * Products can be linked to multiple suppliers through metadata.supplier_ids.
+     * supplier_id remains the explicit default used by Create Order/Inquiry, while
+     * default_supplier_id is retained as a legacy read fallback only.
      */
     public function productSupplierId(): ?int
     {
@@ -182,6 +181,45 @@ class MasterRecord extends Model
         );
 
         return $id > 0 ? $id : null;
+    }
+
+    /** @return array<int,int> */
+    public function productSupplierIds(): array
+    {
+        if ($this->type !== 'product') return [];
+
+        $raw = data_get($this->metadata, 'supplier_ids', []);
+
+        // Be tolerant of older/imported records where the nested supplier list
+        // was stored as a JSON string or a comma/space separated scalar instead
+        // of a decoded JSON array. This keeps supplier counts and filters truthful
+        // without requiring a database migration just to read existing links.
+        if (is_string($raw)) {
+            $trimmed = trim($raw);
+            $decoded = $trimmed !== '' ? json_decode($trimmed, true) : null;
+            $raw = is_array($decoded)
+                ? $decoded
+                : (preg_split('/[\s,;|]+/', $trimmed, -1, PREG_SPLIT_NO_EMPTY) ?: []);
+        } elseif (is_int($raw) || is_float($raw)) {
+            $raw = [$raw];
+        } elseif (! is_array($raw)) {
+            $raw = [];
+        }
+
+        $linked = collect($raw)
+            ->flatten()
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0);
+
+        $defaultId = $this->productSupplierId();
+        if ($defaultId) $linked->prepend($defaultId);
+
+        return $linked->unique()->values()->all();
+    }
+
+    public function hasProductSupplier(int $supplierId): bool
+    {
+        return $supplierId > 0 && in_array($supplierId, $this->productSupplierIds(), true);
     }
 
     /** @return array<int, array{quantity:int, price:float}> */

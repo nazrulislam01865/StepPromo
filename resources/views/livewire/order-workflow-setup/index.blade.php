@@ -1,4 +1,4 @@
-<div class="ft-order-workflow-page">
+<div class="ft-order-workflow-page" data-ft-feedback-scope="form">
     <header class="ft-order-workflow-page-head">
         <div>
             <div class="ft-order-workflow-breadcrumb">Administration / Order Workflow Setup</div>

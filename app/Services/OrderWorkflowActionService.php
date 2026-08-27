@@ -92,7 +92,7 @@ class OrderWorkflowActionService
 
         $interaction = match (true) {
             in_array($key, self::DOCUMENT_ACTIONS, true) => 'document',
-            in_array($key, ['NEW_SEND_PO_ARTWORK', 'PROD_START', 'PROD_FINISH', 'QC_APPROVE_SHIPMENT'], true) => 'direct',
+            in_array($key, ['PROD_START', 'PROD_FINISH', 'QC_APPROVE_SHIPMENT'], true) => 'direct',
             $key === 'SHIP_LABEL' && ! str_contains($status, 'label generated') => 'direct',
             default => 'modal',
         };
@@ -106,6 +106,12 @@ class OrderWorkflowActionService
         $status = strtolower(trim((string) $task->status));
 
         return match ($key) {
+            'NEW_SEND_PO_ARTWORK' => [
+                'variant' => 'purchase_order_email',
+                'title' => 'Send Purchase Order to Artwork Team',
+                'copy' => 'Review the destination team and uploaded Purchase Order before sending.',
+                'choices' => ['confirm' => 'Send Purchase Order'],
+            ],
             'ART_INTERNAL_REVIEW' => [
                 'variant' => 'artwork_review',
                 'title' => 'Review Artwork',
@@ -526,6 +532,14 @@ class OrderWorkflowActionService
                 return $this->complete($locked, $actor);
             }
 
+            if (in_array($key, ['NEW_SEND_PO_ARTWORK', 'ART_SEND_ORDER_TEAM'], true)) {
+                abort_unless($decision === 'confirm', 422, 'Confirm the email handoff before sending.');
+
+                app(\App\Services\Orders\OrderWorkflowEmailService::class)->send($locked, $actor);
+
+                return $this->complete($locked, $actor);
+            }
+
             if ($key === 'PAY_PROCESS') {
                 $this->validatePayment($payload);
                 $amount = (float) $payload['payment_amount'];
@@ -549,8 +563,9 @@ class OrderWorkflowActionService
                 return $this->complete($locked, $actor);
             }
 
-            // Client approved with no sample, direct handoffs and normal task
-            // confirmations all finish the task through the common lifecycle.
+            // Client approved with no sample and normal task confirmations
+            // finish through the common lifecycle. Email handoffs are handled
+            // above so a task cannot complete unless delivery is accepted.
             return $this->complete($locked, $actor);
         }, 3);
     }

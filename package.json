@@ -35,7 +35,8 @@
         "quality:phase15": "npm run quality:phase14 && php scripts/quality/final-security-review.php && php scripts/quality/phase15-release-hardening.php",
         "release:manifest": "php scripts/release/release-manifest.php",
         "quality:theme": "npm run quality:phase15 && php scripts/quality/theme-package.php && php scripts/quality/theme-coverage.php",
-        "quality:css-modularization": "php scripts/quality/css-modularization.php"
+        "quality:css-modularization": "php scripts/quality/css-modularization.php",
+        "quality:page-loading": "php scripts/quality/progressive-page-loading.php"
     },
     "devDependencies": {
         "laravel-vite-plugin": "^3.1",

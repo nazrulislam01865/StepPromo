@@ -29,12 +29,14 @@ class Form extends Component
     public string $workflowAppliesTo = 'orders';
     public string $clientAvailability = 'all';
     public array $selectedClientIds = [];
+    public bool $sourceOptionsReady = false;
 
     public function mount(?int $workflowId = null, ?int $sourceWorkflowId = null): void
     {
         $service = app(WorkflowService::class);
         $this->workflowId = $workflowId;
         $this->sourceWorkflowId = $sourceWorkflowId;
+        $this->sourceOptionsReady = (bool) $sourceWorkflowId;
 
         if ($workflowId) {
             $workflow = WorkflowTemplate::query()
@@ -61,6 +63,18 @@ class Form extends Component
                 $this->workflowAppliesTo = (string) $source->applies_to;
             }
         }
+    }
+
+    public function loadCreateSection(string $section): void
+    {
+        abort_unless(! $this->workflowId, 422);
+
+        if ($section === 'source-workflows') {
+            $this->sourceOptionsReady = true;
+            return;
+        }
+
+        abort(422, 'Unknown Create Workflow section.');
     }
 
     public function save(): void
@@ -167,9 +181,11 @@ class Form extends Component
         }
 
         return view('livewire.workflow-setup.form', [
-            'workflows' => app(WorkflowService::class)->all()
-                ->where('applies_to', $this->workflowAppliesTo)
-                ->when($this->workflowId, fn ($rows) => $rows->where('id', '!=', $this->workflowId)),
+            'workflows' => $this->sourceOptionsReady
+                ? app(WorkflowService::class)->all()
+                    ->where('applies_to', $this->workflowAppliesTo)
+                    ->when($this->workflowId, fn ($rows) => $rows->where('id', '!=', $this->workflowId))
+                : collect(),
             'clientOptions' => $clientOptions,
         ]);
     }

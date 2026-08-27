@@ -1,6 +1,6 @@
 import { CONNECTION_STATES, LIVEWIRE_EVENTS, REALTIME_EVENTS } from '../core/events.js';
 import { metaContent } from '../core/meta.js';
-import { setMyWorkCount, setNotificationUnreadCount } from '../components/sidebar-counters.js';
+import { setCancelledOrderCount, setMyWorkCount, setNotificationUnreadCount } from '../components/sidebar-counters.js';
 
 const state = {
     version: null,
@@ -34,6 +34,7 @@ export const syncWorkspaceState = async ({ dispatchOnVersionChange = true } = {}
         const data = await response.json();
         setNotificationUnreadCount(data?.count ?? 0);
         setMyWorkCount(data?.my_work_count ?? 0);
+        setCancelledOrderCount(data?.cancelled_order_count ?? 0);
 
         const nextVersion = String(data?.data_version ?? '1');
         if (state.version === null) {

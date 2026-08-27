@@ -32,7 +32,7 @@ class FilterOptionController
             && $search === ''
             && $requestedPerPage <= 0
             && (
-                in_array($type, ['clients', 'jobs', 'users', 'workflows', 'priorities', 'task-statuses', 'document-categories', 'document-category-records', 'department-records', 'departments', 'suppliers', 'countries', 'phone-country-codes', 'job-statuses', 'job-healths', 'phases'], true)
+                in_array($type, ['clients', 'jobs', 'users', 'workflows', 'priorities', 'task-statuses', 'document-categories', 'document-category-records', 'department-records', 'departments', 'suppliers', 'countries', 'phone-country-codes', 'job-statuses', 'phases'], true)
                 || (in_array($context, ['job-detail', 'create-inquiry'], true) && in_array($type, ['product-categories', 'products'], true))
             );
         $perPage = $requestedPerPage > 0

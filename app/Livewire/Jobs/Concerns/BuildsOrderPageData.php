@@ -93,6 +93,7 @@ trait BuildsOrderPageData
         $productSearchResults = collect();
         $selectedProductDetails = collect();
         $selectedProductSuppliers = collect();
+        $productSearchSuppliers = collect();
         $activeProductCount = 0;
         $productResultTotal = 0;
 
@@ -121,13 +122,14 @@ trait BuildsOrderPageData
             // With a small catalogue, show every Product record immediately so the
             // selector cannot be mistaken for a category suggestion list. Large
             // catalogues keep the prototype's Top matches + View all behaviour.
-            $resultLimit = $this->createProductShowAllResults || $productResultTotal <= 20 ? 20 : 3;
+            $resultLimit = $this->createProductShowAllResults ? 100 : 3;
             $productSearchResults = $catalog->searchForOrderCreation($search, $categoryFilterId ?: null, $resultLimit);
+            $productSearchSuppliers = $catalog->suppliersForProducts($productSearchResults->keyBy('id'));
 
             $selectedProductDetails = $catalog->selectedProducts(
                 collect($this->jobItems)->pluck('product_id')
             );
-            $selectedProductSuppliers = $catalog->suppliersForProducts($selectedProductDetails);
+            $selectedProductSuppliers = $catalog->suppliersForSelectionRows($this->jobItems);
         }
 
         $duplicateProduct = null;
@@ -260,6 +262,7 @@ trait BuildsOrderPageData
                 : collect(),
             'productCategories' => $productCategories,
             'productSearchResults' => $productSearchResults,
+            'productSearchSuppliers' => $productSearchSuppliers,
             'selectedProductDetails' => $selectedProductDetails,
             'selectedProductSuppliers' => $selectedProductSuppliers,
             'activeProductCount' => $activeProductCount,
@@ -283,18 +286,48 @@ trait BuildsOrderPageData
     {
         app(\App\Services\OrderTaskFlagService::class)->syncDueTransitions();
         $master = app(MasterDataService::class);
-        $task = app(TaskService::class)->visibleQuery($user)->with([
+
+        // If an interaction forces a lazy section to hydrate, promote that
+        // readiness into component state. Otherwise closing a modal / finishing
+        // an upload can make the section disappear back into a skeleton until a
+        // second IntersectionObserver request fires.
+        if ($this->showTaskDocumentPicker || count($this->taskDocumentUploads) > 0) {
+            $this->taskDetailSectionsReady['attachments'] = true;
+        }
+        if (filled($this->focusComment) || $this->taskActivityTab !== 'all' || $this->taskActivityPage > 1) {
+            $this->taskDetailSectionsReady['activity'] = true;
+        }
+
+        $taskDetailSectionsReady = $this->taskDetailSectionsReady;
+
+        $with = [
             'job.client:id,name,logo_path',
             'job.orderFlag:id,type,name,color,status,sort_order,metadata',
-            'job.tasks' => fn ($query) => app(AccessControlService::class)
-                ->applyTaskScope($query, $user)
-                ->select(['tasks.id', 'tasks.flow_job_id', 'tasks.workflow_phase_id', 'tasks.title'])
-                ->orderBy('tasks.id'),
-            'assignee', 'phase', 'orderTaskStatus:id,type,name,color,status,sort_order,metadata', 'orderTaskFlag:id,type,name,color,status,sort_order,metadata', 'documentCategory', 'setupTemplate.documentCategory',
-            'checklistItems', 'comments.user', 'documents.uploader:id,name', 'links.creator:id,name', 'activities.user',
-        ])->findOrFail($this->selectedTaskId);
+            'assignee',
+            'phase',
+            'orderTaskStatus:id,type,name,color,status,sort_order,metadata',
+            'orderTaskFlag:id,type,name,color,status,sort_order,metadata',
+            'documentCategory',
+            'setupTemplate.documentCategory',
+        ];
 
-        $availableDocuments = $this->showTaskDocumentPicker
+        if ($taskDetailSectionsReady['checklist']) {
+            $with[] = 'checklistItems';
+        }
+        if ($taskDetailSectionsReady['attachments']) {
+            $with[] = 'documents.uploader:id,name';
+            $with[] = 'links.creator:id,name';
+        }
+        if ($taskDetailSectionsReady['activity']) {
+            $with[] = 'comments.user';
+            $with[] = 'activities.user';
+        }
+
+        $task = app(TaskService::class)->visibleQuery($user)
+            ->with($with)
+            ->findOrFail($this->selectedTaskId);
+
+        $availableDocuments = $taskDetailSectionsReady['attachments'] && $this->showTaskDocumentPicker
             ? app(DocumentService::class)
                 ->query($user, ['client' => $task->job?->client_id])
                 ->with(['job:id,job_number', 'task:id,title'])
@@ -312,6 +345,7 @@ trait BuildsOrderPageData
             'displayTimezone' => app(WorkspaceSettingsService::class)->displayTimezone(),
             'availableDocuments' => $availableDocuments,
             'mentionUsers' => app(\App\Services\MentionService::class)->optionsForTask($task, $user),
+            'taskDetailSectionsReady' => $taskDetailSectionsReady,
         ];
     }
 
@@ -336,21 +370,56 @@ trait BuildsOrderPageData
             }
         }
 
-        $orderQuery->loadTab($selected, $user, $this->detailTab);
+        if ($this->detailTab === 'overview') {
+            // Promote any interaction-forced section into persistent readiness.
+            // This keeps the Order detail DOM stable after modals/forms close
+            // instead of swapping a real section back to a skeleton.
+            if ($this->showAddJobProductForm || $this->showEditOrderProductModal) {
+                $this->orderDetailSectionsReady['products'] = true;
+            }
+            if ($this->showOverviewTaskDocumentModal || $this->showOrderWorkflowActionModal || $this->showAddOrderTaskForm) {
+                $this->orderDetailSectionsReady['workflow'] = true;
+            }
+            if (filled($this->focusComment) || $this->jobActivityTab !== 'all' || $this->jobActivityPage > 1) {
+                $this->orderDetailSectionsReady['activity'] = true;
+            }
+        }
+
+        $orderDetailSectionsReady = $this->orderDetailSectionsReady;
 
         if ($this->detailTab === 'overview') {
-            $phaseIds = $selected->workflow?->phases?->pluck('id')->map(fn ($id) => (int) $id) ?? collect();
+            // Keep the page shell immediately usable, but hydrate expensive
+            // lower sections only when their viewport placeholder is reached.
+            $orderQuery->loadOverviewSummary($selected, $user);
+            if ($orderDetailSectionsReady['products']) {
+                $orderQuery->loadOverviewProducts($selected, $user);
+            }
+            if ($orderDetailSectionsReady['workflow']) {
+                $orderQuery->loadOverviewWorkflow($selected, $user);
+            }
+            if ($orderDetailSectionsReady['attachments']) {
+                $orderQuery->loadOverviewDocuments($selected);
+            }
+            if ($orderDetailSectionsReady['activity']) {
+                $orderQuery->loadOverviewActivity(
+                    $selected,
+                    $this->jobActivityTab,
+                    $this->jobActivityPage,
+                    10,
+                );
+            }
+
             $selectedPhase = $selected->workflow?->phases?->firstWhere('id', (int) ($this->overviewPhaseId ?: 0));
             if (!$selectedPhase || (int) $selectedPhase->sequence > (int) ($selected->phase?->sequence ?? 0)) {
                 $this->overviewPhaseId = (int) $selected->workflow_phase_id;
             }
+        } else {
+            $orderQuery->loadTab($selected, $user, $this->detailTab);
         }
 
-        // The prototype keeps the normal Order Activity section underneath the
-        // Redo detail cards. Reuse the same paginated activity loader for both
-        // Overview and Redo so All / Comments / History remain identical and
-        // we do not create a second activity/audit implementation.
-        if (in_array($this->detailTab, ['overview', 'redo'], true)) {
+        // Redo is an explicitly selected tab, so its activity is intentional
+        // work and may load immediately. Overview activity stays viewport-lazy.
+        if ($this->detailTab === 'redo') {
             $orderQuery->loadOverviewActivity(
                 $selected,
                 $this->jobActivityTab,
@@ -428,16 +497,51 @@ trait BuildsOrderPageData
         }
 
         $jobProductSearchResults = collect();
+        $jobProductSearchSuppliers = collect();
         $jobProductResultTotal = 0;
         $jobProductSelectedProduct = null;
-        if ($this->detailTab === 'overview' && $this->showAddJobProductForm) {
+        $jobProductSelectedSupplier = null;
+        if ($this->detailTab === 'overview' && $orderDetailSectionsReady['products'] && $this->showAddJobProductForm) {
             $catalog = app(\App\Services\ProductCatalogService::class);
             $productSearch = trim($this->jobProductSearch);
             $jobProductResultTotal = $catalog->orderSearchCount($productSearch, null);
             $resultLimit = $this->jobProductShowAllResults || $jobProductResultTotal <= 20 ? 20 : 3;
             $jobProductSearchResults = $catalog->searchForOrderCreation($productSearch, null, $resultLimit);
+            $jobProductSearchSuppliers = $catalog->suppliersForProducts($jobProductSearchResults->keyBy('id'));
             if ($this->jobProductSelectedId) {
                 $jobProductSelectedProduct = $catalog->selectedProducts([$this->jobProductSelectedId])->first();
+                $jobProductSelectedSupplier = $jobProductSelectedProduct
+                    ? $catalog->supplierForProduct($jobProductSelectedProduct)
+                    : null;
+            }
+        }
+
+        $editOrderProductSearchResults = collect();
+        $editOrderProductSearchSuppliers = collect();
+        $editOrderProductResultTotal = 0;
+        $editOrderProductSelectedProduct = null;
+        $editOrderProductSelectedSupplier = null;
+        if (
+            $this->detailTab === 'overview'
+            && $orderDetailSectionsReady['products']
+            && $this->showEditOrderProductModal
+            && $this->editOrderProductItemId
+        ) {
+            $catalog = app(\App\Services\ProductCatalogService::class);
+            $productSearch = trim($this->editOrderProductSearch);
+            $editOrderProductResultTotal = $catalog->orderSearchCount($productSearch, null);
+            $resultLimit = $this->editOrderProductShowAllResults || $editOrderProductResultTotal <= 20 ? 20 : 3;
+            $editOrderProductSearchResults = $catalog->searchForOrderCreation($productSearch, null, $resultLimit);
+            $editOrderProductSearchSuppliers = $catalog->suppliersForProducts($editOrderProductSearchResults->keyBy('id'));
+            if ($this->editOrderProductSelectedId) {
+                $editOrderProductSelectedProduct = $catalog->selectedProducts([$this->editOrderProductSelectedId])->first();
+            }
+            if ($this->editOrderProductSupplierId) {
+                $editOrderProductSelectedSupplier = \App\Models\MasterRecord::query()
+                    ->forWorkspace(app(\App\Services\MasterDataService::class)->workspaceId())
+                    ->ofType('supplier')
+                    ->active()
+                    ->find((int) $this->editOrderProductSupplierId, ['id', 'name', 'code', 'status']);
             }
         }
 
@@ -450,14 +554,15 @@ trait BuildsOrderPageData
         return [
             'selectedJob' => $selected,
             'selectedTask' => null,
-            'taskStatuses' => $this->detailTab === 'overview' ? $this->taskStatusOptions($master) : collect(),
-            'users' => $this->detailTab === 'overview' ? $this->userOptions($user) : collect(),
-            'priorities' => $this->detailTab === 'overview' ? $master->active('priority') : collect(),
+            'taskStatuses' => $this->detailTab === 'overview' && $orderDetailSectionsReady['workflow'] ? $this->taskStatusOptions($master) : collect(),
+            'users' => $this->detailTab === 'overview' && $orderDetailSectionsReady['workflow'] ? $this->userOptions($user) : collect(),
+            'priorities' => $this->detailTab === 'overview' && $orderDetailSectionsReady['workflow'] ? $master->active('priority') : collect(),
             'shipmentUrgencyOptions' => $shipmentUrgencyOptions,
             'orderDetailContext' => $orderDetailContext,
             'orderRedoContext' => $orderRedoContext,
             'orderRedoForm' => $orderRedoForm,
             'overviewPhaseId' => $this->overviewPhaseId,
+            'orderDetailSectionsReady' => $orderDetailSectionsReady,
             // Product/category options on Job Details are loaded remotely only
             // when an inline dropdown opens, avoiding full catalog payloads.
             'products' => collect(),
@@ -465,7 +570,6 @@ trait BuildsOrderPageData
             'availableDocuments' => $availableDocuments,
             'overviewTaskDocumentModalTask' => $overviewTaskDocumentModalTask,
             'overviewTaskAvailableDocuments' => $overviewTaskAvailableDocuments,
-            'healthOptions' => collect(),
             'mentionUsers' => app(\App\Services\MentionService::class)->optionsForJob($selected, $user),
             'inquiryResults' => $inquiryResults,
             'selectedLinkInquiry' => $selectedLinkInquiry,
@@ -483,8 +587,15 @@ trait BuildsOrderPageData
             'canEditFinance' => $canEditFinance,
             'canViewFinance' => app(AccessControlService::class)->can($user, 'finance', 'view'),
             'jobProductSearchResults' => $jobProductSearchResults,
+            'jobProductSearchSuppliers' => $jobProductSearchSuppliers,
             'jobProductResultTotal' => $jobProductResultTotal,
             'jobProductSelectedProduct' => $jobProductSelectedProduct,
+            'jobProductSelectedSupplier' => $jobProductSelectedSupplier,
+            'editOrderProductSearchResults' => $editOrderProductSearchResults,
+            'editOrderProductSearchSuppliers' => $editOrderProductSearchSuppliers,
+            'editOrderProductResultTotal' => $editOrderProductResultTotal,
+            'editOrderProductSelectedProduct' => $editOrderProductSelectedProduct,
+            'editOrderProductSelectedSupplier' => $editOrderProductSelectedSupplier,
         ];
     }
 
@@ -539,17 +650,11 @@ trait BuildsOrderPageData
         ));
     }
 
-    private function healthOptions()
-    {
-        return collect(['On Track', 'At Risk', 'Delayed', 'Blocked', 'Completed']);
-    }
-
     private function jobFilters(): array
     {
         return [
             'search' => $this->search,
             'phase' => $this->phase,
-            'health' => $this->health,
             'client' => $this->client,
             'owner' => $this->owner,
             'assignee' => $this->assignee,

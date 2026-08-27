@@ -122,6 +122,86 @@
     white-space: nowrap
 }
 
+
+/* Workflow preview control and preview cards. The component is shared by
+   Create Inquiry and Create Order, so keep the responsive behavior here. */
+.ft-create-workflow-preview-toggle {
+    display: inline-flex;
+    min-height: 30px;
+    align-items: center;
+    justify-content: center;
+    justify-self: end;
+    padding: 0 10px;
+    border: 1px solid #d5dfec;
+    border-radius: 7px;
+    background: #fff;
+    color: #405675;
+    font-size: .625rem;
+    font-weight: 800;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer
+}
+
+.ft-create-workflow-preview-toggle:hover {
+    border-color: var(--ft-theme-primary-300);
+    background: var(--ft-theme-primary-soft);
+    color: var(--ft-theme-primary)
+}
+
+.ft-create-workflow-preview-toggle:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--ft-theme-primary) 24%, transparent);
+    outline-offset: 2px
+}
+
+.ft-create-workflow-preview {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 8px;
+    padding: 10px;
+    border-top: 1px solid var(--ft-theme-primary-100);
+    background: #fff
+}
+
+.ft-create-workflow-stage {
+    min-width: 0;
+    padding: 9px 10px;
+    border: 1px solid color-mix(in srgb, var(--ft-workflow-stage, var(--ft-theme-primary)) 34%, #dbe4ef);
+    border-left: 3px solid var(--ft-workflow-stage, var(--ft-theme-primary));
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--ft-workflow-stage, var(--ft-theme-primary)) 6%, #fff)
+}
+
+.ft-create-workflow-stage small,
+.ft-create-workflow-stage strong,
+.ft-create-workflow-stage span {
+    display: block;
+    min-width: 0
+}
+
+.ft-create-workflow-stage small {
+    color: #718198;
+    font-size: .5625rem;
+    font-weight: 750;
+    text-transform: uppercase
+}
+
+.ft-create-workflow-stage strong {
+    overflow: hidden;
+    margin-top: 2px;
+    color: #23344d;
+    font-size: .6875rem;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap
+}
+
+.ft-create-workflow-stage span {
+    margin-top: 2px;
+    color: #7a899d;
+    font-size: .5625rem
+}
+
 .ft-create-workflow-chevron {
     color: #536987;
     font-size: .6875rem;
@@ -253,34 +333,98 @@
 }
 
 @media(max-width:900px) {
+    /* Four children live inside the selected workflow row (icon, copy,
+       preview, chevron). The previous 3-column rule forced the preview into
+       an 18px track and pushed the chevron onto a second row. Give preview
+       its own row instead so nothing can overflow. */
     .ft-create-workflow-selected {
-        grid-template-columns: 40px minmax(0, 1fr) 18px
+        grid-template-columns: 40px minmax(0, 1fr) 18px;
+        grid-template-rows: auto auto;
+        gap: 5px 10px
     }
 
+    .ft-create-workflow-icon {
+        grid-column: 1;
+        grid-row: 1 / span 2;
+        align-self: center
+    }
+
+    .ft-create-workflow-copy {
+        grid-column: 2;
+        grid-row: 1
+    }
+
+    .ft-create-workflow-preview-toggle,
     .ft-create-workflow-selected>.ft-workflow-preview-muted {
-        grid-column: 2/3;
+        grid-column: 2;
+        grid-row: 2;
         justify-self: start
+    }
+
+    .ft-create-workflow-chevron {
+        grid-column: 3;
+        grid-row: 1 / span 2;
+        align-self: center;
+        justify-self: end
     }
 }
 
 @media(max-width:640px) {
     .ft-create-workflow-heading {
-        align-items: flex-start;
-        flex-wrap: wrap
+        display: grid;
+        grid-template-columns: 24px minmax(0, 1fr);
+        gap: 5px 8px;
+        align-items: center
+    }
+
+    .ft-create-workflow-heading h2 {
+        min-width: 0;
+        overflow-wrap: anywhere
     }
 
     .ft-create-workflow-heading em {
-        margin-left: 32px
+        grid-column: 2;
+        justify-self: start;
+        margin-left: 0;
+        white-space: normal
     }
 
     .ft-create-workflow-selected {
         grid-template-columns: 36px minmax(0, 1fr) 18px;
-        gap: 8px
+        gap: 5px 8px;
+        padding: 10px
     }
 
     .ft-create-workflow-icon {
         width: 32px;
         height: 32px
+    }
+
+    .ft-create-workflow-copy strong {
+        overflow: visible;
+        line-height: 1.25;
+        text-overflow: clip;
+        white-space: normal;
+        overflow-wrap: anywhere
+    }
+
+    .ft-create-workflow-copy>span {
+        line-height: 1.35
+    }
+
+    .ft-create-workflow-preview-toggle {
+        min-height: 28px;
+        padding: 0 8px
+    }
+
+    .ft-create-workflow-preview {
+        grid-template-columns: 1fr;
+        padding: 8px
+    }
+
+    .ft-create-workflow-stage strong {
+        white-space: normal;
+        overflow-wrap: anywhere
     }
 
     .ft-create-workflow-start-phase {
@@ -289,6 +433,24 @@
 
     .ft-create-workflow-start-phase small {
         grid-column: 1
+    }
+
+    .ft-create-workflow-footnote {
+        line-height: 1.45
+    }
+}
+
+@media(max-width:420px) {
+    .ft-create-workflow-selected {
+        grid-template-columns: 32px minmax(0, 1fr) 16px;
+        gap: 5px 7px;
+        padding: 9px
+    }
+
+    .ft-create-workflow-icon {
+        width: 29px;
+        height: 29px;
+        font-size: .75rem
     }
 }
 

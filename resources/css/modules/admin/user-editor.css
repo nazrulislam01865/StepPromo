@@ -325,7 +325,7 @@
     gap: 6px
 }
 
-.ft-user-editor .field label {
+.ft-user-editor .field > label {
     display: flex;
     justify-content: space-between;
     gap: 8px;
@@ -335,7 +335,7 @@
     font-weight: 750
 }
 
-.ft-user-editor .field label span {
+.ft-user-editor .field > label span {
     color: #8a96a7;
     font-size: .5625rem;
     font-weight: 500
@@ -366,6 +366,52 @@
     cursor: not-allowed;
     background: #f7f9fc;
     color: #64738a
+}
+
+
+/* Keep nested reusable selectors aligned with the direct User Editor fields. */
+.ft-user-editor .field > .ft-search-select > label {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 4px;
+    min-height: 17px;
+    margin: 0 0 6px;
+    color: #273349;
+    font-size: .6875rem;
+    font-weight: 750;
+    line-height: 1.25
+}
+
+.ft-user-editor .field > .ft-search-select > label .ft-filter-required {
+    margin: 0;
+    color: #273349;
+    font-style: normal;
+    font-size: inherit;
+    line-height: inherit
+}
+
+.ft-user-editor .field > .ft-search-select .ft-search-select__trigger {
+    width: 100%;
+    height: 42px;
+    min-height: 42px;
+    padding: 0 12px;
+    border: 1px solid #ced9e7;
+    border-radius: 9px;
+    background: #fff;
+    color: #172033;
+    font-size: .75rem
+}
+
+.ft-user-editor .field > .ft-search-select.is-disabled .ft-search-select__trigger,
+.ft-user-editor .field > .ft-search-select .ft-search-select__trigger:disabled {
+    cursor: not-allowed;
+    background: #f7f9fc;
+    color: #64738a
+}
+
+.ft-user-editor .ft-user-editor-fields {
+    align-items: start
 }
 
 .ft-user-editor .field small {

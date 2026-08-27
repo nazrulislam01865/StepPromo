@@ -29,7 +29,20 @@ trait ManagesClientCreation
     public function closeCreate(): void
     {
         $this->showCreate = false;
+        $this->createAddressOptionsReady = false;
         $this->resetValidation();
+    }
+
+    public function loadCreateSection(string $section): void
+    {
+        abort_unless($this->showCreate, 422);
+
+        if ($section === 'addresses') {
+            $this->createAddressOptionsReady = true;
+            return;
+        }
+
+        abort(422, 'Unknown Create Client section.');
     }
 
     public function createClient(): void
@@ -83,7 +96,9 @@ trait ManagesClientCreation
         $this->billingCountry = $defaultCountry; $this->contactName = ''; $this->contactJobTitle = ''; $this->email = ''; $this->phone = ''; $this->contacts = [$this->blankContact()];
         $this->accountManagerId = auth()->id(); $this->preferredLanguage = 'English'; $this->outstandingBalance = '0'; $this->einTaxId = '';
         $this->salesTaxStatus = 'taxable'; $this->paymentTerms = ''; $this->poRequired = false; $this->notes = '';
-        $this->shippingAddresses = [$this->blankShippingAddress(false)]; $this->resetValidation();
+        $this->shippingAddresses = [$this->blankShippingAddress(false)];
+        $this->createAddressOptionsReady = false;
+        $this->resetValidation();
     }
 
     private function nextClientCode(): string

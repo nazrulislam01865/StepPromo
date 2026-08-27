@@ -70,6 +70,26 @@ final class OrderReadService
         return $this->legacy->loadVisibleDetailTab(...$arguments);
     }
 
+    public function loadVisibleOverviewSummary(mixed ...$arguments): mixed
+    {
+        return $this->legacy->loadVisibleOverviewSummary(...$arguments);
+    }
+
+    public function loadVisibleOverviewProducts(mixed ...$arguments): mixed
+    {
+        return $this->legacy->loadVisibleOverviewProducts(...$arguments);
+    }
+
+    public function loadVisibleOverviewWorkflow(mixed ...$arguments): mixed
+    {
+        return $this->legacy->loadVisibleOverviewWorkflow(...$arguments);
+    }
+
+    public function loadVisibleOverviewDocuments(mixed ...$arguments): mixed
+    {
+        return $this->legacy->loadVisibleOverviewDocuments(...$arguments);
+    }
+
     public function loadVisibleOverviewActivity(mixed ...$arguments): mixed
     {
         return $this->legacy->loadVisibleOverviewActivity(...$arguments);

@@ -194,7 +194,7 @@ class OrderListPrototypeService
             ->select([
                 'flow_jobs.id', 'flow_jobs.job_number', 'flow_jobs.order_number', 'flow_jobs.client_id',
                 'flow_jobs.workflow_phase_id', 'flow_jobs.source_workflow_phase_id', 'flow_jobs.owner_id',
-                'flow_jobs.title', 'flow_jobs.product', 'flow_jobs.quantity', 'flow_jobs.status', 'flow_jobs.health',
+                'flow_jobs.title', 'flow_jobs.product', 'flow_jobs.quantity', 'flow_jobs.status',
                 'flow_jobs.progress', 'flow_jobs.delivery_date', 'flow_jobs.estimated_delivery_date',
                 'flow_jobs.shipment_urgency_ids', 'flow_jobs.commercial_value', 'flow_jobs.currency',
                 'flow_jobs.attention_requested', 'flow_jobs.attention_reason', 'flow_jobs.order_flag_id',
@@ -619,7 +619,6 @@ class OrderListPrototypeService
             'phase_sequence' => (int) ($job->phase?->sequence ?: 1),
             'phase_color' => (string) ($job->phase?->color ?: '#2d72d9'),
             'status' => (string) ($job->status ?: 'New'),
-            'health' => (string) ($job->health ?: 'On Track'),
             'flag' => (string) ($job->orderFlag?->name ?: ($job->attention_requested ? 'Needs attention' : '')),
             'owner' => (string) ($job->owner?->name ?: 'Unassigned'),
             'owner_initials' => OrderDetailPresenter::initials($job->owner?->name),

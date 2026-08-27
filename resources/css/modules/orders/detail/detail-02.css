@@ -1130,6 +1130,7 @@
    ========================================================================== */
 .ft-order-prototype-detail .order-commandbar,
 .ft-order-prototype-detail .ft-order-commandbar {
+    width: 100%;
     gap: 6px;
     margin-top: 10px;
 }
@@ -1154,6 +1155,29 @@
 
 .ft-order-prototype-detail .header-owner-control {
     gap: 4px;
+}
+
+/* Keep destructive/attention Order actions visually grouped at the far right. */
+.ft-order-prototype-detail .ft-order-header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-left: auto;
+}
+
+.ft-order-prototype-detail .ft-order-header-actions .btn,
+.ft-order-prototype-detail .ft-order-header-actions .ft-order-workflow-lock {
+    flex: 0 0 auto;
+}
+
+@media(max-width:820px) {
+    .ft-order-prototype-detail .ft-order-header-actions {
+        flex-basis: 100%;
+        width: 100%;
+        justify-content: flex-end;
+    }
 }
 
 .ft-order-prototype-detail .ft-order-command-icon-btn {
@@ -2341,5 +2365,582 @@
     .ft-order-prototype-detail .ft-order-urgency-inline--planning,
     .ft-order-prototype-detail .ft-order-urgency-inline--planning .ft-order-urgency-editor {
         justify-content: flex-start;
+    }
+}
+
+/* ========================================================================== 
+   Order Details workflow responsiveness — 2026-08-26
+   Respond to the real workflow-card width (not only the browser viewport),
+   which keeps the stage rail and task list usable beside FlowTrack's sidebar.
+   ========================================================================== */
+.ft-order-prototype-detail .ft-order-workflow-card {
+    container-type: inline-size;
+    container-name: ft-order-workflow-detail;
+    min-width: 0;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-card .workflow,
+.ft-order-prototype-detail .ft-order-workflow-card .ft-order-workflow-layout,
+.ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-panel {
+    min-width: 0;
+}
+
+@container ft-order-workflow-detail (max-width: 1320px) {
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-columns {
+        display: none;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-row {
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr) minmax(190px, .62fr);
+        grid-template-areas:
+            "icon copy copy"
+            ". assignee due"
+            ". state actions";
+        gap: 12px 18px;
+        align-items: start;
+        min-height: 0;
+        padding: 16px 18px;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-row > .ft-order-task-icon {
+        grid-area: icon !important;
+        justify-self: center;
+        align-self: start;
+        margin-top: 2px;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-row > .ft-order-task-copy {
+        grid-area: copy !important;
+        padding-right: 0;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-row > .ft-order-task-assignee-inline {
+        grid-area: assignee !important;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-row > .ft-order-task-due {
+        grid-area: due !important;
+        justify-self: stretch;
+        text-align: left;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-row > .ft-order-task-state {
+        grid-area: state !important;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-row > .ft-order-task-actions {
+        grid-area: actions !important;
+        justify-self: stretch !important;
+        justify-content: flex-start;
+        text-align: left;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-assignee-inline,
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-due,
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-state,
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-actions {
+        position: relative;
+        min-width: 0;
+        padding-top: 17px;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-assignee-inline::before,
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-due::before,
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-state::before {
+        position: absolute;
+        top: 0;
+        left: 0;
+        color: #7a8ba0;
+        font-size: .5rem;
+        font-weight: 850;
+        letter-spacing: .055em;
+        line-height: 1;
+        text-transform: uppercase;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-assignee-inline::before {
+        content: "Assignee";
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-due::before {
+        content: "Due date";
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-state::before {
+        content: "Status / files";
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-due > .ft-order-inline-display-row {
+        justify-content: flex-start;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-state .card-sub,
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-copy,
+    .ft-order-prototype-detail .ft-order-workflow-card .task-title,
+    .ft-order-prototype-detail .ft-order-workflow-card .task-description {
+        overflow-wrap: anywhere;
+    }
+}
+
+@container ft-order-workflow-detail (max-width: 1050px) {
+    .ft-order-prototype-detail .ft-order-workflow-card .workflow {
+        display: flex;
+        grid-template-columns: none;
+        gap: 10px;
+        margin-bottom: 12px;
+        padding: 0 14px 10px;
+        overflow-x: auto;
+        overflow-y: visible;
+        scroll-snap-type: x proximity;
+        scrollbar-width: thin;
+        scrollbar-color: #c9d7e5 transparent;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .workflow::-webkit-scrollbar {
+        height: 6px;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .workflow::-webkit-scrollbar-thumb {
+        border-radius: 999px;
+        background: #c9d7e5;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .workflow .stage {
+        flex: 0 0 178px;
+        min-width: 178px;
+        scroll-snap-align: start;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .stage-name {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        overflow-wrap: anywhere;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .stage-dependency {
+        overflow-wrap: anywhere;
+    }
+}
+
+@container ft-order-workflow-detail (max-width: 760px) {
+    .ft-order-prototype-detail .ft-order-workflow-card .process-head {
+        padding: 14px;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .process-head h2 {
+        font-size: 1rem;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .workflow {
+        padding-right: 10px;
+        padding-left: 10px;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .workflow .stage {
+        flex-basis: 190px;
+        min-width: 190px;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-workflow-layout {
+        padding: 0 10px 10px;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-panel .card-head {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 8px;
+        padding: 13px 14px;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .completion {
+        align-self: flex-start;
+        padding: 5px 8px;
+        border-radius: 999px;
+        background: #e8f6f3;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-panel > div:last-child {
+        padding: 8px;
+        background: #f8fafc;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-row {
+        grid-template-columns: 30px minmax(0, 1fr);
+        grid-template-areas:
+            "icon copy"
+            ". assignee"
+            ". due"
+            ". state"
+            ". actions";
+        gap: 10px 12px;
+        margin-bottom: 8px;
+        padding: 14px;
+        border: 1px solid #dce5ee;
+        border-left-width: 4px;
+        border-radius: 10px;
+        background: #fff;
+        box-shadow: 0 2px 6px rgba(15, 35, 55, .035);
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-row:last-child {
+        margin-bottom: 0;
+        border-bottom: 1px solid #dce5ee;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-row.locked {
+        background: #fbfcfd;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-row--estimated-delivery.active {
+        background: #fff7ed;
+        border-color: #fed7aa;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-assignee-inline,
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-due,
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-state,
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-actions {
+        padding-top: 18px;
+        border-top: 1px dashed #e3eaf1;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-actions {
+        padding-top: 10px;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-actions .btn {
+        min-height: 36px;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-assignee-picker {
+        width: min(300px, calc(100vw - 42px));
+        max-width: min(300px, calc(100vw - 42px));
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .task-link-form {
+        flex-wrap: wrap;
+        margin: 0 8px 8px;
+        border: 1px solid #dce5ee;
+        border-radius: 9px;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .task-link-form input {
+        flex: 1 1 100%;
+        width: 100%;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .task-resources {
+        margin: 0 8px 8px;
+        padding: 0 10px;
+        border: 1px solid #dce5ee;
+        border-radius: 9px;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .task-resources > div {
+        grid-template-columns: 30px minmax(0, 1fr);
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-resource-actions,
+    .ft-order-prototype-detail .ft-order-workflow-card .task-resources > div > span:last-child {
+        grid-column: 2;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+        white-space: normal;
+    }
+}
+
+@container ft-order-workflow-detail (max-width: 480px) {
+    .ft-order-prototype-detail .ft-order-workflow-card .process-head,
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-panel .card-head {
+        padding-right: 12px;
+        padding-left: 12px;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .card-sub {
+        line-height: 1.45;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .workflow .stage {
+        flex: 0 0 84%;
+        min-width: 0;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-workflow-layout {
+        padding-right: 8px;
+        padding-left: 8px;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-panel > div:last-child {
+        padding: 6px;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-row {
+        grid-template-columns: 28px minmax(0, 1fr);
+        grid-template-areas:
+            "icon copy"
+            "assignee assignee"
+            "due due"
+            "state state"
+            "actions actions";
+        padding: 12px;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-assignee-inline,
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-due,
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-state {
+        padding: 20px 0 0;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-actions {
+        padding-top: 10px;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-task-actions .btn {
+        width: 100%;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .ft-order-required-task-badge {
+        margin-top: 5px;
+        margin-left: 0;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .task-title {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-card .task-resources > div {
+        grid-template-columns: 26px minmax(0, 1fr);
+    }
+}
+
+/* Viewport fallback for older engines that do not support container queries. */
+@supports not (container-type: inline-size) {
+    @media (max-width: 1100px) {
+        .ft-order-prototype-detail .ft-order-workflow-card .workflow {
+            display: flex;
+            overflow-x: auto;
+        }
+        .ft-order-prototype-detail .ft-order-workflow-card .workflow .stage {
+            flex: 0 0 178px;
+        }
+    }
+}
+
+/* ==========================================================================
+   Order workflow email recipient + exact message preview — 2026-08-27
+   The same rendered Blade email is displayed in an isolated srcdoc frame so
+   users can verify exactly what will be sent before completing a handoff.
+   ========================================================================== */
+.ft-order-prototype-detail .ft-order-email-preview-shell {
+    margin-top: 16px;
+    border: 1px solid #d8e2eb;
+    border-radius: 12px;
+    background: #fff;
+    overflow: hidden;
+}
+
+.ft-order-prototype-detail .ft-order-email-preview-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 16px;
+    border-bottom: 1px solid #e4eaf0;
+    background: #f8fafc;
+}
+
+.ft-order-prototype-detail .ft-order-email-preview-head>div {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+}
+
+.ft-order-prototype-detail .ft-order-email-preview-head small {
+    color: #66788f;
+    font-size: .5rem;
+    font-weight: 800;
+    letter-spacing: .09em;
+}
+
+.ft-order-prototype-detail .ft-order-email-preview-head strong {
+    color: #172a43;
+    font-size: .75rem;
+}
+
+.ft-order-prototype-detail .ft-order-email-preview-head span {
+    color: #708196;
+    font-size: .5625rem;
+    line-height: 1.45;
+}
+
+.ft-order-prototype-detail .ft-order-email-preview-head em {
+    flex: 0 0 auto;
+    padding: 5px 9px;
+    border: 1px solid #b8dcd5;
+    border-radius: 999px;
+    background: #f1fbf8;
+    color: #087d69;
+    font-size: .5rem;
+    font-style: normal;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.ft-order-prototype-detail .ft-order-email-preview-meta {
+    display: grid;
+    padding: 4px 16px;
+}
+
+.ft-order-prototype-detail .ft-order-email-preview-meta-row {
+    display: grid;
+    grid-template-columns: 78px minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+    padding: 9px 0;
+    border-bottom: 1px solid #edf1f5;
+    color: #354a62;
+    font-size: .59375rem;
+}
+
+.ft-order-prototype-detail .ft-order-email-preview-meta-row:last-child {
+    border-bottom: 0;
+}
+
+.ft-order-prototype-detail .ft-order-email-preview-meta-row>span {
+    color: #7b899c;
+    font-weight: 700;
+}
+
+.ft-order-prototype-detail .ft-order-email-preview-meta-row>strong {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    color: #243b53;
+    font-weight: 700;
+}
+
+.ft-order-prototype-detail .ft-order-email-recipient-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.ft-order-prototype-detail .ft-order-email-recipient-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 100%;
+    padding: 5px 8px;
+    border: 1px solid #cfe1dd;
+    border-radius: 999px;
+    background: #f7fbfa;
+    color: #234842;
+}
+
+.ft-order-prototype-detail .ft-order-email-recipient-chip b,
+.ft-order-prototype-detail .ft-order-email-recipient-chip small {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.ft-order-prototype-detail .ft-order-email-recipient-chip b {
+    font-size: .53125rem;
+}
+
+.ft-order-prototype-detail .ft-order-email-recipient-chip small {
+    color: #627b77;
+    font-size: .5rem;
+}
+
+.ft-order-prototype-detail .ft-order-email-recipient-empty {
+    margin: 0;
+    padding: 8px 10px;
+    border: 1px solid #f1d4d1;
+    border-radius: 7px;
+    background: #fff8f7;
+    color: #9d3f35;
+    font-size: .5625rem;
+    font-weight: 700;
+    line-height: 1.45;
+}
+
+.ft-order-prototype-detail .ft-order-email-preview-browser {
+    margin: 4px 16px 16px;
+    border: 1px solid #d8e2eb;
+    border-radius: 9px;
+    background: #f4f7fa;
+    overflow: hidden;
+}
+
+.ft-order-prototype-detail .ft-order-email-preview-browser-bar {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 30px;
+    padding: 0 10px;
+    border-bottom: 1px solid #dce4eb;
+    background: #eef3f6;
+}
+
+.ft-order-prototype-detail .ft-order-email-preview-browser-bar>span {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #a9b7c5;
+}
+
+.ft-order-prototype-detail .ft-order-email-preview-browser-bar b {
+    margin-left: 5px;
+    color: #63758a;
+    font-size: .5rem;
+    font-weight: 800;
+}
+
+.ft-order-prototype-detail .ft-order-email-preview-frame {
+    display: block;
+    width: 100%;
+    height: 410px;
+    border: 0;
+    background: #f4f7fa;
+}
+
+.ft-order-prototype-detail .ft-order-email-preview-unavailable {
+    margin: 4px 16px 16px;
+    padding: 12px;
+    border: 1px dashed #cbd6e0;
+    border-radius: 8px;
+    background: #f8fafc;
+    color: #6b7d91;
+    font-size: .5625rem;
+}
+
+@media(max-width:760px) {
+    .ft-order-prototype-detail .ft-order-email-preview-head {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .ft-order-prototype-detail .ft-order-email-preview-head em {
+        align-self: flex-start;
+    }
+
+    .ft-order-prototype-detail .ft-order-email-preview-meta-row {
+        grid-template-columns: 1fr;
+        gap: 5px;
+    }
+
+    .ft-order-prototype-detail .ft-order-email-recipient-chip {
+        align-items: flex-start;
+        flex-direction: column;
+        border-radius: 8px;
+    }
+
+    .ft-order-prototype-detail .ft-order-email-preview-frame {
+        height: 360px;
     }
 }

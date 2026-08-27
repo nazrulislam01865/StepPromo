@@ -2,7 +2,7 @@
             $selectedWorkflow = collect($workflowFilterOptions)->first(fn ($item) => (int) ($item['id'] ?? 0) === (int) $createWorkflowId);
             $selectedWorkflowName = (string) ($selectedWorkflow['label'] ?? $selectedWorkflowLabel ?: 'Select workflow');
         @endphp
-        <section class="view ft-inquiry-create-v3" x-on:keydown.meta.enter.window="$wire.createInquiry()" x-on:keydown.ctrl.enter.window="$wire.createInquiry()">
+        <section class="view ft-inquiry-create-v3 ft-form-standard ft-form-standard--inquiry" data-ft-feedback-scope="form" x-on:keydown.meta.enter.window="$wire.createInquiry()" x-on:keydown.ctrl.enter.window="$wire.createInquiry()">
             <div class="formwrap ft-inquiry-create-shell">
                 <div class="crumb">Inquiries / New Inquiry</div>
                 <div class="formtop ft-inquiry-create-heading">
@@ -151,6 +151,14 @@
                         @include('components.inquiries.create-products')
                     @endif
 
+                    <x-inquiries.create-rfq
+                        :suppliers="$createRfqSupplierCandidates"
+                        :selected-supplier-ids="$createRfqSupplierIds"
+                        :supplier-search="$createRfqSupplierSearch"
+                        :product-count="$createRfqProductCount"
+                        wire:key="create-inquiry-rfq-selector"
+                    />
+
                     <section class="section ft-inquiry-create-section ft-inquiry-attachments-section">
                         <div class="sectiontitle ft-inquiry-step-title ft-inquiry-step-title-inline">
                             <span>{{ $canUseInquiryProductSelector ? 3 : 2 }}</span><h2>Attachments</h2><p>Add emails, specifications, artwork or reference images.</p>
@@ -228,23 +236,32 @@
                         @endif
                     </section>
 
-                    <x-ui.create-workflow-picker
-                        class="section ft-inquiry-create-section ft-inquiry-next-section"
-                        :step="$canUseInquiryProductSelector ? 4 : 3"
-                        title="What happens next"
-                        :workflow-options="$workflowFilterOptions"
-                        :selected-workflow-id="$createWorkflowId"
-                        :selected-workflow-name="$selectedWorkflowName"
-                        :phase-count="$createWorkflowPhaseCount"
-                        :task-count="$createWorkflowTaskCount"
-                        selection-property="createWorkflowId"
-                        option-fallback="Inquiry workflow"
-                        footnote="Tasks are created when you select Create inquiry."
-                        :preview-allowed="auth()->user()->canAccess('workflow.view')"
-                        :empty-message="$createWorkflowId && $createWorkflowTaskCount === 0 ? 'This Workflow has no active Task Pack tasks.' : null"
-                        error-field="createWorkflowId"
-                        wire:key="create-inquiry-workflow-picker"
-                    />
+                    @if($createWorkflowReady)
+                        <x-ui.create-workflow-picker
+                            class="section ft-inquiry-create-section ft-inquiry-next-section"
+                            :step="$canUseInquiryProductSelector ? 4 : 3"
+                            title="What happens next"
+                            :workflow-options="$workflowFilterOptions"
+                            :selected-workflow-id="$createWorkflowId"
+                            :selected-workflow-name="$selectedWorkflowName"
+                            :phase-count="$createWorkflowPhaseCount"
+                            :task-count="$createWorkflowTaskCount"
+                            selection-property="createWorkflowId"
+                            option-fallback="Inquiry workflow"
+                            footnote="Tasks are created when you select Create inquiry."
+                            :preview-allowed="auth()->user()->canAccess('workflow.view')"
+                            :empty-message="$createWorkflowId && $createWorkflowTaskCount === 0 ? 'This Workflow has no active Task Pack tasks.' : null"
+                            error-field="createWorkflowId"
+                            wire:key="create-inquiry-workflow-picker"
+                        />
+                    @else
+                        <section class="section ft-inquiry-create-section ft-inquiry-next-section" wire:key="create-inquiry-workflow-placeholder">
+                            <div class="sectiontitle ft-inquiry-step-title ft-inquiry-step-title-inline">
+                                <span>{{ $canUseInquiryProductSelector ? 4 : 3 }}</span><h2>What happens next</h2><p>Workflow options load only when this section is needed.</p>
+                            </div>
+                            <x-ui.progressive-section-loader section="workflow" :rows="3" />
+                        </section>
+                    @endif
 
                     <div class="formactions ft-inquiry-create-actions">
                         <span>Required fields are marked with *</span>

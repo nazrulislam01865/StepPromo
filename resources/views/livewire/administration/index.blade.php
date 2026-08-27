@@ -215,7 +215,7 @@
             </div>
         @endif
     @elseif($tab==='users')
-        <div class="section-head"><div><h3>Users & role assignments</h3><div class="small muted">Create, edit, assign roles, change passwords or remove users from FlowTrack.</div></div><button class="primary" wire:click="openUser">＋ Add User</button></div>
+        <div class="section-head"><div><h3>Users & role assignments</h3><div class="small muted">Create, edit, assign roles, change passwords or remove users from FlowTrack.</div></div><a class="primary" href="{{ route('users.create') }}" wire:navigate>＋ Add User</a></div>
 
         {{-- CHANGE 2026-08-24: searchable Users & Assignments list. --}}
         <div class="ft-user-assignment-toolbar">
@@ -322,107 +322,9 @@
         @include('livewire.administration.partials.branding')
     @endif
 
-    @if($showUserModal)
-        <div class="overlay livewire-overlay" wire:click.self="closeUser"></div>
-        <div class="modal livewire-modal ft-user-modal">
-            <div class="modal-head">
-                <h2>{{ $editingUserId ? 'Edit User' : 'Add User' }}</h2>
-                <button class="close-btn" wire:click="closeUser">×</button>
-            </div>
-
-            <div class="modal-body">
-                <div class="form-grid">
-                    <div class="field">
-                        <label>Full name *</label>
-                        <input wire:model="name">
-                        @error('name')
-                            <div class="validation-error">{{ $message }}</div>
-                        @enderror
-                    </div>
-
-                    <div class="field">
-                        <label>Position / job title</label>
-                        <input wire:model="position" placeholder="e.g. Production Manager" maxlength="120">
-                        @error('position')
-                            <div class="validation-error">{{ $message }}</div>
-                        @enderror
-                    </div>
-
-                    <div class="field">
-                        <label>Email *</label>
-                        <input wire:model="email" type="email">
-                        @error('email')
-                            <div class="validation-error">{{ $message }}</div>
-                        @enderror
-                    </div>
-
-                    <div class="field">
-                        <label>Roles *</label>
-                        <x-ui.multi-role-select model="roleIds" :options="$roles->filter(fn($r) => $r->is_active || in_array((string) $r->id, array_map('strval', $roleIds), true))->map(fn($r) => ['id' => $r->id, 'name' => $r->name])->values()->all()" :disabled="$editingUserId && optional($users->firstWhere('id', $editingUserId))->isSuperAdmin()" placeholder="Select one or more roles" />
-                        <div class="small muted">Effective permissions are combined from all selected roles.</div>
-                        @error('roleIds')<div class="validation-error">{{ $message }}</div>@enderror
-                        @error('roleIds.*')<div class="validation-error">{{ $message }}</div>@enderror
-                    </div>
-
-                    <div class="field">
-                        <x-ui.search-select
-                            label="Department"
-                            property="departmentId"
-                            type="departments"
-                            context="administration"
-                            action="setDepartmentSelection"
-                            :value="$departmentId"
-                            placeholder="No department"
-                            :initial-options="$departments"
-                            :menu-width="320"
-                            :fixed-menu="true"
-                            wire:key="administration-department-{{ $departmentId ?? 'none' }}"
-                        />
-                        @error('departmentId')<x-ui.validation-message :message="$message" />@enderror
-                    </div>
-
-                    <div class="field">
-                        <label>Password {{ $editingUserId ? '' : '*' }}</label>
-                        <input wire:model="password" type="password" autocomplete="new-password" placeholder="{{ $editingUserId ? 'Leave blank to keep current password' : 'Enter password' }}">
-                        @error('password')
-                            <div class="validation-error">{{ $message }}</div>
-                        @enderror
-                    </div>
-
-                    <div class="field">
-                        <label>Confirm password {{ $editingUserId ? '' : '*' }}</label>
-                        <input wire:model="passwordConfirmation" type="password" autocomplete="new-password" placeholder="Confirm password">
-                        @error('passwordConfirmation')
-                            <div class="validation-error">{{ $message }}</div>
-                        @enderror
-                    </div>
-
-                    @if($editingUserId)
-                        <div class="field full">
-                            <label>Status</label>
-                            <select wire:model="userActive" @disabled(optional($users->firstWhere('id', $editingUserId))->isSuperAdmin())>
-                                <option value="1">Active</option>
-                                <option value="0">Inactive</option>
-                            </select>
-                        </div>
-                    @endif
-                </div>
-
-                @if($editingUserId)
-                    <div class="ft-access-info">Enter a new password only when you want to change this user's password. Leaving both password fields blank keeps the current password.</div>
-                @endif
-            </div>
-
-            <div class="modal-foot">
-                <button class="ghost" wire:click="closeUser">Cancel</button>
-                <button class="primary" wire:click="saveUser">{{ $editingUserId ? 'Save Changes' : 'Create User' }}</button>
-            </div>
-        </div>
-    @endif
-
     @if($showRoleModal)
         <div class="overlay livewire-overlay" wire:click.self="closeRole"></div>
-        <div class="modal livewire-modal">
+        <div class="modal livewire-modal" data-ft-feedback-scope="form">
             <div class="modal-head">
                 <h2>{{ $editingRoleId ? 'Edit Role' : 'Create Role' }}</h2>
                 <button class="close-btn" wire:click="closeRole">×</button>

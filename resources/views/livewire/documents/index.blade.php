@@ -374,7 +374,7 @@
 
     @if($showUpload)
         <div class="overlay livewire-overlay" wire:click.self="closeUpload"></div>
-        <div class="modal livewire-modal ft-doc-upload-modal" wire:key="document-upload-modal">
+        <div class="modal livewire-modal ft-doc-upload-modal" data-ft-feedback-scope="form" wire:key="document-upload-modal">
             <div class="modal-head">
                 <div><h2>Upload document</h2><div class="small muted">Link the file to a visible Order and optionally to one of your assigned tasks.</div></div>
                 <button type="button" class="close-btn" wire:click="closeUpload">×</button>
@@ -452,7 +452,7 @@
 
     @if($showRename)
         <div class="overlay livewire-overlay" wire:click.self="closeRename"></div>
-        <div class="modal livewire-modal ft-da-small-modal" wire:key="document-rename-modal">
+        <div class="modal livewire-modal ft-da-small-modal" data-ft-feedback-scope="form" wire:key="document-rename-modal">
             <div class="modal-head"><div><h2>Rename document</h2><div class="small muted">Change the display name without moving the stored file.</div></div><button type="button" class="close-btn" wire:click="closeRename">×</button></div>
             <div class="modal-body"><div class="field"><label>File name *</label><input type="text" wire:model="renameName" maxlength="255">@error('renameName')<div class="validation-error">{{ $message }}</div>@enderror</div></div>
             <div class="modal-foot"><button type="button" class="ghost" wire:click="closeRename">Cancel</button><button type="button" class="primary" wire:click="renameDocument">Rename</button></div>
@@ -461,7 +461,7 @@
 
     @if($showVersionUpload)
         <div class="overlay livewire-overlay" wire:click.self="closeVersionUpload"></div>
-        <div class="modal livewire-modal ft-da-small-modal" wire:key="document-version-upload-modal">
+        <div class="modal livewire-modal ft-da-small-modal" data-ft-feedback-scope="form" wire:key="document-version-upload-modal">
             <div class="modal-head"><div><h2>Upload new version</h2><div class="small muted">The new file is added to the same document history.</div></div><button type="button" class="close-btn" wire:click="closeVersionUpload">×</button></div>
             <div class="modal-body">
                 <label class="upload-zone ft-livewire-upload-zone" data-file-dropzone for="document-version-upload-input">

@@ -4,7 +4,6 @@ namespace App\Livewire\Jobs\Concerns;
 
 use App\Actions\Orders\UpdateOrderCoordinator;
 use App\Actions\Orders\UpdateOrderDeliveryDate;
-use App\Actions\Orders\UpdateOrderHealth;
 use App\Actions\Orders\UpdateOrderOverview;
 use App\Actions\Orders\UpdateOrderOwner;
 use App\Actions\Orders\UpdateOrderPriority;
@@ -102,14 +101,6 @@ trait ManagesOrderDetail
     {
         return $this->persistInlineEdit('priority', function () use ($jobId, $priority) {
             app(UpdateOrderPriority::class)->handle(auth()->user(), $jobId, (string) $priority);
-        });
-    }
-
-    #[Renderless]
-    public function updateJobHealth(int $jobId, mixed $health): array
-    {
-        return $this->persistInlineEdit('Order health', function () use ($jobId, $health) {
-            app(UpdateOrderHealth::class)->handle(auth()->user(), $jobId, (string) $health);
         });
     }
 

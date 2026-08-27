@@ -49,7 +49,6 @@
 
                     <span class="ft-board-taskpack-job-client">{{ $group['client'] }}</span>
                     <span class="ft-board-taskpack-job-stage">{{ $group['stage'] }}</span>
-                    <span class="ft-board-taskpack-health {{ $group['healthTone'] }}">{{ $group['health'] }}</span>
                     <span class="ft-board-taskpack-progress"><i><i style="width:{{ $group['progress'] }}%"></i></i>{{ $group['progress'] }}%</span>
                     <span class="ft-board-taskpack-task-count">{{ $group['taskCount'] }} {{ $group['taskCount'] === 1 ? 'task' : 'tasks' }}</span>
                 </header>

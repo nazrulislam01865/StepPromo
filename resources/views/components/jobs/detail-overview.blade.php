@@ -7,18 +7,27 @@
     'shipmentUrgencyOptions' => collect(),
     'overviewPhaseId' => null,
     'orderDetailContext' => [],
+    'detailSectionsReady' => [],
     'products' => collect(),
     'categories' => collect(),
     'showAddJobProductForm' => false,
     'jobProductSearch' => '',
     'jobProductSearchResults' => collect(),
+    'jobProductSearchSuppliers' => collect(),
     'jobProductResultTotal' => 0,
+    'jobProductShowAllResults' => false,
     'jobProductSelectedProduct' => null,
+    'jobProductSelectedSupplier' => null,
     'jobProductCategory' => '',
+    'jobProductQuantity' => '1000',
+    'jobProductUnitPrice' => '0.00',
     'jobProductSupplierId' => null,
     'jobProductSupplierLabel' => '',
     'jobProductSupplierLocked' => false,
     'showEditOrderProductModal' => false, 'editOrderProductItemId' => null, 'editOrderProductName' => '', 'editOrderProductCode' => '',
+    'editOrderProductCategory' => '', 'editOrderProductSearch' => '', 'editOrderProductSearchResults' => collect(),
+    'editOrderProductSearchSuppliers' => collect(), 'editOrderProductResultTotal' => 0, 'editOrderProductSelectedProduct' => null,
+    'editOrderProductSelectedSupplier' => null, 'editOrderProductShowAllResults' => false,
     'editOrderProductSupplierId' => null, 'editOrderProductSupplierLabel' => '', 'editOrderProductQuantity' => '1',
     'editOrderProductUnitPrice' => '0.00', 'editOrderProductNotes' => '',
     'jobTaskSearch' => '',
@@ -64,47 +73,112 @@
         </div>
     </div>
 
-    <x-jobs.order-detail.products
-        :job="$job"
-        :context="$orderDetailContext"
-        :show-add-job-product-form="$showAddJobProductForm"
-        :job-product-search="$jobProductSearch"
-        :job-product-search-results="$jobProductSearchResults"
-        :job-product-result-total="$jobProductResultTotal"
-        :job-product-selected-product="$jobProductSelectedProduct"
-        :job-product-category="$jobProductCategory"
-        :job-product-supplier-id="$jobProductSupplierId"
-        :job-product-supplier-label="$jobProductSupplierLabel"
-        :job-product-supplier-locked="$jobProductSupplierLocked"
-        :show-edit-order-product-modal="$showEditOrderProductModal"
-        :edit-order-product-item-id="$editOrderProductItemId"
-        :edit-order-product-name="$editOrderProductName"
-        :edit-order-product-code="$editOrderProductCode"
-        :edit-order-product-supplier-id="$editOrderProductSupplierId"
-        :edit-order-product-supplier-label="$editOrderProductSupplierLabel"
-        :edit-order-product-quantity="$editOrderProductQuantity"
-        :edit-order-product-unit-price="$editOrderProductUnitPrice"
-        :edit-order-product-notes="$editOrderProductNotes"
-    />
+    @if((bool) ($detailSectionsReady['products'] ?? false))
+        <x-jobs.order-detail.products
+            :job="$job"
+            :context="$orderDetailContext"
+            :show-add-job-product-form="$showAddJobProductForm"
+            :job-product-search="$jobProductSearch"
+            :job-product-search-results="$jobProductSearchResults"
+            :job-product-search-suppliers="$jobProductSearchSuppliers"
+            :job-product-result-total="$jobProductResultTotal"
+            :job-product-show-all-results="$jobProductShowAllResults"
+            :job-product-selected-product="$jobProductSelectedProduct"
+            :job-product-selected-supplier="$jobProductSelectedSupplier"
+            :job-product-category="$jobProductCategory"
+            :job-product-quantity="$jobProductQuantity"
+            :job-product-unit-price="$jobProductUnitPrice"
+            :job-product-supplier-id="$jobProductSupplierId"
+            :job-product-supplier-label="$jobProductSupplierLabel"
+            :job-product-supplier-locked="$jobProductSupplierLocked"
+            :show-edit-order-product-modal="$showEditOrderProductModal"
+            :edit-order-product-item-id="$editOrderProductItemId"
+            :edit-order-product-name="$editOrderProductName"
+            :edit-order-product-code="$editOrderProductCode"
+            :edit-order-product-category="$editOrderProductCategory"
+            :edit-order-product-search="$editOrderProductSearch"
+            :edit-order-product-search-results="$editOrderProductSearchResults"
+            :edit-order-product-search-suppliers="$editOrderProductSearchSuppliers"
+            :edit-order-product-result-total="$editOrderProductResultTotal"
+            :edit-order-product-selected-product="$editOrderProductSelectedProduct"
+            :edit-order-product-selected-supplier="$editOrderProductSelectedSupplier"
+            :edit-order-product-show-all-results="$editOrderProductShowAllResults"
+            :edit-order-product-supplier-id="$editOrderProductSupplierId"
+            :edit-order-product-supplier-label="$editOrderProductSupplierLabel"
+            :edit-order-product-quantity="$editOrderProductQuantity"
+            :edit-order-product-unit-price="$editOrderProductUnitPrice"
+            :edit-order-product-notes="$editOrderProductNotes"
+        />
+    @else
+        <x-ui.progressive-section-loader
+            section="products"
+            method="loadDetailSection"
+            key-prefix="order-detail"
+            context-type="order"
+            :context-id="$job->id"
+            :rows="4"
+            message="Loading order products when needed…"
+            root-margin="360px 0px"
+        />
+    @endif
 
-    <x-jobs.order-detail.workflow
-        :job="$job"
-        :overview-phase-id="$overviewPhaseId"
-        :task-statuses="$taskStatuses"
-        :context="$orderDetailContext"
-        :overview-task-link-form-task-id="$overviewTaskLinkFormTaskId"
-    />
+    @if((bool) ($detailSectionsReady['workflow'] ?? false))
+        <x-jobs.order-detail.workflow
+            :job="$job"
+            :overview-phase-id="$overviewPhaseId"
+            :task-statuses="$taskStatuses"
+            :context="$orderDetailContext"
+            :overview-task-link-form-task-id="$overviewTaskLinkFormTaskId"
+        />
+    @else
+        <x-ui.progressive-section-loader
+            section="workflow"
+            method="loadDetailSection"
+            key-prefix="order-detail"
+            context-type="order"
+            :context-id="$job->id"
+            :rows="5"
+            message="Loading workflow and tasks when needed…"
+            root-margin="360px 0px"
+        />
+    @endif
 
-    <x-jobs.order-detail.attachments :job="$job" :context="$orderDetailContext" :job-document-uploads="$jobDocumentUploads" />
+    @if((bool) ($detailSectionsReady['attachments'] ?? false))
+        <x-jobs.order-detail.attachments :job="$job" :context="$orderDetailContext" :job-document-uploads="$jobDocumentUploads" />
+    @else
+        <x-ui.progressive-section-loader
+            section="attachments"
+            method="loadDetailSection"
+            key-prefix="order-detail"
+            context-type="order"
+            :context-id="$job->id"
+            :rows="3"
+            message="Loading attachments when needed…"
+            root-margin="300px 0px"
+        />
+    @endif
 
-    <x-jobs.order-detail.activity
-        :job="$job"
-        :mention-users="$mentionUsers"
-        :activity-tab="$activityTab"
-        :activity-page="$activityPage"
-        :focus-comment="$focusComment"
-        :can-comment="(bool) ($orderDetailContext['canComment'] ?? false)"
-    />
+    @if((bool) ($detailSectionsReady['activity'] ?? false))
+        <x-jobs.order-detail.activity
+            :job="$job"
+            :mention-users="$mentionUsers"
+            :activity-tab="$activityTab"
+            :activity-page="$activityPage"
+            :focus-comment="$focusComment"
+            :can-comment="(bool) ($orderDetailContext['canComment'] ?? false)"
+        />
+    @else
+        <x-ui.progressive-section-loader
+            section="activity"
+            method="loadDetailSection"
+            key-prefix="order-detail"
+            context-type="order"
+            :context-id="$job->id"
+            :rows="4"
+            message="Loading activity when needed…"
+            root-margin="300px 0px"
+        />
+    @endif
 
     @if($showOrderWorkflowActionModal && $orderWorkflowActionTaskId)
         @php

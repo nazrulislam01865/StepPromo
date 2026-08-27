@@ -30,7 +30,7 @@
     });
 @endphp
 <div class="ft-taxonomy-modal-backdrop" wire:click.self="closeCategoryCreator" wire:keydown.escape="closeCategoryCreator" role="presentation">
-    <section class="ft-taxonomy-modal" role="dialog" aria-modal="true" aria-labelledby="ft-taxonomy-title" x-data x-on:click.stop>
+    <section class="ft-taxonomy-modal" data-ft-feedback-scope="form" role="dialog" aria-modal="true" aria-labelledby="ft-taxonomy-title" x-data x-on:click.stop>
         <header class="ft-taxonomy-modal-header">
             <div>
                 <h3 id="ft-taxonomy-title">{{ $title }}</h3>

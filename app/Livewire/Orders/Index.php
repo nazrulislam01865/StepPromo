@@ -404,7 +404,7 @@ class Index extends Component
         $this->orderWorkflowActionComment = '';
         $this->orderWorkflowActionStep = 'main';
         $this->orderWorkflowActionPayload = $workflowActions->initialPayload($task, $task->job);
-        $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionPayload']);
+        $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
         $this->showOrderWorkflowActionModal = true;
     }
 
@@ -416,7 +416,7 @@ class Index extends Component
         $this->orderWorkflowActionStep = 'main';
         $this->orderWorkflowActionPayload = [];
         $this->listActionOrderId = null;
-        $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionPayload']);
+        $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
     }
 
     public function submitOrderWorkflowAction(string $decision = 'confirm'): void
@@ -437,7 +437,7 @@ class Index extends Component
             && in_array($key, ['ART_INTERNAL_REVIEW', 'ART_CLIENT_ERP_DECISION'], true)) {
             $this->orderWorkflowActionStep = 'revision';
             $this->orderWorkflowActionComment = '';
-            $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionPayload']);
+            $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
             return;
         }
 
@@ -445,14 +445,14 @@ class Index extends Component
             && in_array($key, ['PROD_ISSUE', 'QC_CHECK'], true)) {
             $this->orderWorkflowActionStep = 'issue';
             $this->orderWorkflowActionComment = '';
-            $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionPayload']);
+            $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
             return;
         }
 
         if ($key === 'ART_CLIENT_ERP_DECISION' && $decision === 'approved' && $this->orderWorkflowActionStep === 'main') {
             $this->orderWorkflowActionStep = 'sample';
             $this->orderWorkflowActionComment = '';
-            $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionPayload']);
+            $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
             return;
         }
 
@@ -468,8 +468,14 @@ class Index extends Component
             $this->orderWorkflowActionPayload,
         );
 
+        $successMessage = match ($key) {
+            'NEW_SEND_PO_ARTWORK' => 'Purchase Order emailed to the Artwork Team.',
+            'ART_SEND_ORDER_TEAM' => 'Artwork emailed to the Order Team.',
+            default => 'Order workflow updated.',
+        };
+
         $this->closeOrderWorkflowAction();
-        session()->flash('success', 'Order workflow updated.');
+        session()->flash('success', $successMessage);
     }
 
     /** Initialize the same file-upload action modal used on Order Details. */

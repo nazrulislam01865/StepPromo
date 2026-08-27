@@ -3,7 +3,7 @@
                 x-data="window.FlowTrack.ui.inlineEdit({ key: @js('task-'.$task->id.'-description'), label: 'task description', value: @js($effectiveDescription ?? ''), display: @js($effectiveDescription ?: 'No description has been provided for this task.') })"
                 :class="{ 'is-inline-saving': status === 'saving', 'is-inline-error': status === 'error' }"
             >
-                @if($canEditTask)<button x-show="!editing" :disabled="status === 'saving'" class="ft-card-edit" type="button" title="Edit description" x-on:click="beginRichTextEdit($refs.description)">✎</button>@endif
+                @if($canEditTask)<button x-show="!editing" :disabled="status === 'saving'" class="ft-card-edit ft-detail-edit-button" type="button" title="Edit description" aria-label="Edit task description" x-on:click="beginRichTextEdit($refs.description)"><x-ui.detail-icon name="edit" /></button>@endif
                 <h2>Description</h2>
                 <div x-show="!editing" class="ft-rich-text-content">
                     <div x-show="!hasRichTextOverride">@if($effectiveDescription)<x-ui.mention-text :text="$effectiveDescription" />@else No description has been provided for this task. @endif</div>

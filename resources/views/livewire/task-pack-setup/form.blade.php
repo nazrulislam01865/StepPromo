@@ -1,7 +1,7 @@
 @php
     $masterData = app(\App\Services\MasterDataService::class);
 @endphp
-<div wire:init="loadTaskPackOptions" class="ft-admin-reference ft-taskpack-form-page">
+<div class="ft-admin-reference ft-taskpack-form-page">
     <div class="ft-admin-form-top">
         <div>
             <div class="ft-admin-breadcrumb">{{ $taskPackId ? 'Edit Task Pack' : 'Add Task Pack' }}</div>
@@ -11,7 +11,7 @@
         <a href="{{ route('task-pack.setup') }}" wire:navigate class="ft-admin-back">← Back to Task Pack Setup</a>
     </div>
 
-    <form wire:submit="save" class="ft-admin-form-card">
+    <form wire:submit="save" class="ft-admin-form-card" data-ft-feedback-scope="form">
         <div class="ft-admin-form-card-head">
             <h2>{{ $taskPackId ? 'Edit Task Pack' : 'Create Task Pack' }}</h2>
             <p>Build the complete reusable task sequence activated by workflow phases.</p>
@@ -171,11 +171,17 @@
                                 </div>
                             </div>
                         @else
-                            <div class="ft-taskpack-options-placeholder ft-task-prototype-grid" wire:key="task-pack-options-loading-{{ $index }}" role="status" aria-live="polite" aria-busy="true">
-                                @for($field = 0; $field < 4; $field++)
-                                    <div><span></span><span></span></div>
-                                @endfor
-                            </div>
+                            @if($loop->first)
+                                <div class="ft-taskpack-options-placeholder" wire:key="task-pack-options-loading-trigger-{{ $index }}">
+                                    <x-ui.progressive-section-loader section="task-options" :rows="4" message="Loading assignee, department, priority and timer options when needed…" />
+                                </div>
+                            @else
+                                <div class="ft-taskpack-options-placeholder ft-task-prototype-grid" wire:key="task-pack-options-loading-{{ $index }}" role="status" aria-live="polite" aria-busy="true">
+                                    @for($field = 0; $field < 4; $field++)
+                                        <div><span></span><span></span></div>
+                                    @endfor
+                                </div>
+                            @endif
                         @endif
 
                         <label class="ft-required-task-check ft-required-task-prototype">
@@ -273,7 +279,7 @@
         <div class="ft-admin-form-footer ft-taskpack-form-footer">
             <p>Changes apply to new tasks created from this Task Pack.</p>
             <button type="button" class="ft-admin-cancel" wire:click="cancel">Cancel</button>
-            <button type="submit" class="ft-admin-primary" @disabled(!$optionsReady)>{{ $taskPackId ? 'Save Task Pack' : 'Create Task Pack' }}</button>
+            <button type="submit" class="ft-admin-primary">{{ $taskPackId ? 'Save Task Pack' : 'Create Task Pack' }}</button>
         </div>
         @error('options')<div class="validation-error">{{ $message }}</div>@enderror
     </form>

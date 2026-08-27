@@ -28,6 +28,8 @@
     'shipmentUrgencyPickerSelection' => [],
     'newProductCategoryMain' => '',
     'newSubcategoryProductCategoryId' => null,
+    'taxonomyReady' => true,
+    'shipmentOptionsReady' => true,
 ])
 @php
     $isEdit = (bool) $editProduct;
@@ -41,7 +43,7 @@
         'meta' => $category->code,
     ]);
 @endphp
-<div class="ft-product-page ft-product-form-page" x-data="{dragging:false}">
+<div class="ft-product-page ft-product-form-page ft-form-standard ft-form-standard--product" data-ft-feedback-scope="form" x-data="{dragging:false}">
     <div class="ft-product-page-breadcrumb"><button type="button" wire:click="close">Products</button><span>/</span><strong>{{ $isEdit ? 'Edit product' : 'Create product' }}</strong></div>
     <header class="ft-product-form-header">
         <div><h1>{{ $isEdit ? 'Edit product' : 'Create product' }}</h1><p>{{ $isEdit ? 'Update the product information, default supplier, availability and supporting documents.' : 'Add a product and link its category, default supplier, image and supporting documents.' }}</p></div>
@@ -113,6 +115,7 @@
             </div>
         </x-catalog.product-section>
 
+        @if($taxonomyReady)
         <x-catalog.product-section number="2" title="Category hierarchy" subtitle="Select from top to bottom. Each list is filtered by the selection above.">
             <div class="ft-form-grid ft-form-grid-3 ft-category-grid">
                 <div class="ft-product-search-select-wrap">
@@ -182,6 +185,12 @@
             </div>
             <small class="ft-product-help">Missing a category? Create it here without leaving the product form. Codes are generated automatically.</small>
         </x-catalog.product-section>
+
+        @else
+            <x-catalog.product-section number="2" title="Category hierarchy" subtitle="Category options load only when this section is needed.">
+                <x-ui.progressive-section-loader section="product-taxonomy" :rows="4" />
+            </x-catalog.product-section>
+        @endif
 
         <x-catalog.product-section number="3" title="Product pricing" subtitle="Paste the complete Quantity and Product price table directly from Excel.">
             <label class="ft-product-field ft-product-price-table-field">
@@ -273,13 +282,19 @@
             @error('productOptions')<b class="validation-error">{{ $message }}</b>@enderror
         </x-catalog.product-section>
 
-        <x-catalog.product-shipment-urgencies
-            number="5"
-            :shipment-urgencies="$shipmentUrgencies"
-            :selected-urgencies="$productShipmentUrgencies"
-            :picker-open="$shipmentUrgencyPickerOpen"
-            :picker-selection="$shipmentUrgencyPickerSelection"
-        />
+        @if($shipmentOptionsReady)
+            <x-catalog.product-shipment-urgencies
+                number="5"
+                :shipment-urgencies="$shipmentUrgencies"
+                :selected-urgencies="$productShipmentUrgencies"
+                :picker-open="$shipmentUrgencyPickerOpen"
+                :picker-selection="$shipmentUrgencyPickerSelection"
+            />
+        @else
+            <x-catalog.product-section number="5" title="Shipping urgencies" subtitle="Shipping urgency master data loads only when this section is needed." class="ft-product-shipping-section">
+                <x-ui.progressive-section-loader section="product-shipping-urgencies" :rows="3" />
+            </x-catalog.product-section>
+        @endif
 
         <x-catalog.product-section number="6" title="Supporting documents" subtitle="Add the product files now or replace them later while editing.">
             <div class="ft-product-support-grid is-friendly">

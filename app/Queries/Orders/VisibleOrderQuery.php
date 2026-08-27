@@ -42,6 +42,26 @@ final class VisibleOrderQuery
         return $this->jobs->loadVisibleDetailTab($order, $actor, $tab);
     }
 
+    public function loadOverviewSummary(FlowJob $order, User $actor): FlowJob
+    {
+        return $this->jobs->loadVisibleOverviewSummary($order, $actor);
+    }
+
+    public function loadOverviewProducts(FlowJob $order, User $actor): FlowJob
+    {
+        return $this->jobs->loadVisibleOverviewProducts($order, $actor);
+    }
+
+    public function loadOverviewWorkflow(FlowJob $order, User $actor): FlowJob
+    {
+        return $this->jobs->loadVisibleOverviewWorkflow($order, $actor);
+    }
+
+    public function loadOverviewDocuments(FlowJob $order): FlowJob
+    {
+        return $this->jobs->loadVisibleOverviewDocuments($order);
+    }
+
     public function loadOverviewActivity(
         FlowJob $order,
         string $activityTab = 'all',

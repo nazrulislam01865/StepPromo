@@ -11,6 +11,7 @@
         :phase-filter="$phase"
         :date-from="$dateFrom"
         :date-to="$dateTo"
+        :metric-filter="$metricFilter"
         :stage-quick="$stageQuick"
         :stage-supplier="$stageSupplier"
         :stage-assignee="$stageAssignee"

@@ -1,3 +1,4 @@
+import { createAsyncState } from '../components/async-feedback.js';
 import { createInlineEdit } from '../components/inline-edit.js';
 import {
     createFloatingActionMenu,
@@ -20,6 +21,7 @@ export const installBrowserApi = () => {
     existing.ui = {
         ...(existing.ui || {}),
         inlineEdit: createInlineEdit,
+        asyncState: createAsyncState,
         floatingActionMenu: createFloatingActionMenu,
         remoteFilter: createRemoteFilter,
         searchSelect: createSearchSelect,

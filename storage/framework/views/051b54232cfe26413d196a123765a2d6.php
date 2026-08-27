@@ -137,7 +137,7 @@ unset($__defined_vars, $__key, $__value); ?>
                     aria-pressed="<?php echo e($isSelectedStage ? 'true' : 'false'); ?>"
                 >
                     <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($isSelectedStage): ?>
-                        <span class="ft-order-workflow-stage-selected" aria-hidden="true"><i>✓</i> Selected</span>
+                        <span class="ft-order-workflow-stage-selected" aria-hidden="true" title="Selected">✓</span>
                     <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
 
                     <span class="ft-order-workflow-stage-kicker">Stage <?php echo e((int) data_get($stage, 'sequence')); ?></span>
@@ -156,7 +156,7 @@ unset($__defined_vars, $__key, $__value); ?>
                     aria-pressed="<?php echo e($isSelectedStage ? 'true' : 'false'); ?>"
                 >
                     <?php if($isSelectedStage): ?>
-                        <span class="ft-order-workflow-stage-selected" aria-hidden="true"><i>✓</i> Selected</span>
+                        <span class="ft-order-workflow-stage-selected" aria-hidden="true" title="Selected">✓</span>
                     <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
 
                     <span class="ft-order-workflow-stage-kicker">Stage <?php echo e((int) data_get($stage, 'sequence')); ?></span>

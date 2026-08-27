@@ -90,7 +90,7 @@ class MyWorkService
             ->leftJoin('workflow_phases as my_work_job_phases', 'my_work_job_phases.id', '=', 'flow_jobs.workflow_phase_id')
             ->select([
                 'flow_jobs.id', 'flow_jobs.job_number', 'flow_jobs.title', 'flow_jobs.client_id', 'flow_jobs.workflow_phase_id', 'flow_jobs.created_by',
-                'flow_jobs.health', 'flow_jobs.progress', 'flow_jobs.status', 'flow_jobs.updated_at',
+                'flow_jobs.progress', 'flow_jobs.status', 'flow_jobs.updated_at',
                 'my_work_clients.name as my_work_client_name',
                 'my_work_job_phases.name as my_work_phase_name',
                 'my_work_job_phases.short_name as my_work_phase_short_name',
@@ -140,8 +140,6 @@ class MyWorkService
                 'client' => (string) ($job->getAttribute('my_work_client_name') ?: 'No client'),
                 'stage' => (string) ($job->getAttribute('my_work_phase_name') ?: $job->getAttribute('my_work_phase_short_name') ?: 'No phase'),
                 'stageColor' => $job->getAttribute('my_work_phase_color'),
-                'health' => (string) ($job->health ?: 'On Track'),
-                'healthTone' => $this->tone((string) ($job->health ?: 'On Track')),
                 'progress' => max(0, min(100, (int) $job->progress)),
                 'taskCount' => $taskRows->count(),
                 'route' => $canOpenJobs ? route('jobs.index', ['open' => $job->id]) : null,
@@ -558,6 +556,19 @@ class MyWorkService
         $statusFilter = trim((string) ($filters['status'] ?? ''));
         if ($statusFilter !== '') {
             $query->whereRaw('LOWER(TRIM(tasks.status)) = ?', [mb_strtolower($statusFilter)]);
+        }
+
+        $stageSupplierId = (int) ($filters['stage_supplier_id'] ?? 0);
+        if ($stageSupplierId > 0) {
+            $query->whereHas('job', fn (Builder $job) => $job
+                ->whereHas('items', fn (Builder $items) => $items
+                    ->where('is_removed', false)
+                    ->where('supplier_id', $stageSupplierId)));
+        }
+
+        $stageAssigneeId = (int) ($filters['stage_assignee_id'] ?? 0);
+        if ($stageAssigneeId > 0) {
+            $query->where('tasks.assignee_id', $stageAssigneeId);
         }
 
         $this->applyQuickFilter($query, $user, (string) ($filters['quick'] ?? 'all'));

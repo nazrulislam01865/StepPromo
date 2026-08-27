@@ -25,7 +25,7 @@
                 ? (string) ($inquiry->attention_reason ?? '')
                 : (string) ($headerFlagTask?->attention_reason ?? '');
         @endphp
-        <section class="view inquiry-detail-view ft-detail-products-scope" x-data="{
+        <section class="view inquiry-detail-view ft-detail-products-scope" wire:key="inquiry-detail-{{ $inquiry->id }}" x-data="{
             inquiryStatus:@js($detailStatus),
             inquiryStatusColor:@js($detailStatusColor),
             inquiryStartValue:@js($inquiryStartLocal?->format('Y-m-d\TH:i') ?? ''),
@@ -61,7 +61,7 @@
                         <span>/</span>
                         <span class="ft-copyable-id-wrap ft-inquiry-detail-code-wrap">
                             <span>{{ $inquiry->inquiry_number }}</span>
-                            <button type="button" class="ft-copy-id-btn" title="Copy Inquiry ID" aria-label="Copy {{ $inquiry->inquiry_number }}" onclick="event.preventDefault(); event.stopPropagation(); navigator.clipboard?.writeText(@js($inquiry->inquiry_number)); this.classList.add('copied'); setTimeout(()=>this.classList.remove('copied'),900)">⧉</button>
+                            <button type="button" class="ft-copy-id-btn" title="Copy Inquiry ID" aria-label="Copy {{ $inquiry->inquiry_number }}" onclick="event.preventDefault(); event.stopPropagation(); navigator.clipboard?.writeText(@js($inquiry->inquiry_number)); this.classList.add('copied'); setTimeout(()=>this.classList.remove('copied'),900)"><x-ui.detail-icon name="copy" /></button>
                         </span>
                     </div>
                     <div class="ft-task-title-line">
@@ -72,7 +72,7 @@
                         >
                             <span x-show="!editing" x-text="display">{{ $inquiry->subject }}</span>
                             @if($canEditInquiry && !$inquiry->result)
-                                <button x-show="!editing" :disabled="status === 'saving'" type="button" class="ft-pencil" aria-label="Edit Inquiry title" title="Edit Inquiry title" x-on:click.stop="if (beginEdit()) $nextTick(() => $refs.inquiryTitle.focus())">✎</button>
+                                <button x-show="!editing" :disabled="status === 'saving'" type="button" class="ft-pencil ft-detail-edit-button" aria-label="Edit Inquiry title" title="Edit Inquiry title" x-on:click.stop="if (beginEdit()) $nextTick(() => $refs.inquiryTitle.focus())"><x-ui.detail-icon name="edit" /></button>
                                 <input x-ref="inquiryTitle" x-cloak x-show="editing" x-model="draftValue" type="text" maxlength="255"
                                     x-on:keydown.escape.prevent="cancelEdit()"
                                     x-on:keydown.enter.prevent="$event.target.blur()"
@@ -90,7 +90,7 @@
                             <span class="ft-inquiry-header-meta-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M7 3.5h7l4 4V20.5H7z"></path><path d="M14 3.5v4h4"></path></svg></span>
                             <span>Reference <strong>{{ $inquiry->reference_number ?: '—' }}</strong></span>
                             @if($inquiry->reference_number)
-                                <button type="button" class="ft-copy-id-btn ft-inquiry-header-copy" title="Copy Reference Number" aria-label="Copy reference number {{ $inquiry->reference_number }}" onclick="event.preventDefault(); event.stopPropagation(); navigator.clipboard?.writeText(@js($inquiry->reference_number)); this.classList.add('copied'); setTimeout(()=>this.classList.remove('copied'),900)">⧉</button>
+                                <button type="button" class="ft-copy-id-btn ft-inquiry-header-copy" title="Copy Reference Number" aria-label="Copy reference number {{ $inquiry->reference_number }}" onclick="event.preventDefault(); event.stopPropagation(); navigator.clipboard?.writeText(@js($inquiry->reference_number)); this.classList.add('copied'); setTimeout(()=>this.classList.remove('copied'),900)"><x-ui.detail-icon name="copy" /></button>
                             @endif
                         </span>
                         <span class="ft-inquiry-header-meta-separator" aria-hidden="true">•</span>
@@ -109,12 +109,15 @@
                 </div>
             </div>
 
-            <div class="tabs">
-                <button class="tab active" type="button">Overview</button>
+            <div class="tabs ft-inquiry-detail-tabs" role="tablist" aria-label="Inquiry detail sections">
+                <button class="tab {{ $detailTab === 'overview' ? 'active' : '' }}" type="button" wire:click="setDetailTab('overview')">Overview</button>
+                <button class="tab {{ $detailTab === 'rfq' ? 'active' : '' }}" type="button" wire:click="setDetailTab('rfq')">RFQ @if(($inquiryRfqSummary['invited'] ?? 0) > 0)<span class="ft-inquiry-tab-count">{{ $inquiryRfqSummary['invited'] }} invited</span>@endif</button>
+                <button class="tab {{ $detailTab === 'comparison' ? 'active' : '' }}" type="button" wire:click="setDetailTab('comparison')">Comparison statement @if(($inquiryRfqSummary['submitted'] ?? 0) > 0)<span class="ft-inquiry-tab-count is-green">{{ $inquiryRfqSummary['submitted'] }}</span>@endif</button>
+                <button class="tab {{ $detailTab === 'activity' ? 'active' : '' }}" type="button" wire:click="setDetailTab('activity')">Activity</button>
             </div>
 
             @if($detailTab === 'overview')
-                <div class="tabpane ft-task-detail-page ft-exact-task-detail ft-inquiry-task-overview-exact">
+                <div class="tabpane ft-task-detail-page ft-exact-task-detail ft-inquiry-task-overview-exact" wire:key="inquiry-detail-overview-{{ $inquiry->id }}">
                     <section class="ft-task-property-grid ft-friendly-task-properties ft-inquiry-overview-properties">
                         <div class="ft-task-property ft-inquiry-auto-status-property">
                             <small>Status</small>
@@ -131,7 +134,7 @@
                             x-on:click.outside="if (editing) cancelEdit()"
                         >
                             <small>Priority</small>
-                            <div x-show="!editing" class="ft-task-property-display"><span class="status-dot ft-master-color-dot" style="{{ \App\Support\MasterColor::style($detailPriorityColor) }}" x-bind:style="priorityColor ? '--ft-master-color:'+priorityColor : ''"></span><b class="ft-property-value" x-text="display">{{ $inquiry->priority }}</b>@if($canEditInquiry && !$inquiry->result)<button type="button" :disabled="status === 'saving'" title="Edit priority" x-on:click.stop="if (beginEdit()) $nextTick(() => $refs.inquiryPriority?.showPicker ? $refs.inquiryPriority.showPicker() : $refs.inquiryPriority?.focus())">✎</button>@endif</div>
+                            <div x-show="!editing" class="ft-task-property-display"><span class="status-dot ft-master-color-dot" style="{{ \App\Support\MasterColor::style($detailPriorityColor) }}" x-bind:style="priorityColor ? '--ft-master-color:'+priorityColor : ''"></span><b class="ft-property-value" x-text="display">{{ $inquiry->priority }}</b>@if($canEditInquiry && !$inquiry->result)<button type="button" :disabled="status === 'saving'" class="ft-property-edit-button" title="Edit priority" aria-label="Edit Inquiry priority" x-on:click.stop="if (beginEdit()) $nextTick(() => $refs.inquiryPriority?.showPicker ? $refs.inquiryPriority.showPicker() : $refs.inquiryPriority?.focus())"><x-ui.detail-icon name="edit" /></button>@endif</div>
                             @if($canEditInquiry && !$inquiry->result)
                                 <div x-cloak x-show="editing" class="ft-task-property-inline-editor"><select data-master-color-select x-ref="inquiryPriority" x-model="draftValue" class="ft-task-property-inline-input ft-master-color" style="{{ \App\Support\MasterColor::style($detailPriorityColor) }}" x-on:keydown.escape.prevent="cancelEdit()" x-on:change="const nextColor=String($event.target.selectedOptions[0]?.dataset?.color || ''); window.FlowTrack.ui.masterColor?.applySelect($event.target); commit($event.target.value, selectedLabel($event), () => $wire.updateInquiryField('priority', draftValue)).then(ok => { if(ok) priorityColor=nextColor; });">@unless($inquiryPriorities->contains(fn($priority) => (string) $priority->name === (string) $inquiry->priority))<option value="{{ $inquiry->priority }}" data-color="{{ $masterData->displayColorFor('priority', (string) $inquiry->priority) }}">{{ $inquiry->priority }}</option>@endunless @foreach($inquiryPriorities as $priority)<option value="{{ $priority->name }}" data-color="{{ $masterData->displayColorFor('priority', $priority->name) }}">{{ $priority->name }}</option>@endforeach</select></div>
                                 <x-ui.inline-save-state compact />
@@ -150,7 +153,7 @@
                             <div x-show="!editing" class="ft-task-property-display ft-inline-person-live">
                                 <x-ui.inline-live-avatar :size="26" />
                                 <b class="ft-property-value" x-text="display">{{ $inquiry->owner?->name ?? 'Unassigned' }}</b>
-                                @if($canEditInquiry && $canAssignInquiry && !$inquiry->result)<button type="button" :disabled="status === 'saving'" title="Edit assignee" aria-label="Edit Inquiry assignee" x-on:click.stop="openRemotePicker($event.currentTarget)">✎</button>@endif
+                                @if($canEditInquiry && $canAssignInquiry && !$inquiry->result)<button type="button" :disabled="status === 'saving'" class="ft-property-edit-button" title="Edit assignee" aria-label="Edit Inquiry assignee" x-on:click.stop="openRemotePicker($event.currentTarget)"><x-ui.detail-icon name="edit" /></button>@endif
                             </div>
                             @if($canEditInquiry && $canAssignInquiry && !$inquiry->result)
                                 <div x-cloak x-show="editing" class="ft-task-property-inline-editor ft-task-property-assignee-editor">
@@ -178,7 +181,7 @@
                             x-on:click.outside="if (editing) cancelEdit()"
                         >
                             <small>Due date</small>
-                            <div x-show="!editing" class="ft-task-property-display"><span class="ft-calendar-glyph">▣</span><b class="ft-property-value" x-text="display">{{ $currentTask?->due_date?->format('M j, Y') ?? '—' }}</b>@if($currentTask && $canEditActiveTask)<button type="button" :disabled="status === 'saving'" title="Edit due date" x-on:click.stop="if (beginEdit()) $nextTick(() => $refs.inquiryOverviewDue?.showPicker ? $refs.inquiryOverviewDue.showPicker() : $refs.inquiryOverviewDue?.focus())">✎</button>@endif</div>
+                            <div x-show="!editing" class="ft-task-property-display"><x-ui.detail-icon name="calendar" class="ft-calendar-glyph" /><b class="ft-property-value" x-text="display">{{ $currentTask?->due_date?->format('M j, Y') ?? '—' }}</b>@if($currentTask && $canEditActiveTask)<button type="button" :disabled="status === 'saving'" class="ft-property-edit-button" title="Edit due date" aria-label="Edit Inquiry due date" x-on:click.stop="if (beginEdit()) $nextTick(() => $refs.inquiryOverviewDue?.showPicker ? $refs.inquiryOverviewDue.showPicker() : $refs.inquiryOverviewDue?.focus())"><x-ui.detail-icon name="edit" /></button>@endif</div>
                             @if($currentTask && $canEditActiveTask)
                                 <div x-cloak x-show="editing" class="ft-task-property-inline-editor"><input x-ref="inquiryOverviewDue" x-model="draftValue" class="ft-task-property-inline-input" type="date" x-on:keydown.escape.prevent="cancelEdit()" x-on:change="commit($event.target.value, formatDate($event.target.value), () => $wire.updateTaskDueInline({{ $currentTask->id }}, draftValue))"></div>
                                 <x-ui.inline-save-state compact />
@@ -194,10 +197,10 @@
                         >
                             <small>Start date</small>
                             <div x-show="!editing" class="ft-task-property-display">
-                                <span class="ft-calendar-glyph">▣</span>
+                                <x-ui.detail-icon name="calendar" class="ft-calendar-glyph" />
                                 <b class="ft-property-value" x-text="display">{{ $inquiryStartLocal?->format('M j, Y · g:i A') ?? '—' }}</b>
                                 @if($canEditInquiry && !$inquiry->result)
-                                    <button type="button" :disabled="status === 'saving'" title="Edit start date and time" aria-label="Edit Inquiry start date and time" x-on:click.stop="if (beginEdit()) $nextTick(() => $refs.inquiryStartAt?.showPicker ? $refs.inquiryStartAt.showPicker() : $refs.inquiryStartAt?.focus())">✎</button>
+                                    <button type="button" :disabled="status === 'saving'" class="ft-property-edit-button" title="Edit start date and time" aria-label="Edit Inquiry start date and time" x-on:click.stop="if (beginEdit()) $nextTick(() => $refs.inquiryStartAt?.showPicker ? $refs.inquiryStartAt.showPicker() : $refs.inquiryStartAt?.focus())"><x-ui.detail-icon name="edit" /></button>
                                 @endif
                             </div>
                             @if($canEditInquiry && !$inquiry->result)
@@ -212,7 +215,7 @@
 
                         <div class="ft-task-property ft-task-completed-property">
                             <small>Completed On</small>
-                            <div class="ft-task-property-display"><span class="ft-calendar-glyph">▣</span><b class="ft-property-value ft-completed-date-time"><span>{{ $inquiryCompletedAt ? \App\Support\UserLocalTime::format($inquiryCompletedAt, 'M j, Y') : '—' }}</span>@if($inquiryCompletedAt)<span class="ft-completed-time">{{ \App\Support\UserLocalTime::format($inquiryCompletedAt, 'g:i A') }}</span>@endif</b></div>
+                            <div class="ft-task-property-display"><x-ui.detail-icon name="calendar" class="ft-calendar-glyph" /><b class="ft-property-value ft-completed-date-time"><span>{{ $inquiryCompletedAt ? \App\Support\UserLocalTime::format($inquiryCompletedAt, 'M j, Y') : '—' }}</span>@if($inquiryCompletedAt)<span class="ft-completed-time">{{ \App\Support\UserLocalTime::format($inquiryCompletedAt, 'g:i A') }}</span>@endif</b></div>
                         </div>
                     </section>
 
@@ -224,7 +227,7 @@
                         <div class="ft-inquiry-description-head">
                             <h2>Description</h2>
                             @if($canEditInquiry && !$inquiry->result)
-                                <button x-show="!editing" :disabled="status === 'saving'" type="button" class="ft-inline-edit-button" title="Edit description" aria-label="Edit Inquiry description" x-on:click.stop="beginRichTextEdit($refs.inquiryDescription)">✎</button>
+                                <button x-show="!editing" :disabled="status === 'saving'" type="button" class="ft-inline-edit-button ft-detail-edit-button" title="Edit description" aria-label="Edit Inquiry description" x-on:click.stop="beginRichTextEdit($refs.inquiryDescription)"><x-ui.detail-icon name="edit" /></button>
                             @endif
                         </div>
                         <div x-show="!editing" class="ft-rich-text-content ft-inquiry-description-content">
@@ -244,6 +247,7 @@
                     </section>
 
                     @if($canViewInquiryProducts)
+                    @if((bool) ($inquiryDetailSectionsReady['products'] ?? false))
                     @php
                         // Only persisted products belong in the details table. The shared
                         // Add Product panel owns the temporary selection state, exactly as
@@ -261,7 +265,7 @@
                         :total-units="$inquiryItemUnits"
                     >
                         @if($inquiryItemRows->isEmpty())
-                            <tr class="ft-order-product-empty-row"><td colspan="7">No products have been added to this Inquiry yet.</td></tr>
+                            <tr class="ft-order-product-empty-row"><td colspan="8">No products have been added to this Inquiry yet.</td></tr>
                         @else
                             @foreach($inquiryItemRows as $item)
                                 @php
@@ -275,6 +279,14 @@
                                     $productImageUrl = $productMaster?->productImageUrl();
                                     $productCode = $productMaster?->productDisplayCode();
                                     $productReference = $productMaster?->productReferenceCode();
+                                    $productSupplier = $productMaster ? $inquiryProductSuppliers->get((int) $productMaster->id) : null;
+                                    $supplierLeadDays = (int) (data_get($productMaster?->metadata, 'lead_time_days') ?: data_get($productMaster?->metadata, 'supplier_lead_time_days') ?: 0);
+                                    $supplierPreferred = (bool) (data_get($productMaster?->metadata, 'supplier_preferred') ?: data_get($productMaster?->metadata, 'preferred_supplier'));
+                                    $supplierMeta = collect([
+                                        $productSupplier ? 'Default supplier' : null,
+                                        $supplierLeadDays > 0 ? number_format($supplierLeadDays).'-day lead time' : null,
+                                        $supplierPreferred ? 'Preferred' : null,
+                                    ])->filter()->implode(' · ');
                                     $classificationParts = collect([
                                         $productMaster?->productMainCategory(),
                                         ...array_filter(array_map('trim', preg_split('/\s*>\s*/', (string) ($productMaster?->productClassificationPath() ?? '')) ?: [])),
@@ -284,13 +296,15 @@
                                     $unitPrice = $item->unit_price !== null ? (float) $item->unit_price : null;
                                     $unitPriceValue = $unitPrice !== null ? number_format($unitPrice, 2, '.', '') : '';
                                     $unitPriceDisplay = $unitPrice !== null ? $inquiryCurrencySymbol.number_format($unitPrice, 2) : '—';
-                                    $updatedDate = $item->updated_at ? \App\Support\UserLocalTime::format($item->updated_at, 'M j, Y') : '—';
-                                    $updatedTime = $item->updated_at ? \App\Support\UserLocalTime::format($item->updated_at, 'g:i A') : null;
+                                    $updatedBy = $inquiry->owner?->name ?: $inquiry->creator?->name ?: 'FlowTrack';
+                                    $updatedRelative = $item->updated_at
+                                        ? (\App\Support\UserLocalTime::localize($item->updated_at)?->diffForHumans() ?: '—')
+                                        : '—';
                                 @endphp
                                 <tr
                                     wire:key="inquiry-product-detail-{{ $item->id }}"
-                                    x-data="{ categorySaving: false, productSaving: false, quantitySaving: false, priceSaving: false, notesSaving: false, actionOpen: false, draftProductReady: @js(filled($item->item_name)) }"
-                                    @class(['ft-order-product-draft-row' => $isDraftInquiryItem])
+                                    x-data="{ actionOpen: false }"
+                                    @class(['ft-order-product-draft-row' => $isDraftInquiryItem, 'is-editing' => (int) $editInquiryProductItemId === (int) $item->id])
                                 >
                                     <td data-label="Product">
                                         <x-catalog.detail-product-identity
@@ -300,131 +314,79 @@
                                             :reference="$productReference"
                                             fallback-meta="Inquiry product"
                                         >
-                                            <div
-                                                class="ft-inline-field-editor ft-inline-edit-shell ft-inline-catalog-editor ft-order-product-name-editor"
-                                                wire:key="{{ $productPickerKey }}"
-                                                x-data="window.FlowTrack.ui.inlineEdit({ key: @js('inquiry-item-'.$item->id.'-product'), label: 'product', value: @js($item->item_name ?? ''), display: @js($productLabel) })"
-                                                x-init="if (@js($canEditInquiryProducts && $productNeedsSelection)) { editing = true; $nextTick(() => setTimeout(() => { const picker = $el.querySelector('[data-ft-inline-remote-picker]'); picker?.dispatchEvent(new CustomEvent('ft-inline-remote-open', { detail: { value: value, label: display } })) }, 0)) }"
-                                                :class="{ 'is-inline-saving': status === 'saving', 'is-inline-error': status === 'error' }"
-                                                x-on:click.outside="if (editing && !@js($productNeedsSelection)) cancelEdit()"
-                                                x-on:ft-inline-remote-cancel.stop="if (!@js($productNeedsSelection)) cancelEdit()"
-                                                x-on:ft-inline-remote-selected.stop="const nextValue = String($event.detail?.value ?? ''); const nextLabel = String($event.detail?.label ?? 'Select product'); productSaving = true; commit(nextValue, nextLabel, () => $wire.updateInquiryItem({{ $item->id }}, 'item_name', nextValue)).then(async (ok) => { productSaving = false; if (ok) { draftProductReady = true; await $wire.$refresh(); } })"
-                                            >
-                                                <span class="ft-order-product-name" x-show="!editing" x-text="display">{{ $productLabel }}</span>
-                                                @if($canEditInquiryProducts)
-                                                    <button x-show="!editing" :disabled="status === 'saving' || categorySaving || quantitySaving || priceSaving || notesSaving || @js(blank($item->category))" type="button" class="ft-inline-edit-button" aria-label="Edit product" title="{{ blank($item->category) ? 'Select a category first' : 'Edit product' }}" x-on:click.stop="openRemotePicker($event.currentTarget)">✎</button>
-                                                    <div x-cloak x-show="editing" class="ft-inline-catalog-picker">
-                                                        <x-ui.inline-remote-catalog
-                                                            type="products"
-                                                            context="inquiry-detail"
-                                                            :value="$item->item_name ?? ''"
-                                                            :selected-label="$productLabel"
-                                                            :placeholder="blank($item->category) ? 'Select category first' : 'Select product'"
-                                                            search-label="product"
-                                                            :params="['category' => (string) ($item->category ?? '')]"
-                                                            :disabled="blank($item->category)"
-                                                            :menu-width="360"
-                                                            :fixed-menu="true"
-                                                        />
-                                                    </div>
-                                                    <x-ui.inline-save-state compact />
-                                                @endif
-                                            </div>
+                                            <span class="ft-order-product-name">{{ $productLabel }}</span>
                                         </x-catalog.detail-product-identity>
                                     </td>
                                     <td data-label="Category">
-                                        <div
-                                            class="ft-inline-field-editor ft-inline-edit-shell ft-inline-catalog-editor ft-order-product-category-editor"
-                                            wire:key="inquiry-item-{{ $item->id }}-category-{{ md5((string) ($item->category ?? '')) }}"
-                                            x-data="window.FlowTrack.ui.inlineEdit({ key: @js('inquiry-item-'.$item->id.'-category'), label: 'product category', value: @js($item->category ?? ''), display: @js($categoryDisplay) })"
-                                            x-init="if (@js($canEditInquiryProducts && $categoryNeedsSelection)) { editing = true; $nextTick(() => setTimeout(() => { const picker = $el.querySelector('[data-ft-inline-remote-picker]'); picker?.dispatchEvent(new CustomEvent('ft-inline-remote-open', { detail: { value: value, label: display } })) }, 0)) }"
-                                            :class="{ 'is-inline-saving': status === 'saving', 'is-inline-error': status === 'error' }"
-                                            x-on:click.outside="if (editing && !@js($categoryNeedsSelection)) cancelEdit()"
-                                            x-on:ft-inline-remote-cancel.stop="if (!@js($categoryNeedsSelection)) cancelEdit()"
-                                            x-on:ft-inline-remote-selected.stop="const nextValue = String($event.detail?.value ?? ''); const nextLabel = String($event.detail?.label ?? 'Select category'); const changed = nextValue !== savedValue; categorySaving = true; commit(nextValue, nextLabel, () => $wire.updateInquiryItem({{ $item->id }}, 'category', nextValue)).then(async (ok) => { if (ok && changed) await $wire.$refresh(); categorySaving = false })"
-                                        >
-                                            <span class="ft-order-product-category-path" x-show="!editing" x-text="display">{{ $categoryDisplay }}</span>
-                                            @if($canEditInquiryProducts)
-                                                <button x-show="!editing" :disabled="status === 'saving' || productSaving || quantitySaving || priceSaving || notesSaving" type="button" class="ft-inline-edit-button" aria-label="Edit product category" title="Edit category" x-on:click.stop="openRemotePicker($event.currentTarget)">✎</button>
-                                                <div x-cloak x-show="editing" class="ft-inline-catalog-picker">
-                                                    <x-ui.inline-remote-catalog
-                                                        type="product-categories"
-                                                        context="inquiry-detail"
-                                                        :value="$item->category ?? ''"
-                                                        :selected-label="$categoryLabel"
-                                                        placeholder="Select category"
-                                                        search-label="product category"
-                                                        :menu-width="340"
-                                                        :fixed-menu="true"
-                                                    />
-                                                </div>
-                                                <x-ui.inline-save-state compact />
-                                            @endif
-                                        </div>
+                                        <span class="ft-order-product-category-path">{{ $categoryDisplay }}</span>
+                                    </td>
+                                    <td data-label="Supplier">
+                                        <x-catalog.detail-product-supplier
+                                            :supplier="$productSupplier"
+                                            :meta="$supplierMeta"
+                                            fallback="No default supplier"
+                                        />
                                     </td>
                                     <td class="ft-order-product-quantity" data-label="Quantity">
-                                        <div
-                                            class="ft-inline-field-editor ft-inline-edit-shell"
-                                            x-data="window.FlowTrack.ui.inlineEdit({ key: @js('inquiry-item-'.$item->id.'-quantity'), label: 'quantity', value: @js((string) max(1, (int) $item->quantity)), display: @js(number_format((int) max(1, (int) $item->quantity)).' units') })"
-                                            x-init="if (@js($canEditInquiryProducts && $isDraftInquiryItem)) editing = true"
-                                            :class="{ 'is-inline-saving': status === 'saving', 'is-inline-error': status === 'error' }"
-                                        >
-                                            <span x-show="!editing" class="ft-order-product-edit-value" x-text="display">{{ number_format((int) max(1, (int) $item->quantity)) }} units</span>
-                                            @if($canEditInquiryProducts)
-                                                <button x-show="!editing" :disabled="status === 'saving' || categorySaving || productSaving || priceSaving || notesSaving" type="button" class="ft-inline-edit-button" title="Edit quantity" aria-label="Edit product quantity" x-on:click.stop="if (beginEdit()) $nextTick(() => { $refs.quantityInput.focus(); $refs.quantityInput.select(); })">✎</button>
-                                                <input x-ref="quantityInput" data-inquiry-item-quantity x-cloak x-show="editing" x-model="draftValue" class="ft-order-product-inline-input ft-order-product-number-input" type="number" min="1" max="999999999" step="1" :disabled="categorySaving || productSaving"
-                                                    x-on:keydown.escape.prevent="cancelEdit()"
-                                                    x-on:keydown.enter.prevent="$event.target.blur()"
-                                                    x-on:blur="if (editing && !categorySaving && !productSaving && !quantitySaving) { const next = positiveInteger(draftValue); quantitySaving = true; commit(next, Number(next).toLocaleString() + ' units', () => $wire.updateInquiryItem({{ $item->id }}, 'quantity', next)).then(async (ok) => { quantitySaving = false; if (ok && @js($isDraftInquiryItem)) await $wire.$refresh(); else if (!ok) editing = true; }) }"
-                                                >
-                                                <x-ui.inline-save-state compact />
-                                            @endif
-                                        </div>
+                                        <strong class="ft-order-product-static-value">{{ number_format((int) max(1, (int) $item->quantity)) }} units</strong>
                                     </td>
                                     <td class="ft-order-product-price" data-label="Unit price">
-                                        <div class="ft-inline-field-editor ft-inline-edit-shell" x-data="window.FlowTrack.ui.inlineEdit({ key: @js('inquiry-item-'.$item->id.'-unit-price'), label: 'unit price', value: @js($unitPriceValue), display: @js($unitPriceDisplay) })" :class="{ 'is-inline-saving': status === 'saving', 'is-inline-error': status === 'error' }">
-                                            <span x-show="!editing" class="ft-order-product-edit-value" x-text="display">{{ $unitPriceDisplay }}</span>
-                                            @if($canEditInquiryProducts)
-                                                <button x-show="!editing" :disabled="status === 'saving' || categorySaving || productSaving || quantitySaving || notesSaving" type="button" class="ft-inline-edit-button" title="Edit unit price" aria-label="Edit unit price" x-on:click.stop="if (beginEdit()) $nextTick(() => { $refs.priceInput.focus(); $refs.priceInput.select(); })">✎</button>
-                                                <div x-cloak x-show="editing" class="ft-order-product-price-input-wrap">
-                                                    <span>{{ $inquiryCurrencySymbol }}</span>
-                                                    <input x-ref="priceInput" x-model="draftValue" class="ft-order-product-inline-input ft-order-product-number-input" type="number" min="0" step="0.01"
-                                                        x-on:keydown.escape.prevent="cancelEdit()"
-                                                        x-on:keydown.enter.prevent="$event.target.blur()"
-                                                        x-on:blur="if (editing && !priceSaving) { const raw = String(draftValue ?? '').trim(); const parsed = raw === '' ? '' : Number(raw); const next = raw === '' ? '' : (Number.isFinite(parsed) ? Math.max(0, parsed).toFixed(2) : ''); priceSaving = true; commit(next, next === '' ? '—' : @js($inquiryCurrencySymbol) + Number(next).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}), () => $wire.updateInquiryItem({{ $item->id }}, 'unit_price', next)).then((ok) => { priceSaving = false; if (!ok) editing = true; }) }"
-                                                    >
-                                                </div>
-                                                <x-ui.inline-save-state compact />
-                                            @endif
-                                        </div>
+                                        <strong class="ft-order-product-static-value">{{ $unitPriceDisplay }}</strong>
                                     </td>
                                     <td class="ft-order-product-notes" data-label="Notes">
-                                        <div class="ft-inline-field-editor ft-inline-edit-shell" x-data="window.FlowTrack.ui.inlineEdit({ key: @js('inquiry-item-'.$item->id.'-notes'), label: 'product notes', value: @js($item->notes ?? ''), display: @js($item->notes ?: 'Add notes') })" :class="{ 'is-inline-saving': status === 'saving', 'is-inline-error': status === 'error' }">
-                                            <span x-show="!editing" class="ft-order-product-note-value" :class="{ 'is-empty': !value }" x-text="display">{{ $item->notes ?: 'Add notes' }}</span>
-                                            @if($canEditInquiryProducts)
-                                                <button x-show="!editing" :disabled="status === 'saving' || categorySaving || productSaving || quantitySaving || priceSaving" type="button" class="ft-inline-edit-button" title="Edit notes" aria-label="Edit product notes" x-on:click.stop="if (beginEdit()) $nextTick(() => { $refs.notesInput.focus(); $refs.notesInput.select(); })">✎</button>
-                                                <input x-ref="notesInput" x-cloak x-show="editing" x-model="draftValue" class="ft-order-product-inline-input ft-order-product-notes-input" type="text" maxlength="2000" placeholder="Product notes"
-                                                    x-on:keydown.escape.prevent="cancelEdit()"
-                                                    x-on:keydown.enter.prevent="$event.target.blur()"
-                                                    x-on:blur="if (editing && !notesSaving) { const next = String(draftValue || '').trim(); notesSaving = true; commit(next, next || 'Add notes', () => $wire.updateInquiryItem({{ $item->id }}, 'notes', next)).then((ok) => { notesSaving = false; if (!ok) editing = true; }) }"
-                                                >
-                                                <x-ui.inline-save-state compact />
-                                            @endif
-                                        </div>
+                                        <span class="ft-order-product-note-value {{ filled($item->notes) ? '' : 'is-empty' }}">{{ $item->notes ?: 'Add notes' }}</span>
                                     </td>
                                     <x-catalog.detail-product-updated
-                                        :primary="$updatedDate"
-                                        :secondary="$updatedTime"
+                                        :primary="$updatedBy"
+                                        :secondary="$updatedRelative"
                                     />
                                     <td class="ft-order-product-actions-cell" data-label="Actions">
                                         <x-catalog.detail-product-actions
                                             :item-id="$item->id"
+                                            :can-edit="$canEditInquiryProducts"
+                                            edit-method="openEditInquiryProduct"
                                             :can-delete="$canDeleteInquiryProducts"
                                             remove-method="removeInquiryItem"
                                             confirm-text="Remove this product from the Inquiry?"
                                         />
                                     </td>
                                 </tr>
+
+                                @if($canEditInquiryProducts && (int) $editInquiryProductItemId === (int) $item->id)
+                                    <tr class="ft-detail-product-editor-row" wire:key="inquiry-product-inline-editor-{{ $item->id }}">
+                                        <td colspan="8">
+                                            <x-catalog.detail-product-edit
+                                                :wire-key="'inquiry-product-edit-'.$item->id"
+                                                variant="inquiry"
+                                                record-label="Inquiry"
+                                                search-model="editInquiryProductSearch"
+                                                :search-value="$editInquiryProductSearch"
+                                                :search-results="$editInquiryProductSearchResults"
+                                                :search-suppliers="$editInquiryProductSearchSuppliers"
+                                                :result-total="$editInquiryProductResultTotal"
+                                                :show-all-results="$editInquiryProductShowAllResults"
+                                                show-all-method="showAllEditInquiryProductResults"
+                                                select-method="selectEditInquiryProduct"
+                                                :selected-product="$editInquiryProductSelectedProduct"
+                                                :selected-supplier="$editInquiryProductSelectedSupplier"
+                                                :category-value="$editInquiryProductCategory"
+                                                quantity-model="editInquiryProductQuantity"
+                                                :quantity-value="$editInquiryProductQuantity"
+                                                :unit-price-value="$editInquiryProductUnitPrice"
+                                                notes-model="editInquiryProductNotes"
+                                                :notes-value="$editInquiryProductNotes"
+                                                :supplier-editable="false"
+                                                :currency-symbol="$inquiryCurrencySymbol"
+                                                close-method="closeEditInquiryProduct"
+                                                save-method="saveEditInquiryProduct"
+                                                selected-error-key="editInquiryProductSelectedId"
+                                                quantity-error-key="editInquiryProductQuantity"
+                                                unit-price-error-key="editInquiryProductUnitPrice"
+                                                notes-error-key="editInquiryProductNotes"
+                                            />
+                                        </td>
+                                    </tr>
+                                @endif
                             @endforeach
                         @endif
 
@@ -436,13 +398,18 @@
                                         search-model="inquiryProductSearch"
                                         :search-value="$inquiryProductSearch"
                                         :search-results="$inquiryProductSearchResults"
+                                        :search-suppliers="$inquiryProductSearchSuppliers"
                                         :result-total="$inquiryProductResultTotal"
+                                        :show-all-results="$inquiryProductShowAllResults"
                                         show-all-method="showAllInquiryProductResults"
                                         select-method="selectInquiryProduct"
                                         :selected-product="$inquiryProductSelectedProduct"
+                                        :selected-supplier="$inquiryProductSelectedSupplier"
                                         :category-value="$inquiryProductCategory"
                                         quantity-model="inquiryProductQuantity"
+                                        :quantity-value="$inquiryProductQuantity"
                                         unit-price-model="inquiryProductUnitPrice"
+                                        :unit-price-value="$inquiryProductUnitPrice"
                                         :currency-symbol="$inquiryCurrencySymbol"
                                         close-method="closeAddInquiryProductForm"
                                         save-method="saveInquiryProduct"
@@ -456,25 +423,68 @@
                         </x-slot:afterTable>
 
                         <x-slot:footer>
-                            <span>Product and quantity changes are recorded in inquiry activity.</span>
+                            <span>Product, quantity, price and supplier changes are recorded in inquiry activity.</span>
                             @if($canCreateInquiryProducts && !$showAddInquiryProductForm)
                                 <button type="button" class="ft-outline-btn ft-order-product-add-another" wire:click="openAddInquiryProductForm" wire:loading.attr="disabled" wire:target="openAddInquiryProductForm">＋ Add another product</button>
                             @endif
                         </x-slot:footer>
                     </x-catalog.detail-products-card>
+                    @else
+                        <x-ui.progressive-section-loader
+                            section="products"
+                            method="loadDetailSection"
+                            key-prefix="inquiry-detail"
+                            context-type="inquiry"
+                            :context-id="$inquiry->id"
+                            :rows="4"
+                            message="Loading Inquiry products when needed…"
+                            root-margin="360px 0px"
+                        />
+                    @endif
                     @endif
 
                     <div id="tab-workflow" class="ft-inquiry-overview-taskflow ft-inquiry-workflow-pane">
                         @if(auth()->user()->canModule('tasks', 'view'))
-                            @include('livewire.inquiries._taskflow')
+                            @if((bool) ($inquiryDetailSectionsReady['taskflow'] ?? false))
+                                @include('livewire.inquiries._taskflow')
+                            @else
+                                <x-ui.progressive-section-loader
+                                    section="taskflow"
+                                    method="loadDetailSection"
+                                    key-prefix="inquiry-detail"
+                                    context-type="inquiry"
+                                    :context-id="$inquiry->id"
+                                    :rows="5"
+                                    message="Loading Inquiry taskflow when needed…"
+                                    root-margin="360px 0px"
+                                />
+                            @endif
                         @else
                             <section class="panel"><div class="ft-inquiry-empty-workflow">Task access is not enabled for your role.</div></section>
                         @endif
                     </div>
 
-                    @if(auth()->user()->canModule('documents', 'view'))@include('livewire.inquiries._attachments')@endif
+                    @if(auth()->user()->canModule('documents', 'view'))
+                        @if((bool) ($inquiryDetailSectionsReady['documents'] ?? false))
+                            @include('livewire.inquiries._attachments')
+                        @else
+                            <x-ui.progressive-section-loader section="documents" method="loadDetailSection" key-prefix="inquiry-detail" context-type="inquiry" :context-id="$inquiry->id" :rows="3" message="Loading Inquiry attachments when needed…" root-margin="300px 0px" />
+                        @endif
+                    @endif
+
+                </div>
+            @elseif($detailTab === 'rfq')
+                @include('livewire.inquiries.sections.rfq')
+            @elseif($detailTab === 'comparison')
+                @include('livewire.inquiries.sections.comparison')
+            @elseif($detailTab === 'activity')
+                <div class="ft-rfq-pane ft-rfq-activity-pane" wire:key="inquiry-detail-activity-{{ $inquiry->id }}">
                     @include('livewire.inquiries._activity')
                 </div>
+            @endif
+
+            @if($showRfqEmailPreview)
+                <x-inquiries-rfq-email-preview :previews="$rfqEmailPreviews" :active="$rfqEmailPreviewType" />
             @endif
 
             @if($showTaskDocumentModal && $taskDocumentModalTask)
@@ -482,7 +492,7 @@
                     $completeAfterTaskDocument = (int) ($pendingCompletionTaskId ?? 0) === (int) $taskDocumentModalTask->id;
                 @endphp
                 <div class="ft-inquiry-task-document-modal-backdrop" wire:key="inquiry-task-document-modal" wire:click.self="closeTaskDocumentModal">
-                    <section class="ft-inquiry-task-document-modal" role="dialog" aria-modal="true" aria-labelledby="task-document-modal-title">
+                    <section class="ft-inquiry-task-document-modal" data-ft-feedback-scope="form" role="dialog" aria-modal="true" aria-labelledby="task-document-modal-title">
                         <header class="ft-inquiry-task-document-modal-head">
                             <div>
                                 <h2 id="task-document-modal-title">{{ $completeAfterTaskDocument ? 'Required file needed to complete task' : 'Add new document to task' }}</h2>
@@ -576,7 +586,7 @@
 
             @if($showInquiryAttentionModal)
                 <div class="ft-inquiry-attention-modal-backdrop" wire:key="inquiry-attention-modal" wire:click.self="closeInquiryAttentionReason">
-                    <section class="ft-inquiry-attention-modal" role="dialog" aria-modal="true" aria-labelledby="inquiry-attention-modal-title">
+                    <section class="ft-inquiry-attention-modal" data-ft-feedback-scope="form" role="dialog" aria-modal="true" aria-labelledby="inquiry-attention-modal-title">
                         <header class="ft-inquiry-attention-modal-head">
                             <div>
                                 <h2 id="inquiry-attention-modal-title">Request attention</h2>
@@ -609,7 +619,7 @@
                     $attentionTask = $inquiry->tasks->firstWhere('id', (int) $taskAttentionTaskId);
                 @endphp
                 <div class="ft-inquiry-attention-modal-backdrop" wire:key="inquiry-task-attention-modal" wire:click.self="closeTaskAttentionReason">
-                    <section class="ft-inquiry-attention-modal" role="dialog" aria-modal="true" aria-labelledby="task-attention-modal-title">
+                    <section class="ft-inquiry-attention-modal" data-ft-feedback-scope="form" role="dialog" aria-modal="true" aria-labelledby="task-attention-modal-title">
                         <header class="ft-inquiry-attention-modal-head">
                             <div>
                                 <h2 id="task-attention-modal-title">Why is attention required?</h2>

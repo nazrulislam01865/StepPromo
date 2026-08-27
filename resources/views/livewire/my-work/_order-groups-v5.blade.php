@@ -33,7 +33,6 @@
                             <b>Stage</b>
                             <i class="stage-chip" style="--stage:{{ $group['stageColor'] ?: '#2563EB' }}">{{ $group['stage'] }}</i>
                         </span>
-                        <span><b>Health</b><i class="row-status {{ $group['healthTone'] === 'red' ? 'attn' : 'good' }}">{{ $group['health'] }}</i></span>
                         <span class="ft-my-task-summary-progress">
                             <b>Progress</b>
                             <i class="row-progress-track"><i style="width:{{ $group['progress'] }}%"></i></i>

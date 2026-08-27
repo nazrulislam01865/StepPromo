@@ -8,10 +8,17 @@
                 <p>{{ $pageSubtitle }}</p>
             </div>
             @if($canCreateMaster)
-                <button type="button" class="primary ft-master-add-button" wire:click="open">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-                    <span>Add {{ $singularLabel }}</span>
-                </button>
+                @if($group === 'supplier')
+                    <a href="{{ route('master-data', ['group' => 'supplier', 'create' => 1]) }}" wire:navigate class="primary ft-master-add-button">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                        <span>Create supplier</span>
+                    </a>
+                @else
+                    <button type="button" class="primary ft-master-add-button" wire:click="open">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                        <span>Add {{ $singularLabel }}</span>
+                    </button>
+                @endif
             @endif
         </div>
 

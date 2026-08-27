@@ -19,10 +19,17 @@ trait ManagesCreateOrderProducts
 {
     public function updatedJobItems(mixed $value, string $key): void
     {
-        if (!$this->showCreate || !str_ends_with($key, '.category')) return;
+        if (!$this->showCreate) return;
 
         $index = (int) str($key)->before('.')->toString();
         if (!array_key_exists($index, $this->jobItems)) return;
+
+        if (str_ends_with($key, '.quantity')) {
+            $this->syncCreateOrderProductBasePrice($index);
+            return;
+        }
+
+        if (!str_ends_with($key, '.category')) return;
 
         // A product belongs to the selected category. Clear any stale product
         // immediately so the remote selector cannot submit a value from the
@@ -72,8 +79,8 @@ trait ManagesCreateOrderProducts
         if (!$alreadySelected) {
             abort_if(count($this->jobItems) >= 25, 422, 'An Order can contain up to 25 products.');
 
-            // Supplier is never selected from the Order form. Product Master is
-            // the single source of truth for the Product -> Supplier link.
+            // Start from the Product Master default supplier. The selected row may
+            // later use an Order-only supplier override through the reusable Change control.
             $productSupplier = app(\App\Services\ProductCatalogService::class)->supplierForProduct($product);
             if (!$productSupplier) {
                 $this->missingProductSupplierName = (string) $product->name;
@@ -91,6 +98,7 @@ trait ManagesCreateOrderProducts
             $this->appendCreateOrderProduct($product, (int) $productSupplier->id);
         }
 
+        $this->createProductShowAllResults = false;
         $this->resetValidation('jobItems');
         $this->dispatch('create-order-product-selected');
     }
@@ -149,9 +157,42 @@ trait ManagesCreateOrderProducts
             $this->appendCreateOrderProduct($product, $supplier?->id);
         }
 
+        $this->createProductShowAllResults = false;
         $this->resetValidation('jobItems');
         $this->closeMissingProductSupplierModal();
         $this->dispatch('create-order-product-selected');
+    }
+
+    public function updateCreateOrderProductSupplierFromSelector(string $property, mixed $supplierId): array
+    {
+        $this->authorizeCreateOrderProducts();
+        abort_unless(preg_match('/^create-order-item-supplier:(\d+)$/', $property, $matches) === 1, 422, 'Invalid supplier target.');
+
+        $index = (int) $matches[1];
+        abort_unless(array_key_exists($index, $this->jobItems), 422, 'That product row is no longer available.');
+
+        $supplierId = filled($supplierId) ? (int) $supplierId : 0;
+        abort_unless($supplierId > 0, 422, 'Select a supplier.');
+
+        $supplier = MasterRecord::query()
+            ->forWorkspace(app(MasterDataService::class)->workspaceId())
+            ->ofType('supplier')
+            ->active()
+            ->findOrFail($supplierId, ['id', 'name', 'code', 'status']);
+
+        $productId = (int) ($this->jobItems[$index]['product_id'] ?? 0);
+        abort_unless($productId > 0, 422, 'That product row is no longer available.');
+
+        $this->jobItems[$index]['supplier_id'] = (int) $supplier->id;
+        $this->createOrderSupplierOverrides[$productId] = (int) $supplier->id;
+        $this->createOrderSupplierSkipProductIds = array_values(array_filter(
+            $this->createOrderSupplierSkipProductIds,
+            fn (int $id): bool => $id !== $productId
+        ));
+        $this->resetValidation("jobItems.$index.supplier_id");
+        $this->dispatch('create-order-product-supplier-selected');
+
+        return ['ok' => true, 'value' => (string) $supplier->id, 'label' => (string) $supplier->name];
     }
 
     private function appendCreateOrderProduct(MasterRecord $product, ?int $supplierId): void
@@ -166,15 +207,51 @@ trait ManagesCreateOrderProducts
         }
         $productCategory = $productCategory !== '' ? $productCategory : 'Uncategorized';
 
+        $defaultQuantity = 1000;
+        $basePrice = $product->productPriceForQuantity($defaultQuantity);
+
         $this->jobItems[] = [
             'product_id' => (int) $product->id,
             'category' => $productCategory,
             'product' => (string) $product->name,
-            'quantity' => 1000,
+            'quantity' => $defaultQuantity,
             'supplier_id' => $supplierId,
-            'unit_price' => '',
+            'unit_price' => $basePrice !== null ? number_format($basePrice, 2, '.', '') : '',
             'notes' => '',
         ];
+    }
+
+    /**
+     * Keep the Create Order base/unit price synchronized with the Product
+     * Master's quantity price table. Order creation never treats this value as
+     * a manual override: changing quantity immediately resolves the matching
+     * price breakpoint for the selected Product.
+     */
+    private function syncCreateOrderProductBasePrice(int $index): void
+    {
+        if (!array_key_exists($index, $this->jobItems)) return;
+
+        $productId = (int) ($this->jobItems[$index]['product_id'] ?? 0);
+        $quantity = (int) ($this->jobItems[$index]['quantity'] ?? 0);
+
+        if ($productId <= 0 || $quantity <= 0) {
+            $this->jobItems[$index]['unit_price'] = '';
+            $this->resetValidation("jobItems.$index.unit_price");
+            return;
+        }
+
+        $product = MasterRecord::query()
+            ->forWorkspace(app(MasterDataService::class)->workspaceId())
+            ->ofType('product')
+            ->active()
+            ->find($productId);
+
+        $basePrice = $product?->productPriceForQuantity($quantity);
+        $this->jobItems[$index]['unit_price'] = $basePrice !== null
+            ? number_format($basePrice, 2, '.', '')
+            : '';
+
+        $this->resetValidation("jobItems.$index.unit_price");
     }
 
     public function incrementCreateProductQuantity(int $index): void
@@ -183,6 +260,7 @@ trait ManagesCreateOrderProducts
         abort_unless(array_key_exists($index, $this->jobItems), 422);
         $current = max(1, (int) ($this->jobItems[$index]['quantity'] ?? 1));
         $this->jobItems[$index]['quantity'] = min(999999999, $current + 1);
+        $this->syncCreateOrderProductBasePrice($index);
         $this->resetValidation("jobItems.$index.quantity");
     }
 
@@ -192,6 +270,7 @@ trait ManagesCreateOrderProducts
         abort_unless(array_key_exists($index, $this->jobItems), 422);
         $current = max(1, (int) ($this->jobItems[$index]['quantity'] ?? 1));
         $this->jobItems[$index]['quantity'] = max(1, $current - 1);
+        $this->syncCreateOrderProductBasePrice($index);
         $this->resetValidation("jobItems.$index.quantity");
     }
 
