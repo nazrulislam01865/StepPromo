@@ -73,7 +73,11 @@ trait ManagesOrderDetail
         });
 
         if ($result['ok'] ?? false) {
-            $result['avatarUrl'] = $owner?->profileImageUrl();
+            // Return the canonical saved owner so every visible owner control can
+            // synchronize immediately without forcing a full Livewire re-render.
+            $result['value'] = $owner ? (string) $owner->id : '';
+            $result['display'] = $owner?->name ?? 'Unassigned';
+            $result['avatarUrl'] = $owner?->profileImageUrl() ?? '';
         }
 
         return $result;

@@ -1,6 +1,7 @@
 @php
     $invitedCount = (int) ($inquiryRfqSummary['invited'] ?? 0);
     $submittedCount = (int) ($inquiryRfqSummary['submitted'] ?? 0);
+    $inquiryEmailEnabled = app(\App\Services\Email\ModuleEmailControlService::class)->inquiryEnabled();
     $rfqInitials = static function (?string $name): string {
         $parts = preg_split('/\s+/u', trim((string) $name)) ?: [];
         return strtoupper(substr(implode('', array_map(fn ($part) => mb_substr($part, 0, 1), $parts)), 0, 2)) ?: '—';
@@ -33,11 +34,12 @@
             <div class="ft-rfq-candidates">
                 <div class="ft-rfq-candidate-summary">
                     <span>{{ number_format($rfqSupplierCandidates->count()) }} {{ \Illuminate\Support\Str::plural('supplier', $rfqSupplierCandidates->count()) }} from Supplier list</span>
-                    <span>Invite active suppliers with a valid email</span>
+                    <span>{{ $inquiryEmailEnabled ? 'Active suppliers can be added even without email' : 'Inquiry email service is disabled · suppliers will be added without email' }}</span>
                 </div>
                 @forelse($rfqSupplierCandidates as $candidate)
                     @php
                         $candidateInvitable = (bool) ($candidate['invitable'] ?? false);
+                        $candidateEmailReady = (bool) ($candidate['email_ready'] ?? false);
                         $candidateUnavailableReason = trim((string) ($candidate['unavailable_reason'] ?? ''));
                         $candidateEmail = trim((string) ($candidate['email'] ?? ''));
                     @endphp
@@ -49,8 +51,8 @@
                         </div>
                         @if($candidateInvitable && $canManageInquiryRfq)
                             <button type="button" class="ft-rfq-primary-small" wire:click="inviteRfqSupplier({{ $candidate['id'] }})" wire:loading.attr="disabled" wire:target="inviteRfqSupplier({{ $candidate['id'] }})">
-                                <span wire:loading.remove wire:target="inviteRfqSupplier({{ $candidate['id'] }})">Invite</span>
-                                <span wire:loading wire:target="inviteRfqSupplier({{ $candidate['id'] }})">Sending…</span>
+                                <span wire:loading.remove wire:target="inviteRfqSupplier({{ $candidate['id'] }})">{{ $candidateEmailReady && $inquiryEmailEnabled ? 'Invite' : 'Add' }}</span>
+                                <span wire:loading wire:target="inviteRfqSupplier({{ $candidate['id'] }})">{{ $candidateEmailReady && $inquiryEmailEnabled ? 'Sending…' : 'Adding…' }}</span>
                             </button>
                         @elseif(! $candidateInvitable)
                             <span class="ft-rfq-candidate-unavailable" title="Update this supplier in Master Data before sending an RFQ">{{ $candidateUnavailableReason !== '' ? $candidateUnavailableReason : 'Unavailable' }}</span>
@@ -69,6 +71,7 @@
                     @foreach($rfqDefaultSuppliers as $defaultSupplier)
                         @php
                             $defaultInvitable = (bool) ($defaultSupplier['invitable'] ?? false);
+                            $defaultEmailReady = (bool) ($defaultSupplier['email_ready'] ?? false);
                             $defaultEmail = trim((string) ($defaultSupplier['email'] ?? ''));
                             $defaultUnavailableReason = trim((string) ($defaultSupplier['unavailable_reason'] ?? ''));
                             $defaultProductCount = (int) ($defaultSupplier['product_count'] ?? 0);
@@ -85,15 +88,15 @@
                             </td>
                             <td data-label="Invited">Not sent</td>
                             <td data-label="Email status">
-                                <span class="ft-rfq-status-pill {{ $defaultInvitable ? 'is-blue' : 'is-neutral' }}">{{ $defaultInvitable ? 'Ready to send' : ($defaultUnavailableReason !== '' ? $defaultUnavailableReason : 'Unavailable') }}</span>
+                                <span class="ft-rfq-status-pill {{ $defaultInvitable ? 'is-blue' : 'is-neutral' }}">{{ $defaultInvitable ? ($defaultEmailReady && $inquiryEmailEnabled ? 'Ready to send' : 'Ready to add') : ($defaultUnavailableReason !== '' ? $defaultUnavailableReason : 'Unavailable') }}</span>
                             </td>
                             <td data-label="Expression of interest"><span class="ft-rfq-status-pill is-neutral">—</span></td>
                             <td data-label="Quotation"><span class="ft-rfq-status-pill is-neutral">—</span></td>
                             <td class="ft-rfq-table-action" data-label="Action">
                                 @if($defaultInvitable && $canManageInquiryRfq)
                                     <button type="button" class="ft-rfq-primary-small" wire:click="inviteRfqSupplier({{ $defaultSupplier['id'] }})" wire:loading.attr="disabled" wire:target="inviteRfqSupplier({{ $defaultSupplier['id'] }})">
-                                        <span wire:loading.remove wire:target="inviteRfqSupplier({{ $defaultSupplier['id'] }})">Send</span>
-                                        <span wire:loading wire:target="inviteRfqSupplier({{ $defaultSupplier['id'] }})">Sending…</span>
+                                        <span wire:loading.remove wire:target="inviteRfqSupplier({{ $defaultSupplier['id'] }})">{{ $defaultEmailReady && $inquiryEmailEnabled ? 'Send' : 'Add' }}</span>
+                                        <span wire:loading wire:target="inviteRfqSupplier({{ $defaultSupplier['id'] }})">{{ $defaultEmailReady && $inquiryEmailEnabled ? 'Sending…' : 'Adding…' }}</span>
                                     </button>
                                 @elseif(! $defaultInvitable)
                                     <span class="ft-rfq-candidate-unavailable">{{ $defaultUnavailableReason !== '' ? $defaultUnavailableReason : 'Unavailable' }}</span>
@@ -108,18 +111,28 @@
                         @php
                             $interest = $invitation->interest_status === 'interested' ? 'Interested' : ($invitation->interest_status === 'declined' ? 'Declined' : 'Pending');
                             $quotation = $rfqStatusLabel($invitation);
+                            $invitationEmailReady = filter_var($invitation->supplierEmail(), FILTER_VALIDATE_EMAIL) !== false;
                         @endphp
                         <tr wire:key="rfq-invitation-{{ $invitation->id }}">
                             <td data-label="Supplier">
                                 <div class="ft-rfq-table-supplier"><span class="ft-rfq-supplier-avatar">{{ $rfqInitials($invitation->supplier?->name) }}</span><div><strong>{{ $invitation->supplier?->name ?: 'Supplier' }}</strong><span>{{ $invitation->supplierEmail() ?: 'No email' }}</span></div></div>
                             </td>
                             <td data-label="Invited">{{ $invitation->invited_at ? \App\Support\UserLocalTime::format($invitation->invited_at, 'M j, Y') : '—' }}</td>
-                            <td data-label="Email status"><span class="ft-rfq-status-pill {{ $invitation->email_status === 'Delivered' ? 'is-green' : ($invitation->email_status === 'Failed' ? 'is-red' : 'is-blue') }}">{{ $invitation->email_status }}</span></td>
+                            <td data-label="Email status"><span class="ft-rfq-status-pill {{ $invitation->email_status === 'Delivered' ? 'is-green' : ($invitation->email_status === 'Failed' ? 'is-red' : ($invitation->email_status === 'Email disabled' ? 'is-neutral' : 'is-blue')) }}">{{ $invitation->email_status }}</span></td>
                             <td data-label="Expression of interest"><span class="ft-rfq-status-pill {{ $interest === 'Interested' ? 'is-green' : ($interest === 'Declined' ? 'is-red' : 'is-neutral') }}">{{ $interest }}</span></td>
                             <td data-label="Quotation"><span class="ft-rfq-status-pill {{ in_array($quotation, ['Submitted','Selected'], true) ? 'is-green' : ($quotation === 'Not selected' ? 'is-neutral' : 'is-blue') }}">{{ $quotation }}</span></td>
                             <td class="ft-rfq-table-action" data-label="Action">
                                 @if($invitation->quote_status === 'submitted')
                                     <button type="button" class="ft-rfq-link" wire:click="setDetailTab('comparison')">View response</button>
+                                @elseif($canManageInquiryRfq && $inquiryEmailEnabled && $invitation->email_status !== 'Delivered' && $invitationEmailReady)
+                                    <button type="button" class="ft-rfq-primary-small" wire:click="sendExistingRfqInvitation({{ $invitation->id }})" wire:loading.attr="disabled" wire:target="sendExistingRfqInvitation({{ $invitation->id }})">
+                                        <span wire:loading.remove wire:target="sendExistingRfqInvitation({{ $invitation->id }})">{{ $invitation->email_status === 'Failed' ? 'Retry email' : 'Send invitation' }}</span>
+                                        <span wire:loading wire:target="sendExistingRfqInvitation({{ $invitation->id }})">Sending…</span>
+                                    </button>
+                                @elseif(! $inquiryEmailEnabled && $invitationEmailReady)
+                                    <span class="ft-rfq-candidate-unavailable">Email service disabled</span>
+                                @elseif($invitation->email_status === 'No email')
+                                    <span class="ft-rfq-candidate-unavailable">No email configured</span>
                                 @else
                                     <span>—</span>
                                 @endif

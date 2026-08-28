@@ -36,6 +36,9 @@ class Index extends Component
 
     public bool $showRoleModal = false;
     public ?int $editingRoleId = null;
+
+    // Friendly confirmation state for disabling module email delivery.
+    public ?string $pendingEmailServiceModule = null;
     public string $roleName = '';
     public string $roleCode = '';
     public string $roleDescription = '';
@@ -234,6 +237,51 @@ class Index extends Component
         app(AdminService::class)->toggleSecurity($code, auth()->user());
     }
 
+    public function toggleEmailService(string $module): void
+    {
+        $enabled = app(AdminService::class)->toggleEmailService($module, auth()->user());
+        session()->flash('success', ucfirst($module).' email service '.($enabled ? 'enabled' : 'disabled').'.');
+    }
+
+    public function requestDisableEmailService(string $module): void
+    {
+        $setting = collect(app(AdminService::class)->emailServiceSettings())
+            ->firstWhere('module', $module);
+
+        abort_unless($setting, 422, 'Unknown email service.');
+
+        // If another administrator already disabled it, simply refresh the UI
+        // instead of opening a stale confirmation dialog.
+        if (! (bool) ($setting['enabled'] ?? false)) {
+            $this->pendingEmailServiceModule = null;
+            return;
+        }
+
+        $this->pendingEmailServiceModule = $module;
+    }
+
+    public function cancelDisableEmailService(): void
+    {
+        $this->pendingEmailServiceModule = null;
+    }
+
+    public function confirmDisableEmailService(): void
+    {
+        $module = $this->pendingEmailServiceModule;
+        abort_unless(filled($module), 422, 'No email service is waiting for confirmation.');
+
+        $enabled = app(AdminService::class)->setEmailService($module, false, auth()->user());
+        $this->pendingEmailServiceModule = null;
+
+        session()->flash('success', ucfirst($module).' email service '.($enabled ? 'enabled' : 'disabled').'.');
+    }
+
+    public function setEmailService(string $module, bool $enabled): void
+    {
+        $enabled = app(AdminService::class)->setEmailService($module, $enabled, auth()->user());
+        session()->flash('success', ucfirst($module).' email service '.($enabled ? 'enabled' : 'disabled').'.');
+    }
+
     public function toggleRule(int $id): void { app(AdminService::class)->toggleRule($id); }
 
     public function saveLogo()
@@ -290,7 +338,7 @@ class Index extends Component
             'users' => $this->usersPageData($service),
             'audit' => ['auditLog' => $service->auditLog()],
             'security' => ['securitySettings' => $service->securitySettings()],
-            'settings' => [],
+            'settings' => ['emailServiceSettings' => $service->emailServiceSettings()],
             'branding' => ['branding' => app(BrandingService::class)->current()],
             default => $this->dashboardPageData($service),
         });

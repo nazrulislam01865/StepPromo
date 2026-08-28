@@ -106,6 +106,9 @@
     'orderWorkflowActionTaskId'=>null,
     'orderWorkflowActionStep'=>'main',
     'orderWorkflowActionPayload'=>[],
+    'orderWorkflowEmailFallback'=>false,
+    'orderWorkflowEmailFallbackMessage'=>'',
+    'orderWorkflowEmailFallbackAttempts'=>0,
 ])
 @php
     $manualAttention = (bool) ($job->attention_requested ?? false);
@@ -194,6 +197,9 @@
             :order-workflow-action-task-id="$orderWorkflowActionTaskId"
             :order-workflow-action-step="$orderWorkflowActionStep"
             :order-workflow-action-payload="$orderWorkflowActionPayload"
+            :order-workflow-email-fallback="$orderWorkflowEmailFallback"
+            :order-workflow-email-fallback-message="$orderWorkflowEmailFallbackMessage"
+            :order-workflow-email-fallback-attempts="$orderWorkflowEmailFallbackAttempts"
         />
     @elseif($detailTab==='inquiry')
         <x-jobs.detail-inquiry

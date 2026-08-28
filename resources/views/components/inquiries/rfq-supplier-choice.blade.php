@@ -11,6 +11,7 @@
     $badge = trim((string) ($supplier['badge'] ?? ''));
     $badgeTone = (string) ($supplier['badge_tone'] ?? '');
     $invitable = (bool) ($supplier['invitable'] ?? true);
+    $emailReady = (bool) ($supplier['email_ready'] ?? filter_var((string) ($supplier['email'] ?? ''), FILTER_VALIDATE_EMAIL));
     $unavailableReason = trim((string) ($supplier['unavailable_reason'] ?? ''));
     $email = trim((string) ($supplier['email'] ?? ''));
 @endphp
@@ -33,6 +34,8 @@
     </span>
     @if(! $invitable && $unavailableReason !== '')
         <span class="ft-create-rfq-badge is-blue">{{ $unavailableReason }}</span>
+    @elseif(! $emailReady)
+        <span class="ft-create-rfq-badge is-blue">No email configured</span>
     @elseif($badge !== '')
         <span class="ft-create-rfq-badge {{ $badgeTone === 'green' ? 'is-green' : 'is-blue' }}">{{ $badge }}</span>
     @endif

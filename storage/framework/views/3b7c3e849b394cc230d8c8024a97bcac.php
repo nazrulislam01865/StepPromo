@@ -80,10 +80,18 @@
         data-navigate-track
         defer
     ></script>
+    <script
+        src="<?php echo e(asset('js/flowtrack-sidebar-navigation.js')); ?>?v=<?php echo e(\App\Support\FrontendBuildVersion::current()); ?>"
+        data-navigate-once
+        defer
+    ></script>
 </head>
 <body class="<?php echo e(request()->routeIs('dashboard', 'team-performance.report') ? 'ft-management-dashboard-page' : ''); ?>">
 <div class="app">
-    <?php echo $__env->make('layouts.partials.sidebar', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+    
+    <?php app("livewire")->forceAssetInjection(); ?><div x-persist="<?php echo e('flowtrack-sidebar'); ?>">
+        <?php echo $__env->make('layouts.partials.sidebar', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+    </div>
     <div id="sidebarShade" class="mobile-sidebar-shade"></div>
     <main class="main">
         <?php echo $__env->make('layouts.partials.topbar', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>

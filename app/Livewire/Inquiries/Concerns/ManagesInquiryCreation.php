@@ -538,7 +538,7 @@ trait ManagesInquiryCreation
 
         foreach ($this->createAttachments as $upload) app(\App\Actions\Inquiries\UploadInquiryDocument::class)->handle($inquiry, $upload, auth()->user());
 
-        $rfqDelivery = ['sent' => 0, 'failed' => 0];
+        $rfqDelivery = ['sent' => 0, 'added_without_email' => 0, 'failed' => 0];
         if (! $draft && $createRfqSupplierIds !== []) {
             $rfqDelivery = $this->sendCreateRfqInvitations($inquiry, $user, $createRfqSupplierIds);
         }
@@ -554,6 +554,10 @@ trait ManagesInquiryCreation
             $message = $inquiry->inquiry_number.' created with its taskflow tasks.';
             if ($rfqDelivery['sent'] > 0) {
                 $message .= ' '.$rfqDelivery['sent'].' RFQ '.\Illuminate\Support\Str::plural('invitation', $rfqDelivery['sent']).' sent.';
+            }
+            if (($rfqDelivery['added_without_email'] ?? 0) > 0) {
+                $count = (int) $rfqDelivery['added_without_email'];
+                $message .= ' '.$count.' '.\Illuminate\Support\Str::plural('supplier', $count).' added to the RFQ without email delivery.';
             }
             if ($rfqDelivery['failed'] > 0) {
                 $message .= ' '.$rfqDelivery['failed'].' RFQ '.\Illuminate\Support\Str::plural('email', $rfqDelivery['failed']).' could not be delivered; the Inquiry is still available from the RFQ tab.';

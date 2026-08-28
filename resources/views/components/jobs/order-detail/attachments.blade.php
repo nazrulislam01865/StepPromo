@@ -3,10 +3,16 @@
     $canUpload = (bool) ($context['canUploadDocument'] ?? false);
     $canDelete = (bool) ($context['canDeleteDocument'] ?? false);
     $canExport = (bool) ($context['canExportDocument'] ?? false);
+    // Task evidence (Purchase Order, Artwork, Sample Approval, etc.) belongs
+    // against its workflow task. This section is intentionally order-level only.
+    $otherDocuments = $job->documents
+        ->filter(fn ($document) => blank($document->task_id))
+        ->sortByDesc('created_at')
+        ->values();
 @endphp
 <section class="section-card attachments-card ft-order-section-card ft-order-attachments-card" data-order-disclosure>
     <div class="section-head ft-order-section-head">
-        <h2>Attachments <span class="status-pill">{{ $job->documents->count() }}</span></h2>
+        <h2>Other document <span class="status-pill">{{ $otherDocuments->count() }}</span></h2>
         <button type="button" class="section-toggle ft-order-disclosure-button ft-order-compact-toggle" data-order-disclosure-trigger aria-expanded="false">Show files</button>
     </div>
     <div class="collapse-body collapsed ft-order-disclosure-body" data-order-disclosure-body hidden>
@@ -24,11 +30,11 @@
                 </div>
             @endif
         @else
-            <div class="attachment-drop readonly"><div><b>⌕ &nbsp; Order attachments</b><div class="card-sub">You have read-only access.</div></div></div>
+            <div class="attachment-drop readonly"><div><b>⌕ &nbsp; Other documents</b><div class="card-sub">You have read-only access.</div></div></div>
         @endif
 
         <div class="attachment-list ft-order-file-list">
-            @forelse($job->documents->sortByDesc('created_at') as $document)
+            @forelse($otherDocuments as $document)
                 <div class="attachment-row" wire:key="order-document-{{ $document->id }}">
                     <div class="file-icon ft-order-file-icon">{{ strtoupper(pathinfo($document->name, PATHINFO_EXTENSION) ?: 'FILE') }}</div>
                     <div style="flex:1"><b>{{ $document->name }}</b><div class="card-sub">{{ $document->task?->title ?: 'Order document' }} · {{ $document->uploader?->name ?? 'FlowTrack' }} · {{ \App\Support\UserLocalTime::format($document->created_at, 'M j, Y, g:i A') }}</div></div>
@@ -37,7 +43,7 @@
                     @if($canDelete)<button type="button" class="btn danger small" wire:click="deleteJobDocument({{ $document->id }})" wire:confirm="Delete this document link?">×</button>@endif
                 </div>
             @empty
-                <div class="empty-stage ft-order-empty-state">No order attachments yet.</div>
+                <div class="empty-stage ft-order-empty-state">No other documents yet.</div>
             @endforelse
         </div>
     </div>

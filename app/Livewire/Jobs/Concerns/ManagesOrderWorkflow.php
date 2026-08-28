@@ -2,10 +2,12 @@
 
 namespace App\Livewire\Jobs\Concerns;
 
+use App\Exceptions\EmailDeliveryException;
 use App\Queries\Orders\VisibleOrderQuery;
 use App\Models\FlowJob;
 use App\Models\Task;
 use App\Services\AccessControlService;
+use App\Services\Orders\OrderWorkflowEmailService;
 use App\Services\TaskService;
 
 /**
@@ -79,6 +81,15 @@ trait ManagesOrderWorkflow
         $this->orderWorkflowActionComment = '';
         $this->orderWorkflowActionStep = 'main';
         $this->orderWorkflowActionPayload = $workflowActions->initialPayload($task, $task->job);
+        $this->resetOrderWorkflowEmailFallbackState();
+
+        if (in_array($descriptor['key'] ?? null, ['NEW_SEND_PO_ARTWORK', 'ART_SEND_ORDER_TEAM'], true)) {
+            $failure = $this->orderWorkflowEmailFallbackMarker($task);
+            if ($failure) {
+                $this->showOrderWorkflowEmailFallback($descriptor['key'], (int) ($failure['attempts'] ?? 3));
+            }
+        }
+
         $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
         $this->showOrderWorkflowActionModal = true;
     }
@@ -90,6 +101,7 @@ trait ManagesOrderWorkflow
         $this->orderWorkflowActionComment = '';
         $this->orderWorkflowActionStep = 'main';
         $this->orderWorkflowActionPayload = [];
+        $this->resetOrderWorkflowEmailFallbackState();
         $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
     }
 
@@ -134,13 +146,52 @@ trait ManagesOrderWorkflow
             $decision = $decision === 'sample_yes' ? 'sample' : 'confirm';
         }
 
-        $workflowActions->perform(
-            $task,
-            auth()->user(),
-            $decision,
-            $this->orderWorkflowActionComment,
-            $this->orderWorkflowActionPayload,
-        );
+        if (in_array($key, ['NEW_SEND_PO_ARTWORK', 'ART_SEND_ORDER_TEAM'], true)) {
+            // A fresh click retries delivery from attempt one again, so clear
+            // the older manual-fallback marker before starting the new cycle.
+            $this->resetOrderWorkflowEmailFallbackState();
+            $this->forgetOrderWorkflowEmailFallbackMarker($task);
+        }
+
+        try {
+            $workflowActions->perform(
+                $task,
+                auth()->user(),
+                $decision,
+                $this->orderWorkflowActionComment,
+                $this->orderWorkflowActionPayload,
+            );
+        } catch (EmailDeliveryException $exception) {
+            if (! in_array($key, ['NEW_SEND_PO_ARTWORK', 'ART_SEND_ORDER_TEAM'], true)) {
+                throw $exception;
+            }
+
+            $preview = app(OrderWorkflowEmailService::class)->preview($task, auth()->user());
+            $trackingId = '';
+            if (preg_match('/Reference:\s*([A-Za-z0-9-]+)/', $exception->getMessage(), $matches) === 1) {
+                $trackingId = (string) ($matches[1] ?? '');
+            }
+            $failure = [
+                'task_id' => (int) $task->id,
+                'flow_job_id' => (int) $task->flow_job_id,
+                'handoff_key' => (string) $key,
+                'document_id' => (int) ($preview['document_id'] ?? 0),
+                'document_name' => (string) ($preview['document_name'] ?? ''),
+                'attempts' => 3,
+                'tracking_id' => $trackingId,
+                'failed_at' => now()->toIso8601String(),
+            ];
+            session()->put($this->orderWorkflowEmailFallbackSessionKey($task), $failure);
+
+            $this->showOrderWorkflowEmailFallback($key, 3);
+            $this->resetValidation('orderWorkflowActionEmail');
+
+            return;
+        }
+
+        if (in_array($key, ['NEW_SEND_PO_ARTWORK', 'ART_SEND_ORDER_TEAM'], true)) {
+            $this->forgetOrderWorkflowEmailFallbackMarker($task);
+        }
 
         $successMessage = match ($key) {
             'NEW_SEND_PO_ARTWORK' => 'Purchase Order emailed to the Artwork Team.',
@@ -152,6 +203,72 @@ trait ManagesOrderWorkflow
         $currentPhaseId = FlowJob::query()->whereKey($this->selectedJobId)->value('workflow_phase_id');
         if ($currentPhaseId) $this->overviewPhaseId = (int) $currentPhaseId;
         session()->flash('success', $successMessage);
+    }
+
+    public function completeOrderWorkflowEmailTaskAfterFailure(): void
+    {
+        abort_unless($this->selectedJobId && $this->orderWorkflowActionTaskId, 422);
+
+        $task = app(TaskService::class)->visibleQuery(auth()->user())
+            ->with(['job.client', 'job.items', 'job.phase', 'setupTemplate'])
+            ->where('flow_job_id', $this->selectedJobId)
+            ->findOrFail((int) $this->orderWorkflowActionTaskId);
+        abort_unless(app(AccessControlService::class)->canEditTask(auth()->user(), $task), 403);
+
+        $workflowActions = app(\App\Services\OrderWorkflowActionService::class);
+        $key = $workflowActions->automationKey($task);
+        abort_unless(in_array($key, ['NEW_SEND_PO_ARTWORK', 'ART_SEND_ORDER_TEAM'], true), 422);
+
+        $failure = $this->orderWorkflowEmailFallbackMarker($task);
+        if (! $failure) {
+            $this->resetOrderWorkflowEmailFallbackState();
+            $this->addError('orderWorkflowActionEmail', 'Manual completion is available only after the email service has failed three delivery attempts.');
+            return;
+        }
+
+        $workflowActions->completeEmailHandoffAfterFailure($task, auth()->user(), $failure);
+        $this->forgetOrderWorkflowEmailFallbackMarker($task);
+
+        $attachmentLabel = $key === 'ART_SEND_ORDER_TEAM' ? 'artwork' : 'Purchase Order';
+        $this->closeOrderWorkflowAction();
+        $currentPhaseId = FlowJob::query()->whereKey($this->selectedJobId)->value('workflow_phase_id');
+        if ($currentPhaseId) $this->overviewPhaseId = (int) $currentPhaseId;
+        session()->flash('success', 'Task completed manually. Please send the '.$attachmentLabel.' outside FlowTrack using the downloaded file.');
+    }
+
+    private function showOrderWorkflowEmailFallback(?string $key, int $attempts = 3): void
+    {
+        $attempts = max(3, $attempts);
+        $attachmentLabel = $key === 'ART_SEND_ORDER_TEAM' ? 'artwork' : 'Purchase Order';
+
+        $this->orderWorkflowEmailFallback = true;
+        $this->orderWorkflowEmailFallbackAttempts = $attempts;
+        $this->orderWorkflowEmailFallbackMessage = 'Due to some technical issue, the email could not be sent after '.$attempts.' attempts. Please download the '.$attachmentLabel.' and send it manually. After sending it manually, you can complete this task to continue the workflow.';
+    }
+
+    /** @return array<string,mixed>|null */
+    private function orderWorkflowEmailFallbackMarker(Task $task): ?array
+    {
+        $value = session()->get($this->orderWorkflowEmailFallbackSessionKey($task));
+
+        return is_array($value) ? $value : null;
+    }
+
+    private function forgetOrderWorkflowEmailFallbackMarker(Task $task): void
+    {
+        session()->forget($this->orderWorkflowEmailFallbackSessionKey($task));
+    }
+
+    private function orderWorkflowEmailFallbackSessionKey(Task $task): string
+    {
+        return 'order_workflow_email_fallback.'.(int) auth()->id().'.'.(int) $task->id;
+    }
+
+    private function resetOrderWorkflowEmailFallbackState(): void
+    {
+        $this->orderWorkflowEmailFallback = false;
+        $this->orderWorkflowEmailFallbackMessage = '';
+        $this->orderWorkflowEmailFallbackAttempts = 0;
     }
 
 }

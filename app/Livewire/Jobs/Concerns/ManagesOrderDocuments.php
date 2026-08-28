@@ -221,7 +221,7 @@ trait ManagesOrderDocuments
 
         $this->jobDocumentUploads = [];
         $this->resetValidation(['jobDocumentUploads', 'jobDocumentUploads.*']);
-        session()->flash('success', 'Order attachment uploaded.');
+        session()->flash('success', 'Other document uploaded.');
 
         return ['ok' => true];
     }

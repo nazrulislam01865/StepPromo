@@ -160,7 +160,7 @@
                 type="button"
                 class="ft-remote-filter-option ft-remote-filter-clear"
                 :aria-selected="selectedValue === ''"
-                x-on:click.stop="@if($remote) clearSelection() @else choose('', @js($placeholder)) @endif; $dispatch('flowtrack-selection-changed', {property: @js($property), value: '', label: @js($placeholder)}); $nextTick(() => Promise.resolve(@if($action) $wire.call(@js($action), @js($property), '') @else $wire.set(@js($property), '') @endif).catch(() => @if($remote) selectionFailed() @else null @endif))"
+                x-on:click.stop="@if($remote) clearSelection() @else choose('', @js($placeholder)) @endif; $dispatch('flowtrack-selection-changed', {property: @js($property), value: '', label: @js($placeholder)}); @if($action) Promise.resolve($wire.call(@js($action), @js($property), '')).catch(() => @if($remote) selectionFailed() @else null @endif) @else $nextTick(() => Promise.resolve($wire.set(@js($property), '')).catch(() => @if($remote) selectionFailed() @else null @endif)) @endif"
             >
                 <span>{{ $placeholder }}</span><small x-show="selectedValue === ''">Clear</small>
             </button>
@@ -175,7 +175,7 @@
                     role="option"
                     class="ft-remote-filter-option ft-search-select__option"
                     :aria-selected="String(item.id) === String(selectedValue)"
-                    x-on:click.stop="@if($remote) select(item) @else choose(String(item.id), item.label) @endif; $dispatch('flowtrack-selection-changed', {property: @js($property), value: String(item.id), label: item.label}); $nextTick(() => Promise.resolve(@if($action) $wire.call(@js($action), @js($property), String(item.id)) @else $wire.set(@js($property), String(item.id)) @endif).catch(() => @if($remote) selectionFailed() @else null @endif))"
+                    x-on:click.stop="@if($remote) select(item) @else choose(String(item.id), item.label) @endif; $dispatch('flowtrack-selection-changed', {property: @js($property), value: String(item.id), label: item.label}); @if($action) Promise.resolve($wire.call(@js($action), @js($property), String(item.id))).catch(() => @if($remote) selectionFailed() @else null @endif) @else $nextTick(() => Promise.resolve($wire.set(@js($property), String(item.id))).catch(() => @if($remote) selectionFailed() @else null @endif)) @endif"
                 >
                     @if($showAvatar)
                         <span class="ft-search-select__user-option">

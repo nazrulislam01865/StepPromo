@@ -4,6 +4,7 @@ namespace App\Livewire\Orders;
 
 use App\Actions\Orders\DeleteOrder;
 use App\Actions\Orders\DeleteOrders;
+use App\Exceptions\EmailDeliveryException;
 use App\Queries\Orders\OrderListQuery;
 use App\Queries\Orders\VisibleOrderQuery;
 use App\Livewire\Concerns\RefreshesFromWorkspace;
@@ -17,6 +18,7 @@ use App\Services\OrderDetailViewService;
 use App\Services\OrderListPrototypeService;
 use App\Services\OrderTaskSequenceService;
 use App\Services\OrderWorkflowActionService;
+use App\Services\Orders\OrderWorkflowEmailService;
 use App\Services\TaskService;
 use App\Support\AttachmentUpload;
 use Illuminate\Support\Collection;
@@ -63,6 +65,9 @@ class Index extends Component
     public string $orderWorkflowActionStep = 'main';
     /** @var array<string,mixed> */
     public array $orderWorkflowActionPayload = [];
+    public bool $orderWorkflowEmailFallback = false;
+    public string $orderWorkflowEmailFallbackMessage = '';
+    public int $orderWorkflowEmailFallbackAttempts = 0;
 
     public bool $showOverviewTaskDocumentModal = false;
     public ?int $overviewTaskDocumentModalTaskId = null;
@@ -126,6 +131,26 @@ class Index extends Component
     public function updatedOwner(): void
     {
         $this->owner = $this->normalizeNumericFilter($this->owner);
+        $this->metricFilter = '';
+        $this->resetOrderSelection();
+        $this->resetPage();
+    }
+
+    /**
+     * Commit the Orders-list owner filter through an explicit Livewire action.
+     *
+     * The shared remote selector updates its label optimistically. On this
+     * high-traffic list that optimistic Alpine state could survive even when a
+     * deferred/stale Livewire property update lost the race with another list
+     * request, leaving the dropdown showing a user while the query still used
+     * owner = "".  Use a deterministic action for this filter so the visible
+     * selection and the server-side query state are always committed together.
+     */
+    public function applyOwnerFilter(string $property, string|int|null $value = null): void
+    {
+        abort_unless($property === 'owner', 422);
+
+        $this->owner = $this->normalizeNumericFilter((string) ($value ?? ''));
         $this->metricFilter = '';
         $this->resetOrderSelection();
         $this->resetPage();
@@ -404,6 +429,15 @@ class Index extends Component
         $this->orderWorkflowActionComment = '';
         $this->orderWorkflowActionStep = 'main';
         $this->orderWorkflowActionPayload = $workflowActions->initialPayload($task, $task->job);
+        $this->resetOrderWorkflowEmailFallbackState();
+
+        if (in_array($descriptor['key'] ?? null, ['NEW_SEND_PO_ARTWORK', 'ART_SEND_ORDER_TEAM'], true)) {
+            $failure = $this->orderWorkflowEmailFallbackMarker($task);
+            if ($failure) {
+                $this->showOrderWorkflowEmailFallback($descriptor['key'], (int) ($failure['attempts'] ?? 3));
+            }
+        }
+
         $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
         $this->showOrderWorkflowActionModal = true;
     }
@@ -416,6 +450,7 @@ class Index extends Component
         $this->orderWorkflowActionStep = 'main';
         $this->orderWorkflowActionPayload = [];
         $this->listActionOrderId = null;
+        $this->resetOrderWorkflowEmailFallbackState();
         $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
     }
 
@@ -460,13 +495,49 @@ class Index extends Component
             $decision = $decision === 'sample_yes' ? 'sample' : 'confirm';
         }
 
-        $workflowActions->perform(
-            $task,
-            auth()->user(),
-            $decision,
-            $this->orderWorkflowActionComment,
-            $this->orderWorkflowActionPayload,
-        );
+        if (in_array($key, ['NEW_SEND_PO_ARTWORK', 'ART_SEND_ORDER_TEAM'], true)) {
+            $this->resetOrderWorkflowEmailFallbackState();
+            $this->forgetOrderWorkflowEmailFallbackMarker($task);
+        }
+
+        try {
+            $workflowActions->perform(
+                $task,
+                auth()->user(),
+                $decision,
+                $this->orderWorkflowActionComment,
+                $this->orderWorkflowActionPayload,
+            );
+        } catch (EmailDeliveryException $exception) {
+            if (! in_array($key, ['NEW_SEND_PO_ARTWORK', 'ART_SEND_ORDER_TEAM'], true)) {
+                throw $exception;
+            }
+
+            $preview = app(OrderWorkflowEmailService::class)->preview($task, auth()->user());
+            $trackingId = '';
+            if (preg_match('/Reference:\s*([A-Za-z0-9-]+)/', $exception->getMessage(), $matches) === 1) {
+                $trackingId = (string) ($matches[1] ?? '');
+            }
+            $failure = [
+                'task_id' => (int) $task->id,
+                'flow_job_id' => (int) $task->flow_job_id,
+                'handoff_key' => (string) $key,
+                'document_id' => (int) ($preview['document_id'] ?? 0),
+                'document_name' => (string) ($preview['document_name'] ?? ''),
+                'attempts' => 3,
+                'tracking_id' => $trackingId,
+                'failed_at' => now()->toIso8601String(),
+            ];
+            session()->put($this->orderWorkflowEmailFallbackSessionKey($task), $failure);
+
+            $this->showOrderWorkflowEmailFallback($key, 3);
+            $this->resetValidation('orderWorkflowActionEmail');
+            return;
+        }
+
+        if (in_array($key, ['NEW_SEND_PO_ARTWORK', 'ART_SEND_ORDER_TEAM'], true)) {
+            $this->forgetOrderWorkflowEmailFallbackMarker($task);
+        }
 
         $successMessage = match ($key) {
             'NEW_SEND_PO_ARTWORK' => 'Purchase Order emailed to the Artwork Team.',
@@ -476,6 +547,69 @@ class Index extends Component
 
         $this->closeOrderWorkflowAction();
         session()->flash('success', $successMessage);
+    }
+
+    public function completeOrderWorkflowEmailTaskAfterFailure(): void
+    {
+        abort_unless($this->listActionOrderId && $this->orderWorkflowActionTaskId, 422);
+
+        $task = $this->editableListWorkflowTask(
+            (int) $this->listActionOrderId,
+            (int) $this->orderWorkflowActionTaskId,
+            ['job.client', 'job.items', 'job.phase', 'setupTemplate'],
+        );
+
+        $workflowActions = app(OrderWorkflowActionService::class);
+        $key = $workflowActions->automationKey($task);
+        abort_unless(in_array($key, ['NEW_SEND_PO_ARTWORK', 'ART_SEND_ORDER_TEAM'], true), 422);
+
+        $failure = $this->orderWorkflowEmailFallbackMarker($task);
+        if (! $failure) {
+            $this->resetOrderWorkflowEmailFallbackState();
+            $this->addError('orderWorkflowActionEmail', 'Manual completion is available only after the email service has failed three delivery attempts.');
+            return;
+        }
+
+        $workflowActions->completeEmailHandoffAfterFailure($task, auth()->user(), $failure);
+        $this->forgetOrderWorkflowEmailFallbackMarker($task);
+
+        $attachmentLabel = $key === 'ART_SEND_ORDER_TEAM' ? 'artwork' : 'Purchase Order';
+        $this->closeOrderWorkflowAction();
+        session()->flash('success', 'Task completed manually. Please send the '.$attachmentLabel.' outside FlowTrack using the downloaded file.');
+    }
+
+    private function showOrderWorkflowEmailFallback(?string $key, int $attempts = 3): void
+    {
+        $attempts = max(3, $attempts);
+        $attachmentLabel = $key === 'ART_SEND_ORDER_TEAM' ? 'artwork' : 'Purchase Order';
+
+        $this->orderWorkflowEmailFallback = true;
+        $this->orderWorkflowEmailFallbackAttempts = $attempts;
+        $this->orderWorkflowEmailFallbackMessage = 'Due to some technical issue, the email could not be sent after '.$attempts.' attempts. Please download the '.$attachmentLabel.' and send it manually. After sending it manually, you can complete this task to continue the workflow.';
+    }
+
+    /** @return array<string,mixed>|null */
+    private function orderWorkflowEmailFallbackMarker(Task $task): ?array
+    {
+        $value = session()->get($this->orderWorkflowEmailFallbackSessionKey($task));
+        return is_array($value) ? $value : null;
+    }
+
+    private function forgetOrderWorkflowEmailFallbackMarker(Task $task): void
+    {
+        session()->forget($this->orderWorkflowEmailFallbackSessionKey($task));
+    }
+
+    private function orderWorkflowEmailFallbackSessionKey(Task $task): string
+    {
+        return 'order_workflow_email_fallback.'.(int) auth()->id().'.'.(int) $task->id;
+    }
+
+    private function resetOrderWorkflowEmailFallbackState(): void
+    {
+        $this->orderWorkflowEmailFallback = false;
+        $this->orderWorkflowEmailFallbackMessage = '';
+        $this->orderWorkflowEmailFallbackAttempts = 0;
     }
 
     /** Initialize the same file-upload action modal used on Order Details. */

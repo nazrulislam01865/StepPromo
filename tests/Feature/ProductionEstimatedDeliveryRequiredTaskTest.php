@@ -37,6 +37,8 @@ class ProductionEstimatedDeliveryRequiredTaskTest extends TestCase
         $this->assertStringContainsString("'estimated_delivery_date' => \$estimatedDeliveryDate", $service);
         $this->assertStringContainsString("\$variant === 'estimated_delivery'", $modal);
         $this->assertStringContainsString('Required before Production', $modal);
+        $this->assertStringContainsString('ft-prototype-clickable-date', $modal);
+        $this->assertStringContainsString("typeof this.showPicker === 'function'", $modal);
         $this->assertStringContainsString('ft-order-task-row--estimated-delivery', $row);
         $this->assertStringContainsString('ft-order-required-task-badge', $row);
     }

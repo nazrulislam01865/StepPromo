@@ -93,7 +93,7 @@ export const bootBulkOrderImport = () => {
         if (file.size > 20 * 1024 * 1024) return showError('File exceeds the 20 MB limit.');
 
         setStep(2);
-        startLoading(`Preparing ${file.name}…`, 'Reading the file and validating client, product, repeat-order, date, urgency and workflow values. Nothing has been created yet.');
+        startLoading(`Preparing ${file.name}…`, 'Reading the file and validating client, reference, product, repeat-order, order hand date, shipment urgency and workflow values. Nothing has been created yet.');
         try {
             const normalized = await browserNormalizeExcel(file);
             const form = new FormData();
@@ -212,11 +212,11 @@ export const bootBulkOrderImport = () => {
             const product = row.product_resolved_name
                 ? `<b>${escapeHtml(row.product_resolved_name)}</b><br><span class="sub">${escapeHtml(row.product_id || '')} · Qty ${escapeHtml(row.product_quantity_resolved || 1)}</span>`
                 : '<span class="sub">No product</span>';
-            const delivery = `<b>${escapeHtml(row.customer_delivery_normalized || '—')}</b><br><span class="sub">Estimated: ${escapeHtml(row.estimated_delivery_normalized || '—')}</span>`;
-            const urgency = `<b>Production: ${escapeHtml(row.production_urgency_resolved || 'Normal')}</b><br><span class="sub">Shipment: ${escapeHtml(row.shipment_urgency_resolved || 'Normal')}</span>`;
+            const delivery = `<b>${escapeHtml(row.customer_delivery_normalized || '—')}</b>`;
+            const urgency = `<b>${escapeHtml(row.shipment_urgency_resolved || 'Normal')}</b>`;
             return `<tr class="${rowClass}">
                 <td>${escapeHtml(row.row)}</td>
-                <td><b>${escapeHtml(row.title || '—')}</b><br><span class="sub">Ref: ${escapeHtml(row.ref || '—')}</span></td>
+                <td><b>${escapeHtml(row.title || '—')}</b><br><span class="sub">Client ref: ${escapeHtml(row.ref || '—')}</span></td>
                 <td>${escapeHtml(row.client_resolved_label || 'Unresolved')}</td>
                 <td>${repeat}</td>
                 <td>${product}</td>
@@ -301,7 +301,7 @@ export const bootBulkOrderImport = () => {
         if (!state.review) return;
         const rows = state.review.rows.filter((row) => row.errors.length || row.warnings.length);
         const csv = [
-            ['Row', 'Reference Order No.', 'Issue'],
+            ['Row', 'Client Reference Number', 'Issue'],
             ...rows.map((row) => [row.row, row.ref, [...row.errors, ...row.warnings].join('; ')]),
         ].map((row) => row.map(csvCell).join(',')).join('\r\n');
         download('FlowTrack_import_issues.csv', csv);
@@ -310,7 +310,7 @@ export const bootBulkOrderImport = () => {
     const exportResults = () => {
         if (!state.results) return;
         const csv = [
-            ['Import ID', 'Row', 'Reference Order No.', 'Status', 'Message'],
+            ['Import ID', 'Row', 'Client Reference Number', 'Status', 'Message'],
             ...state.results.results.map((row) => [state.results.import_number, row.row, row.reference, row.status, row.message]),
         ].map((row) => row.map(csvCell).join(',')).join('\r\n');
         download(`${state.results.import_number}_results.csv`, csv);
@@ -318,11 +318,11 @@ export const bootBulkOrderImport = () => {
 
     const demoRows = (withError = false) => {
         const rows = [
-            ['CL-011', 'REF-10001', 'No', '', 'Sample merchandise order', 'Conference merchandise for August event.', '123 Main Street, Los Angeles, CA, USA', '+1 213 555 0198', '90012', '', '', '2026-08-25', '2026-08-23', 'Normal', 'Urgent', 'Confirm packing before dispatch.'],
-            ['CL-014', 'REF-10002', 'Yes', 'REF-09940', 'Repeat lanyard order', 'Repeat the previous approved design.', '88 Market Road, Toronto, ON, Canada', '', 'M5V 2T6', '', '', '2026-08-28', '2026-08-26', 'Super Urgent', 'Normal', 'Keep colors identical to prior order.'],
+            ['CL-011', 'FO-333119', 'No', '', 'Conference merchandise for August event.', '123 Main Street, Los Angeles, CA, USA', '+1 213 555 0198', '90012', 'PRD-000123', '250', '2026-08-25', 'Urgent', 'Confirm packing before dispatch.'],
+            ['CL-014', 'FO-333120', 'Yes', 'FO-332940', 'Repeat the previous approved design.', '88 Market Road, Toronto, ON, Canada', '', 'M5V 2T6', 'PRD-000124', '100', '', 'Normal', 'Keep colors identical to prior order.'],
         ];
-        if (withError) rows.push(['', '', 'Yes', '', '', '', '', '+999 12345', '', '', 'abc', '2026-08-40', '', 'Extreme', '', 'This row intentionally demonstrates validation.']);
-        const header = ['Client ID *', 'Reference Order No.', 'Repeat Order? Yes / No', 'Repeat Order No.', 'Order Title *', 'Order Description', 'Shipping Address *', 'Phone Number (with country code)', 'Postal Code *', 'Product ID', 'Product Quantity', 'Customer Requested Delivery Date', 'Estimated Delivery Date', 'Production Urgency', 'Shipment Urgent', 'Notes'];
+        if (withError) rows.push(['', '', 'Yes', '', '', '', '+999 12345', '', '', 'abc', '2026-08-40', 'Extreme', 'This row intentionally demonstrates validation.']);
+        const header = ['Client ID *', 'Client Reference Number *', 'Repeat Order? Yes / No', 'Previous Reference Number', 'Request Description', 'Shipping Address *', 'Phone Number (with country code)', 'Postal Code *', 'Product ID *', 'Product Quantity', 'Order Hand Date', 'Shipment Urgency', 'Notes'];
         const csv = [header, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
         return new File([csv], withError ? 'Order-import-with-errors.csv' : 'FlowTrack-bulk-order-sample.csv', { type: 'text/csv' });
     };

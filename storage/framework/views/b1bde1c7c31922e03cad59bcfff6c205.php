@@ -11,7 +11,7 @@
     $orderCreate = $user->canAccess('jobs.create');
     $taskView = $user->canAccess('tasks.view');
     $orderGroupActive = request()->routeIs('jobs.*', 'orders.*', 'all-tasks', 'my-work');
-    $cancelledOrderCount = $orderView ? app(\App\Services\CancelledOrderService::class)->sidebarCount($user) : 0;
+    $cancelledOrderCount = $orderView ? (int) ($shellData['cancelled_orders'] ?? 0) : 0;
 
     $clientView = $user->canAccess('clients.view');
     $clientCreate = $user->canAccess('clients.create');
@@ -63,7 +63,7 @@
         <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
     </a>
 
-    <nav class="ft-sidebar-nav" aria-label="Primary navigation">
+    <nav class="ft-sidebar-nav" aria-label="Primary navigation" wire:navigate:scroll>
         <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($user->canAccess('dashboard.view')): ?>
             <?php if (isset($component)) { $__componentOriginal230d78629742508075cd03dd9439398e = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal230d78629742508075cd03dd9439398e = $attributes; } ?>

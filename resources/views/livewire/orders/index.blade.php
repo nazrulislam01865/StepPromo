@@ -46,6 +46,9 @@
                     :config="$listActionWorkflowModal"
                     :step="$orderWorkflowActionStep"
                     :payload="$orderWorkflowActionPayload"
+                    :email-fallback="$orderWorkflowEmailFallback"
+                    :email-fallback-message="$orderWorkflowEmailFallbackMessage"
+                    :email-fallback-attempts="$orderWorkflowEmailFallbackAttempts"
                 />
             @endif
 

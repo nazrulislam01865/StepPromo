@@ -11,9 +11,12 @@
     'parentType' => '',
     'parentId' => null,
     'externalTrigger' => false,
+    'instanceKey' => '',
 ])
 @php
     $resolvedLabel = $selectedLabel ?: $placeholder;
+    $listboxKey = $instanceKey !== '' ? $instanceKey : $context.'|'.$parentType.'|'.$parentId;
+    $listboxId = 'ft-inline-user-list-'.substr(md5($listboxKey), 0, 10);
 @endphp
 <div
     {{ $attributes->class(['ft-inline-remote-user', 'ft-inline-remote-user-'.$variant]) }}
@@ -45,7 +48,7 @@
             x-on:click.stop="toggle()"
             :aria-expanded="open.toString()"
             aria-haspopup="listbox"
-            aria-controls="ft-inline-user-list-{{ substr(md5($context.'|'.$parentType.'|'.$parentId), 0, 10) }}"
+            aria-controls="{{ $listboxId }}"
         >
             <span x-text="selectedLabel">{{ $resolvedLabel }}</span>
             <span class="ft-filter-chevron" aria-hidden="true">⌄</span>
@@ -86,7 +89,7 @@
             <span>{{ $placeholder }}</span><small>Clear</small>
         </button>
 
-        <div id="ft-inline-user-list-{{ substr(md5($context.'|'.$parentType.'|'.$parentId), 0, 10) }}" class="ft-remote-filter-list" role="listbox">
+        <div id="{{ $listboxId }}" class="ft-remote-filter-list" role="listbox">
             <template x-if="loading">
                 <div><div class="ft-filter-skeleton"></div><div class="ft-filter-skeleton"></div></div>
             </template>

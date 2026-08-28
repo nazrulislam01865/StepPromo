@@ -9,6 +9,7 @@ use App\Models\InquiryRfqInvitation;
 use App\Models\InquiryRfqQuote;
 use App\Models\MasterRecord;
 use App\Models\User;
+use App\Services\Email\ModuleEmailControlService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Crypt;
@@ -22,6 +23,7 @@ final class InquiryRfqService
 {
     public function __construct(
         private readonly InquiryRfqEmailService $mailer,
+        private readonly ModuleEmailControlService $emailControl,
     ) {}
 
     /** @return array{invited:int,responses:int,submitted:int,awarded:int} */
@@ -69,11 +71,11 @@ final class InquiryRfqService
      *
      * The picker must mirror Master Data > Suppliers rather than silently hiding
      * inactive suppliers or suppliers that still need an email address. Already
-     * invited suppliers are excluded from the picker because they are rendered in
-     * the invitation table immediately below it. Each remaining row carries its
-     * invitable/unavailable state so the UI can disable only the Invite action.
+     * added suppliers are excluded from the picker because they are rendered in
+     * the RFQ table immediately below it. Active rows remain selectable while
+     * email_ready reports whether an invitation can be delivered immediately.
      *
-     * @return Collection<int,array{id:int,name:string,email:string,contact:string,category:string,products:int,badge:?string,badge_tone:?string,status:string,invitable:bool,unavailable_reason:?string}>
+     * @return Collection<int,array{id:int,name:string,email:string,contact:string,category:string,products:int,badge:?string,badge_tone:?string,status:string,invitable:bool,email_ready:bool,unavailable_reason:?string}>
      */
     public function candidateSuppliers(Inquiry $inquiry, string $search = '', int $limit = 100): Collection
     {
@@ -107,7 +109,7 @@ final class InquiryRfqService
      * products so adding/removing products keeps the send list in sync without
      * creating a fake invitation record.
      *
-     * @return Collection<int,array{id:int,name:string,email:string,product_names:array<int,string>,product_count:int,invitable:bool,unavailable_reason:?string}>
+     * @return Collection<int,array{id:int,name:string,email:string,product_names:array<int,string>,product_count:int,invitable:bool,email_ready:bool,unavailable_reason:?string}>
      */
     public function defaultSuppliersAwaitingSend(Inquiry $inquiry): Collection
     {
@@ -148,12 +150,7 @@ final class InquiryRfqService
                     ->unique()
                     ->values();
 
-                $unavailableReason = null;
-                if (! $isActive) {
-                    $unavailableReason = 'Inactive';
-                } elseif (! $validEmail) {
-                    $unavailableReason = 'Email required';
-                }
+                $unavailableReason = ! $isActive ? 'Inactive' : null;
 
                 return [
                     'id' => (int) $supplier->id,
@@ -161,7 +158,11 @@ final class InquiryRfqService
                     'email' => $email,
                     'product_names' => $productNames->all(),
                     'product_count' => $productNames->count(),
-                    'invitable' => $isActive && $validEmail,
+                    // Active suppliers may participate in the RFQ even when an
+                    // email address has not been configured yet. Email readiness
+                    // is a delivery concern, not a supplier-selection rule.
+                    'invitable' => $isActive,
+                    'email_ready' => $validEmail,
                     'unavailable_reason' => $unavailableReason,
                 ];
             })
@@ -228,11 +229,11 @@ final class InquiryRfqService
 
     /**
      * Workspace-level source for callers that need only suppliers that can be
-     * invited immediately. The Inquiry Details picker intentionally uses the
+     * emailed immediately. The Inquiry Details/Create Inquiry pickers use the
      * broader supplierChoicesForWorkspace() directory source instead.
      *
      * @param array<int,int> $excludeSupplierIds
-     * @return Collection<int,array{id:int,name:string,email:string,contact:string,category:string,products:int,badge:?string,badge_tone:?string,status:string,invitable:bool,unavailable_reason:?string}>
+     * @return Collection<int,array{id:int,name:string,email:string,contact:string,category:string,products:int,badge:?string,badge_tone:?string,status:string,invitable:bool,email_ready:bool,unavailable_reason:?string}>
      */
     public function candidateSuppliersForWorkspace(int $workspaceId, string $search = '', int $limit = 20, array $excludeSupplierIds = []): Collection
     {
@@ -244,7 +245,7 @@ final class InquiryRfqService
             min(100, max($limit * 3, 50)),
             $excludeSupplierIds,
         )
-            ->filter(fn (array $supplier): bool => (bool) ($supplier['invitable'] ?? false))
+            ->filter(fn (array $supplier): bool => (bool) ($supplier['invitable'] ?? false) && (bool) ($supplier['email_ready'] ?? false))
             ->take($limit)
             ->values();
     }
@@ -253,13 +254,12 @@ final class InquiryRfqService
      * Supplier-directory source for Create Inquiry RFQ selection.
      *
      * This intentionally mirrors the Supplier list instead of filtering records
-     * out just because their email/status is not yet usable. Unavailable suppliers
-     * are returned with an explicit reason and rendered disabled by the reusable
-     * RFQ supplier-choice component. This makes the selector truthful: if a
-     * supplier exists in Suppliers, the user can see it here.
+     * out just because their email is not configured. Active suppliers remain
+     * selectable RFQ participants; email_ready only controls whether an email can
+     * be delivered immediately. Inactive suppliers remain visible but disabled.
      *
      * @param array<int,int> $excludeSupplierIds
-     * @return Collection<int,array{id:int,name:string,email:string,contact:string,category:string,products:int,badge:?string,badge_tone:?string,status:string,invitable:bool,unavailable_reason:?string}>
+     * @return Collection<int,array{id:int,name:string,email:string,contact:string,category:string,products:int,badge:?string,badge_tone:?string,status:string,invitable:bool,email_ready:bool,unavailable_reason:?string}>
      */
     public function supplierChoicesForWorkspace(int $workspaceId, string $search = '', int $limit = 50, array $excludeSupplierIds = []): Collection
     {
@@ -315,7 +315,7 @@ final class InquiryRfqService
                 $leadDays = $leadDays ?: ($metadataLeadDays > 0 ? $metadataLeadDays : null);
                 $validEmail = filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
                 $isActive = (string) $supplier->status === 'active';
-                $invitable = $isActive && $validEmail;
+                $invitable = $isActive;
 
                 $badge = null;
                 $badgeTone = null;
@@ -327,12 +327,7 @@ final class InquiryRfqService
                     $badgeTone = 'blue';
                 }
 
-                $unavailableReason = null;
-                if (! $isActive) {
-                    $unavailableReason = 'Inactive';
-                } elseif (! $validEmail) {
-                    $unavailableReason = 'Email required';
-                }
+                $unavailableReason = ! $isActive ? 'Inactive' : null;
 
                 return [
                     'id' => (int) $supplier->id,
@@ -345,6 +340,7 @@ final class InquiryRfqService
                     'badge_tone' => $badgeTone,
                     'status' => (string) $supplier->status,
                     'invitable' => $invitable,
+                    'email_ready' => $validEmail,
                     'unavailable_reason' => $unavailableReason,
                 ];
             })
@@ -362,13 +358,13 @@ final class InquiryRfqService
     }
 
     /**
-     * Resolve selected Create Inquiry suppliers without relying on the visible
-     * search result limit.
+     * Resolve active RFQ participants without relying on the visible search
+     * result limit. Email is intentionally not required here.
      *
      * @param array<int,int> $supplierIds
      * @return Collection<int,MasterRecord>
      */
-    public function invitableSuppliersByIds(int $workspaceId, array $supplierIds): Collection
+    public function selectableSuppliersByIds(int $workspaceId, array $supplierIds): Collection
     {
         $ids = collect($supplierIds)->map(fn ($id) => (int) $id)->filter()->unique()->values();
         if ($ids->isEmpty()) return collect();
@@ -379,6 +375,19 @@ final class InquiryRfqService
             ->active()
             ->whereIn('id', $ids->all())
             ->get(['id','name','code','metadata'])
+            ->values();
+    }
+
+    /**
+     * Backward-compatible helper for callers that specifically require immediate
+     * email delivery capability.
+     *
+     * @param array<int,int> $supplierIds
+     * @return Collection<int,MasterRecord>
+     */
+    public function invitableSuppliersByIds(int $workspaceId, array $supplierIds): Collection
+    {
+        return $this->selectableSuppliersByIds($workspaceId, $supplierIds)
             ->filter(fn (MasterRecord $supplier) => filter_var(trim((string) data_get($supplier->metadata, 'email')), FILTER_VALIDATE_EMAIL) !== false)
             ->values();
     }
@@ -410,7 +419,8 @@ final class InquiryRfqService
             ->findOrFail($supplierId, ['id','name','metadata','status']);
 
         $recipient = trim((string) data_get($supplier->metadata, 'email'));
-        abort_unless(filter_var($recipient, FILTER_VALIDATE_EMAIL), 422, 'This supplier does not have a valid email address.');
+        $emailReady = filter_var($recipient, FILTER_VALIDATE_EMAIL) !== false;
+        $emailEnabled = $this->emailControl->inquiryEnabled();
 
         $existing = InquiryRfqInvitation::query()
             ->where('inquiry_id', $inquiry->id)
@@ -440,10 +450,28 @@ final class InquiryRfqService
             'invited_at' => now(),
             'due_at' => $dueAt ?: ($sharedDueAt ? Carbon::parse($sharedDueAt) : $this->defaultDueAt($inquiry)),
             'request_message' => filled($requestMessage) ? trim((string) $requestMessage) : ($sharedRequestMessage ?: null),
-            'email_status' => 'Sending',
+            'email_status' => $emailReady ? 'Sending' : 'No email',
         ]);
         $invitation->setRelation('supplier', $supplier);
         $inquiry->loadMissing('items:id,inquiry_id,item_name,category,quantity,unit,unit_price,notes,sort_order');
+
+        if (! $emailEnabled && $emailReady) {
+            $invitation->update(['email_status' => 'Email disabled']);
+        }
+
+        if (! $emailReady || ! $emailEnabled) {
+            $reason = ! $emailReady
+                ? 'because the supplier has no configured email address'
+                : 'because the Inquiry email service is disabled by an administrator';
+            $this->activity($inquiry, $actor, 'rfq.added', $supplier->name.' was added to the RFQ without sending email '.$reason.'.', [
+                'supplier_id' => (int) $supplier->id,
+                'invitation_id' => (int) $invitation->id,
+                'email_service_disabled' => ! $emailEnabled,
+            ]);
+            app(\App\Services\WorkspaceRefreshService::class)->touch('InquiryRFQ:added');
+
+            return $invitation->fresh(['supplier','quote']);
+        }
 
         try {
             $trackingId = $this->mailer->sendInvitation($invitation, $token);
@@ -460,6 +488,50 @@ final class InquiryRfqService
 
         $this->activity($inquiry, $actor, 'rfq.invited', 'RFQ invitation sent to '.$supplier->name.'.', [
             'supplier_id' => (int) $supplier->id,
+            'invitation_id' => (int) $invitation->id,
+        ]);
+        app(\App\Services\WorkspaceRefreshService::class)->touch('InquiryRFQ:invited');
+
+        return $invitation->fresh(['supplier','quote']);
+    }
+
+    /**
+     * Send a previously-added RFQ participant after an email address becomes
+     * available (or retry a failed delivery). This keeps selection independent
+     * from email availability while preserving the existing secure-link flow.
+     */
+    public function sendExistingInvitation(Inquiry $inquiry, int $invitationId, User $actor): InquiryRfqInvitation
+    {
+        $invitation = InquiryRfqInvitation::query()
+            ->where('inquiry_id', $inquiry->id)
+            ->whereKey($invitationId)
+            ->with(['supplier','inquiry.items','quote'])
+            ->firstOrFail();
+
+        abort_if($invitation->email_status === 'Delivered', 422, 'This RFQ invitation has already been sent.');
+        abort_unless($this->emailControl->inquiryEnabled(), 422, 'Inquiry email service is currently disabled by an administrator.');
+
+        $recipient = $invitation->supplierEmail();
+        abort_unless(filter_var($recipient, FILTER_VALIDATE_EMAIL), 422, 'Add a valid email address to this supplier before sending the RFQ invitation.');
+
+        $token = Crypt::decryptString((string) $invitation->token_cipher);
+        $invitation->update(['email_status' => 'Sending']);
+
+        try {
+            $trackingId = $this->mailer->sendInvitation($invitation, $token);
+        } catch (Throwable $exception) {
+            $invitation->update(['email_status' => 'Failed']);
+            throw $exception;
+        }
+
+        $invitation->update([
+            'invited_at' => now(),
+            'email_status' => 'Delivered',
+            'email_tracking_id' => $trackingId,
+        ]);
+
+        $this->activity($inquiry, $actor, 'rfq.invited', 'RFQ invitation sent to '.$invitation->supplier?->name.'.', [
+            'supplier_id' => (int) $invitation->supplier_id,
             'invitation_id' => (int) $invitation->id,
         ]);
         app(\App\Services\WorkspaceRefreshService::class)->touch('InquiryRFQ:invited');
@@ -574,19 +646,21 @@ final class InquiryRfqService
         ]);
         app(\App\Services\WorkspaceRefreshService::class)->touch('InquiryRFQ:quote-submitted');
 
-        try {
-            $this->mailer->sendQuoteReceived($invitation, $quote->fresh('items'));
-        } catch (Throwable $exception) {
-            Log::warning('flowtrack.rfq.quote_confirmation_failed', [
-                'invitation_id' => $invitation->id,
-                'error' => $exception->getMessage(),
-            ]);
+        if ($this->emailControl->inquiryEnabled()) {
+            try {
+                $this->mailer->sendQuoteReceived($invitation, $quote->fresh('items'));
+            } catch (Throwable $exception) {
+                Log::warning('flowtrack.rfq.quote_confirmation_failed', [
+                    'invitation_id' => $invitation->id,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
         }
 
         return $quote->fresh('items');
     }
 
-    /** @return array{winner:InquiryRfqInvitation,email_failures:int} */
+    /** @return array{winner:InquiryRfqInvitation,email_failures:int,email_service_disabled:bool} */
     public function award(Inquiry $inquiry, int $invitationId, User $actor): array
     {
         $winner = InquiryRfqInvitation::query()
@@ -622,6 +696,14 @@ final class InquiryRfqService
         ]);
         app(\App\Services\WorkspaceRefreshService::class)->touch('InquiryRFQ:awarded');
 
+        if (! $this->emailControl->inquiryEnabled()) {
+            return [
+                'winner' => $winner->fresh(['supplier','quote.items']),
+                'email_failures' => 0,
+                'email_service_disabled' => true,
+            ];
+        }
+
         $failures = 0;
         try {
             $this->mailer->sendAward($winner->fresh(['supplier','inquiry.items','quote.items']), $actor);
@@ -646,13 +728,18 @@ final class InquiryRfqService
             }
         }
 
-        return ['winner' => $winner->fresh(['supplier','quote.items']), 'email_failures' => $failures];
+        return [
+            'winner' => $winner->fresh(['supplier','quote.items']),
+            'email_failures' => $failures,
+            'email_service_disabled' => false,
+        ];
     }
 
     /** @return array{sent:int,failed:int} */
     public function sendDueReminders(): array
     {
         if (! Schema::hasTable('inquiry_rfq_invitations')) return ['sent' => 0, 'failed' => 0];
+        if (! $this->emailControl->inquiryEnabled()) return ['sent' => 0, 'failed' => 0];
 
         $start = now()->addDay()->startOfDay();
         $end = now()->addDay()->endOfDay();
@@ -661,6 +748,7 @@ final class InquiryRfqService
 
         InquiryRfqInvitation::query()
             ->whereBetween('due_at', [$start, $end])
+            ->where('email_status', 'Delivered')
             ->whereNull('reminder_sent_at')
             ->where('quote_status', '!=', 'submitted')
             ->where('interest_status', '!=', 'declined')

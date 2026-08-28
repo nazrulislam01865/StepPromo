@@ -9,6 +9,7 @@ use App\Models\Invoice;
 use App\Models\MasterRecord;
 use App\Services\AccessControlService;
 use App\Services\Email\EmailService;
+use App\Services\Email\ModuleEmailControlService;
 use App\Services\MasterDataService;
 use App\Services\OrderFinanceService;
 use App\Support\AttachmentUpload;
@@ -301,6 +302,11 @@ trait ManagesOrderFinance
 
         if (!$email) {
             $this->addError('collectionForm', 'No billing email is available for this client.');
+            return;
+        }
+
+        if (! app(ModuleEmailControlService::class)->orderEnabled()) {
+            $this->addError('collectionForm', 'Order email service is currently disabled by an administrator.');
             return;
         }
 

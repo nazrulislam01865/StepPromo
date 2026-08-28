@@ -18,12 +18,11 @@ trait ManagesInquiryDocuments
         abort_unless(app(\App\Queries\Inquiries\InquiryDetailQuery::class)->canEditTask(auth()->user(), $task), 403);
         abort_if($task->inquiry->result, 422, 'Tasks on a closed Inquiry cannot receive documents.');
         $canCreateDocument = auth()->user()->canModule('documents', 'create');
-        $canLinkDocument = auth()->user()->canModule('documents', 'link');
-        abort_unless($canCreateDocument || $canLinkDocument, 403, 'Your role cannot add documents.');
+        abort_unless($canCreateDocument, 403, 'Your role cannot upload documents.');
 
         $this->pendingCompletionTaskId = null;
         $this->resetTaskDocumentModal();
-        $this->taskDocumentSource = $canCreateDocument ? 'upload' : 'existing';
+        $this->taskDocumentSource = 'upload';
         $this->taskDocumentModalTaskId = $taskId;
         $this->showTaskDocumentModal = true;
     }
@@ -45,11 +44,10 @@ trait ManagesInquiryDocuments
         }
 
         $canCreateDocument = auth()->user()->canModule('documents', 'create');
-        $canLinkDocument = auth()->user()->canModule('documents', 'link');
-        abort_unless($canCreateDocument || $canLinkDocument, 403, 'A required file is missing and your role cannot add documents.');
+        abort_unless($canCreateDocument, 403, 'A required file is missing and your role cannot upload documents.');
         $this->pendingCompletionTaskId = $taskId;
         $this->resetTaskDocumentModal();
-        $this->taskDocumentSource = $canCreateDocument ? 'upload' : 'existing';
+        $this->taskDocumentSource = 'upload';
         $this->taskDocumentModalTaskId = $taskId;
         $this->showTaskDocumentModal = true;
     }

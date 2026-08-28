@@ -124,6 +124,10 @@ class Index extends Component
     public string $orderWorkflowActionStep = 'main';
     /** @var array<string,mixed> */
     public array $orderWorkflowActionPayload = [];
+    /** Email-handoff fallback shown only after the synchronous provider fails three times. */
+    public bool $orderWorkflowEmailFallback = false;
+    public string $orderWorkflowEmailFallbackMessage = '';
+    public int $orderWorkflowEmailFallbackAttempts = 0;
     public string $jobTaskSearch = '';
     public bool $showCreate = false;
     public bool $createCatalogReady = false;
@@ -131,7 +135,6 @@ class Index extends Component
     public bool $createWorkflowReady = false;
     public int $createWorkflowSelectorVersion = 0;
 
-    public string $jobTitle = '';
     public string $referenceNumber = '';
     public bool $isRepeatedOrder = false;
     public string $repeatedOrderNumber = '';
@@ -201,6 +204,8 @@ class Index extends Component
     public string $newProductName = '';
     public ?int $newProductSupplierId = null;
     public $newProductImage = null;
+    /** Purchase Order selected during Create Order. Stored against NEW_UPLOAD_PO after the Order exists. */
+    public $purchaseOrderUpload = null;
     public array $jobAttachments = [];
     public array $jobDocumentUploads = [];
     public $jobRequiredDocumentUpload = null;

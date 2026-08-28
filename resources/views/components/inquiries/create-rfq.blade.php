@@ -55,10 +55,6 @@
                 @endforelse
             </div>
 
-            <div class="ft-create-rfq-note">
-                <strong>Suppliers remain RFQ participants only.</strong>
-                <span>Selecting a supplier here sends an invitation after the inquiry is created; it does not tag or award that supplier to the product.</span>
-            </div>
         </div>
     </div>
 

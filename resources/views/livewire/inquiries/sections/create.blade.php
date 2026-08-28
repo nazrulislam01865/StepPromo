@@ -117,7 +117,7 @@
                             ))->color;
                         @endphp
                         <div class="ft-inquiry-create-field ft-inquiry-create-field-full">
-                            <label>Priority *</label>
+                            <label>Shipment Priority *</label>
                             <select
                                 data-master-color-select
                                 wire:model="createPriority"
@@ -163,30 +163,16 @@
                         <div class="sectiontitle ft-inquiry-step-title ft-inquiry-step-title-inline">
                             <span>{{ $canUseInquiryProductSelector ? 3 : 2 }}</span><h2>Attachments</h2><p>Add emails, specifications, artwork or reference images.</p>
                         </div>
-                        <div
-                            class="inquiry-dropzone ft-inquiry-prototype-dropzone"
-                            x-data="{ dragging: false }"
-                            x-bind:class="{ 'is-dragging': dragging }"
-                            x-on:dragenter.prevent="dragging = true"
-                            x-on:dragover.prevent="dragging = true"
-                            x-on:dragleave.prevent="if (!$el.contains($event.relatedTarget)) dragging = false"
-                            x-on:drop.prevent="dragging = false; const files = $event.dataTransfer.files; if (files.length) { $refs.createAttachmentInput.files = files; $refs.createAttachmentInput.dispatchEvent(new Event('change', { bubbles: true })); }"
-                            x-on:click="$refs.createAttachmentInput.click()"
-                            role="button"
-                            tabindex="0"
-                            x-on:keydown.enter.prevent="$refs.createAttachmentInput.click()"
-                            x-on:keydown.space.prevent="$refs.createAttachmentInput.click()"
-                        >
-                            <input x-ref="createAttachmentInput" class="file-input" type="file" wire:model="createAttachments" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.zip,.txt,.csv,.ai,.eps,.esp">
-                            <div class="inquiry-dropzone-icon" aria-hidden="true">⇧</div>
-                            <div class="inquiry-dropzone-copy">
-                                <strong>Drop client files here</strong>
-                                <span class="ft-inquiry-drop-or">or <b>browse files</b></span>
-                                <small>PDF, Office files, JPG, PNG, ZIP, AI, EPS or ESP · Max 20 MB per file</small>
-                            </div>
-                            <button class="secondary inquiry-dropzone-button" type="button" x-on:click.stop="$refs.createAttachmentInput.click()">Choose files</button>
-                        </div>
-                        <div class="inquiry-upload-state" wire:loading wire:target="createAttachments">Uploading files…</div>
+                        <x-ui.create-attachment-dropzone
+                            input-id="inquiry-create-attachments"
+                            model="createAttachments"
+                            :multiple="true"
+                            headline="Drop client files here"
+                            browse-text="browse files"
+                            helper="PDF, Office files, JPG, PNG, ZIP, AI, EPS or ESP · Max 20 MB per file"
+                            progress-label="Uploading files..."
+                            progress-aria-label="Inquiry attachment upload progress"
+                        />
                         @if(count($createAttachments))
                             <div class="inquiry-selected-files ft-inquiry-selected-files">
                                 <div class="inquiry-selected-files-title">Selected files <span>{{ count($createAttachments) }}</span></div>

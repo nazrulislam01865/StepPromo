@@ -14,6 +14,7 @@
     $subject = trim((string) ($preview['subject'] ?? '')) ?: $defaultSubject;
     $attachment = trim((string) ($preview['document_name'] ?? ''));
     $delivery = trim((string) ($preview['delivery'] ?? '')) ?: 'Configured email service';
+    $emailServiceEnabled = (bool) ($preview['email_service_enabled'] ?? true);
     $recipientSource = trim((string) ($preview['recipient_source'] ?? ''));
     $previewEmptyRecipientText = trim((string) ($preview['empty_recipient_message'] ?? ''));
     if ($previewEmptyRecipientText !== '') {
@@ -26,8 +27,8 @@
     <header class="ft-order-email-preview-head">
         <div>
             <small>EMAIL PREVIEW</small>
-            <strong>Exact email that will be sent</strong>
-            <span>Recipients, subject, attachment and message body are generated from this Order.</span>
+            <strong>{{ $emailServiceEnabled ? 'Exact email that will be sent' : 'Email delivery is currently disabled' }}</strong>
+            <span>{{ $emailServiceEnabled ? 'Recipients, subject, attachment and message body are generated from this Order.' : 'The preview remains available, but confirming this task will continue the workflow without sending email.' }}</span>
         </div>
         <em>{{ $delivery }}</em>
     </header>

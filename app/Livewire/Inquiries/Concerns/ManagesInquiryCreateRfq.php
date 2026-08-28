@@ -44,8 +44,9 @@ trait ManagesInquiryCreateRfq
 
     /**
      * Validate supplier IDs against the same RFQ service used by the detail page.
-     * This prevents stale/inactive suppliers or records without email addresses
-     * from being injected into the Livewire payload.
+     * Email availability is intentionally not an eligibility rule: active
+     * suppliers may be selected and retained in the RFQ even before an email is
+     * configured.
      *
      * @return array<int,int>
      */
@@ -64,7 +65,7 @@ trait ManagesInquiryCreateRfq
 
         $workspaceId = app(MasterDataService::class)->workspaceId();
         $available = app(InquiryRfqService::class)
-            ->invitableSuppliersByIds($workspaceId, $ids)
+            ->selectableSuppliersByIds($workspaceId, $ids)
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
             ->sort()
@@ -73,7 +74,7 @@ trait ManagesInquiryCreateRfq
 
         $expected = collect($ids)->sort()->values()->all();
         if ($available !== $expected) {
-            $this->addError('createRfqSupplierIds', 'One or more selected suppliers are no longer active or do not have a valid email address.');
+            $this->addError('createRfqSupplierIds', 'One or more selected suppliers are no longer active or available.');
             return [];
         }
 
@@ -87,12 +88,12 @@ trait ManagesInquiryCreateRfq
      * Inquiry or duplicate messages that were accepted successfully.
      *
      * @param array<int,int> $supplierIds
-     * @return array{sent:int,failed:int}
+     * @return array{sent:int,added_without_email:int,failed:int}
      */
     private function sendCreateRfqInvitations(Inquiry $inquiry, User $actor, array $supplierIds): array
     {
         if ($supplierIds === []) {
-            return ['sent' => 0, 'failed' => 0];
+            return ['sent' => 0, 'added_without_email' => 0, 'failed' => 0];
         }
 
         $dueAt = $this->createRfqDueDate !== ''
@@ -100,25 +101,30 @@ trait ManagesInquiryCreateRfq
             : null;
         $message = trim($this->createRfqMessage);
         $sent = 0;
+        $addedWithoutEmail = 0;
         $failed = 0;
 
         foreach ($supplierIds as $supplierId) {
             try {
-                app(InquiryRfqService::class)->invite(
+                $invitation = app(InquiryRfqService::class)->invite(
                     $inquiry,
                     (int) $supplierId,
                     $actor,
                     $dueAt,
                     $message !== '' ? $message : null,
                 );
-                $sent++;
+                if ($invitation->email_status === 'Delivered') {
+                    $sent++;
+                } else {
+                    $addedWithoutEmail++;
+                }
             } catch (Throwable $exception) {
                 report($exception);
                 $failed++;
             }
         }
 
-        return ['sent' => $sent, 'failed' => $failed];
+        return ['sent' => $sent, 'added_without_email' => $addedWithoutEmail, 'failed' => $failed];
     }
 
     private function defaultCreateRfqMessage(): string

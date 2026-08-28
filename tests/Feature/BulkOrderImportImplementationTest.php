@@ -24,10 +24,10 @@ class BulkOrderImportImplementationTest extends TestCase
         $routeLoader = file_get_contents(resource_path('js/features/route-loader.js'));
 
         $this->assertStringContainsString('<h1>Import orders</h1>', $view);
-        $this->assertStringContainsString('Client ID, Order Title, Shipping Address and Postal Code are mandatory.', $view);
+        $this->assertStringContainsString('Client ID, Client Reference Number, Shipping Address, Postal Code and Product ID are mandatory.', $view);
         $this->assertStringContainsString('Phone Number is optional', $view);
-        $this->assertStringContainsString('Repeat Order No. becomes required only when Repeat Order? is Yes.', $view);
-        $this->assertStringContainsString('Product ID may be blank.', $view);
+        $this->assertStringContainsString('Previous Reference Number becomes required only when Repeat Order? is Yes.', $view);
+        $this->assertStringContainsString('Product ID is required so FlowTrack can generate the Order Title automatically', $view);
         $this->assertStringContainsString('Normal, Urgent or Super Urgent', $view);
         $this->assertStringContainsString('Reference already exists; this row will be skipped', $service);
         $this->assertStringContainsString('Reference already exists; the matching order will be updated', $service);
@@ -42,17 +42,22 @@ class BulkOrderImportImplementationTest extends TestCase
         $this->assertStringContainsString("name('orders.bulk-import.template')", $routes);
 
         $this->assertStringContainsString("'client_id' => ['clientid', 'clientcode']", $service);
+        $this->assertStringContainsString("'ref' => ['clientreferencenumber', 'clientreference', 'referenceorderno'", $service);
         $this->assertStringContainsString("'is_repeat' => ['repeatorderyesno'", $service);
         $this->assertStringContainsString("'product_id' => ['productid'", $service);
         $this->assertStringContainsString("'shipping_address' => ['shippingaddress'", $service);
         $this->assertStringContainsString("'shipping_phone' => ['phonenumberwithcountrycode'", $service);
         $this->assertStringContainsString("'shipping_postal_code' => ['postalcode'", $service);
+        // Legacy aliases stay readable for old uploads, but the v4 template no longer exposes these Create Order fields.
         $this->assertStringContainsString("'estimated_delivery' => ['estimateddeliverydate']", $service);
         $this->assertStringContainsString("'production_urgency' => ['productionurgency'", $service);
         $this->assertStringContainsString("'shipment_urgency' => ['shipmenturgency'", $service);
         $this->assertStringContainsString("'notes' => ['notes', 'ordernotes']", $service);
         $this->assertStringContainsString('Client ID is required', $service);
-        $this->assertStringContainsString('Order Title is required', $service);
+        $this->assertStringContainsString('Client Reference Number is required', $service);
+        $this->assertStringContainsString('Product ID is required', $service);
+        $this->assertStringContainsString('OrderCreateData::generateTitle', $service);
+        $this->assertStringNotContainsString('Order Title is required', $service);
         $this->assertStringContainsString('Shipping Address is required', $service);
         $this->assertStringContainsString('Postal Code is required', $service);
         $this->assertStringContainsString('activePhoneCountryCodes', $service);
@@ -60,7 +65,7 @@ class BulkOrderImportImplementationTest extends TestCase
         $this->assertStringContainsString("'shipping_address' => \$row['shipping_address']", $service);
         $this->assertStringContainsString("'shipping_postal_code' => \$row['shipping_postal_code']", $service);
         $this->assertStringContainsString('Repeat Order? must be Yes or No', $service);
-        $this->assertStringContainsString('Repeat Order No. is required when Repeat Order? is Yes', $service);
+        $this->assertStringContainsString('Previous Reference Number is required when Repeat Order? is Yes', $service);
         $this->assertStringContainsString('Product ID does not match an active Product', $service);
         $this->assertStringContainsString('Product Quantity must be a whole number', $service);
         $this->assertStringContainsString("'product_supplier_resolved_id'", $service);
@@ -70,7 +75,7 @@ class BulkOrderImportImplementationTest extends TestCase
         $this->assertStringContainsString("'supplier_id' => filled(\$row['product_supplier_resolved_id']", $service);
         $this->assertStringContainsString("'unit_price' => \$row['product_unit_price_resolved'] ?? 0", $service);
         $this->assertStringContainsString("'catalog_product_id' => (int) \$row['product_resolved_id']", $service);
-        $this->assertStringContainsString('Invalid Customer Requested Delivery Date', $service);
+        $this->assertStringContainsString('Invalid Order Hand Date', $service);
         $this->assertStringContainsString('Invalid Estimated Delivery Date', $service);
         $this->assertStringContainsString('resolveUrgency', $service);
         $this->assertStringContainsString("'notes' => blank(\$row['notes']) ? null : \$row['notes']", $service);
@@ -98,8 +103,13 @@ class BulkOrderImportImplementationTest extends TestCase
         $this->assertStringContainsString('Shipping Address *', $bulkJs);
         $this->assertStringContainsString('Phone Number (with country code)', $bulkJs);
         $this->assertStringContainsString('Postal Code *', $bulkJs);
-        $this->assertStringContainsString('Production Urgency', $bulkJs);
-        $this->assertStringContainsString('Shipment Urgent', $bulkJs);
+        $this->assertStringContainsString('Client Reference Number *', $bulkJs);
+        $this->assertStringContainsString('Product ID *', $bulkJs);
+        $this->assertStringContainsString('Order Hand Date', $bulkJs);
+        $this->assertStringContainsString('Shipment Urgency', $bulkJs);
+        $this->assertStringNotContainsString('Order Title *', $bulkJs);
+        $this->assertStringNotContainsString('Estimated Delivery Date', $bulkJs);
+        $this->assertStringNotContainsString('Production Urgency', $bulkJs);
         $this->assertStringContainsString("'view_orders_url'", $controller);
         $this->assertStringContainsString("'import' => \$result['import_id']", $controller);
         $this->assertStringContainsString('result.view_orders_url', $bulkJs);
@@ -114,7 +124,10 @@ class BulkOrderImportImplementationTest extends TestCase
         $this->assertStringContainsString('Show all orders', $ordersTable);
 
         $this->assertStringContainsString("in_array('clientid', \$keys, true)", $reader);
-        $this->assertStringContainsString("in_array('ordertitle', \$keys, true)", $reader);
+        $this->assertStringContainsString("in_array('clientreferencenumber', \$keys, true)", $reader);
+        $this->assertStringContainsString("in_array('referenceorderno', \$keys, true)", $reader);
+        $this->assertStringContainsString("in_array('productid', \$keys, true)", $reader);
+        $this->assertStringNotContainsString("in_array('ordertitle', \$keys, true)", $reader);
         $this->assertStringContainsString("in_array('shippingaddress', \$keys, true)", $reader);
         $this->assertStringContainsString("in_array('postalcode', \$keys, true)", $reader);
         $this->assertStringContainsString('legacy binary .xls', $reader);
@@ -129,7 +142,8 @@ class BulkOrderImportImplementationTest extends TestCase
         $this->assertStringContainsString("Schema::create('bulk_order_import_rows'", $baseMigration);
         $this->assertStringContainsString("Schema::hasColumn('flow_jobs', 'notes')", $refinedMigration);
         $this->assertStringContainsString("'name' => 'Super Urgent'", $refinedMigration);
-        $this->assertStringContainsString('FlowTrack_Bulk_Order_Import_Template_v3.xlsx', $controller);
-        $this->assertFileExists(storage_path('app/templates/FlowTrack_Bulk_Order_Import_Template_v3.xlsx'));
+        $this->assertStringContainsString('FlowTrack_Bulk_Order_Import_Template_v4.xlsx', $controller);
+        $this->assertFileExists(resource_path('templates/FlowTrack_Bulk_Order_Import_Template_v4.xlsx'));
+        $this->assertFileExists(storage_path('app/templates/FlowTrack_Bulk_Order_Import_Template_v4.xlsx'));
     }
 }

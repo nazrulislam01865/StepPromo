@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\FlowJob;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\OrderStageResolver;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -95,6 +96,7 @@ class MyWorkService
                 'my_work_job_phases.name as my_work_phase_name',
                 'my_work_job_phases.short_name as my_work_phase_short_name',
                 'my_work_job_phases.color as my_work_phase_color',
+                'my_work_job_phases.sequence as my_work_phase_sequence',
             ])
             ->get()
             ->keyBy('id');
@@ -113,7 +115,9 @@ class MyWorkService
                 'my_work_task_phases.name as my_work_phase_name',
                 'my_work_task_phases.short_name as my_work_phase_short_name',
                 'my_work_task_phases.color as my_work_phase_color',
+                'my_work_task_phases.sequence as my_work_phase_sequence',
                 'my_work_task_templates.color as my_work_task_color',
+                'my_work_task_templates.automation_key as my_work_automation_key',
                 'my_work_assignees.name as my_work_assignee_name',
                 'my_work_assignees.profile_image_path as my_work_assignee_profile_image_path',
                 'my_work_task_flags.name as task_flag_name',
@@ -133,13 +137,20 @@ class MyWorkService
                 ->map(fn (Task $task) => $this->presentTask($task, $user, $access, $displayTimezone, $today, $parentCreatedByUser))
                 ->values();
 
+            $jobStage = OrderStageResolver::resolve(
+                $job->getAttribute('my_work_phase_name'),
+                $job->getAttribute('my_work_phase_short_name'),
+                $job->getAttribute('my_work_phase_sequence') !== null ? (int) $job->getAttribute('my_work_phase_sequence') : null,
+                (string) $job->status,
+            );
+
             return [
                 'id' => (int) $job->id,
                 'number' => (string) $job->displayOrderNumber(),
                 'title' => (string) $job->title,
                 'client' => (string) ($job->getAttribute('my_work_client_name') ?: 'No client'),
-                'stage' => (string) ($job->getAttribute('my_work_phase_name') ?: $job->getAttribute('my_work_phase_short_name') ?: 'No phase'),
-                'stageColor' => $job->getAttribute('my_work_phase_color'),
+                'stage' => (string) $jobStage['name'],
+                'stageColor' => $job->getAttribute('my_work_phase_color') ?: $jobStage['color'],
                 'progress' => max(0, min(100, (int) $job->progress)),
                 'taskCount' => $taskRows->count(),
                 'route' => $canOpenJobs ? route('jobs.index', ['open' => $job->id]) : null,
@@ -260,73 +271,86 @@ class MyWorkService
     /** @return list<string> */
     public function orderPhaseOptions(): array
     {
-        return DB::table('workflow_phases as my_work_filter_phases')
-            ->join('workflow_templates as my_work_filter_workflows', 'my_work_filter_workflows.id', '=', 'my_work_filter_phases.workflow_template_id')
-            ->where('my_work_filter_workflows.applies_to', 'orders')
-            ->where('my_work_filter_workflows.is_active', true)
-            ->where('my_work_filter_phases.is_active', true)
-            ->whereNotNull('my_work_filter_phases.name')
-            ->where('my_work_filter_phases.name', '!=', '')
-            ->orderBy('my_work_filter_phases.sequence')
-            ->orderBy('my_work_filter_phases.name')
-            ->get(['my_work_filter_phases.name', 'my_work_filter_phases.sequence'])
-            ->map(fn ($phase) => trim((string) $phase->name))
+        return collect(OrderWorkflowSetupService::fixedStages())
+            ->pluck('name')
+            ->map(fn ($name) => trim((string) $name))
             ->filter()
-            ->unique(fn ($name) => mb_strtolower($name))
             ->values()
             ->all();
     }
 
     /**
-     * Reuse the Order-list workflow-stage visual on My Tasks without changing
-     * My Tasks' personal visibility rules. Counts are task counts (not Order
-     * counts) and come from the same open personal task scope as this page.
+     * Reuse the authoritative seven-stage Order runtime on My Tasks. Historical
+     * task rows may still reference retired phases such as "Order Intake", but
+     * their counts and labels are folded into the matching current stage.
      *
      * @return list<array{id:int,filter_value:string,name:string,short_name:string,sequence:int,color:string,count:int,count_label:string}>
      */
     public function orderPhaseCards(User $user): array
     {
-        $definitions = DB::table('workflow_phases as my_work_card_phases')
-            ->join('workflow_templates as my_work_card_workflows', 'my_work_card_workflows.id', '=', 'my_work_card_phases.workflow_template_id')
-            ->where('my_work_card_workflows.applies_to', 'orders')
-            ->where('my_work_card_workflows.is_active', true)
-            ->where('my_work_card_phases.is_active', true)
-            ->whereNotNull('my_work_card_phases.name')
-            ->where('my_work_card_phases.name', '!=', '')
-            ->orderBy('my_work_card_phases.sequence')
-            ->orderBy('my_work_card_phases.id')
-            ->get([
-                'my_work_card_phases.id',
-                'my_work_card_phases.name',
-                'my_work_card_phases.short_name',
-                'my_work_card_phases.sequence',
-                'my_work_card_phases.color',
-            ])
-            ->unique(fn ($phase) => mb_strtolower(trim((string) $phase->name)))
-            ->values();
+        $preferredWorkflowId = OrderWorkflowSetupService::orderWorkflowQuery()
+            ->where('is_active', true)
+            ->orderByDesc('is_default')
+            ->orderBy('id')
+            ->value('id');
 
-        $counts = $this->personalTaskQuery($user, [])
-            ->leftJoin('workflow_phases as my_work_card_task_phases', 'my_work_card_task_phases.id', '=', 'tasks.workflow_phase_id')
+        $preferredPhases = $preferredWorkflowId
+            ? DB::table('workflow_phases')
+                ->where('workflow_template_id', $preferredWorkflowId)
+                ->where('is_active', true)
+                ->whereBetween('sequence', [1, count(OrderWorkflowSetupService::fixedStages())])
+                ->get(['id', 'sequence', 'short_name', 'color'])
+                ->keyBy(fn ($phase) => (int) $phase->sequence)
+            : collect();
+
+        // activeVisibleTaskQuery() already joins the current phase and saved
+        // Task Pack item as my_work_active_phase/my_work_active_template. Reuse
+        // those aliases and aggregate a tiny number of stage/key/status groups.
+        $rawCounts = $this->personalTaskQuery($user, [])
             ->reorder()
-            ->selectRaw("LOWER(TRIM(COALESCE(my_work_card_task_phases.name, ''))) AS stage_key")
+            ->select([])
+            ->select([
+                'my_work_active_phase.name as phase_name',
+                'my_work_active_phase.short_name as phase_short_name',
+                'my_work_active_phase.sequence as phase_sequence',
+                'my_work_active_template.automation_key as automation_key',
+                'tasks.status as task_status',
+            ])
             ->selectRaw('COUNT(tasks.id) AS aggregate')
-            ->groupBy('stage_key')
-            ->pluck('aggregate', 'stage_key')
-            ->map(fn ($count) => (int) $count);
+            ->groupBy([
+                'my_work_active_phase.name',
+                'my_work_active_phase.short_name',
+                'my_work_active_phase.sequence',
+                'my_work_active_template.automation_key',
+                'tasks.status',
+            ])
+            ->get();
 
-        return $definitions
-            ->map(function ($phase) use ($counts): array {
-                $name = trim((string) $phase->name);
-                $key = mb_strtolower($name);
+        $countBySequence = $rawCounts
+            ->groupBy(fn ($row) => OrderStageResolver::resolve(
+                $row->phase_name,
+                $row->phase_short_name,
+                $row->phase_sequence !== null ? (int) $row->phase_sequence : null,
+                $row->task_status,
+                $row->automation_key,
+            )['sequence'])
+            ->map(fn ($rows): int => (int) $rows->sum(fn ($row) => (int) $row->aggregate));
+
+        return collect(OrderWorkflowSetupService::fixedStages())
+            ->values()
+            ->map(function (array $fixed, int $index) use ($preferredPhases, $countBySequence): array {
+                $sequence = $index + 1;
+                $phase = $preferredPhases->get($sequence);
+                $name = (string) $fixed['name'];
 
                 return [
-                    'id' => (int) $phase->id,
+                    'id' => (int) ($phase?->id ?: $sequence),
                     'filter_value' => $name,
                     'name' => $name,
-                    'short_name' => trim((string) ($phase->short_name ?: $name)),
-                    'sequence' => (int) $phase->sequence,
-                    'color' => \App\Support\MasterColor::normalize((string) $phase->color) ?: '#2563EB',
-                    'count' => (int) ($counts->get($key, 0)),
+                    'short_name' => trim((string) ($phase?->short_name ?: $fixed['short'] ?: $name)),
+                    'sequence' => $sequence,
+                    'color' => \App\Support\MasterColor::normalize((string) ($phase?->color ?: $fixed['color'])) ?: '#2563EB',
+                    'count' => (int) ($countBySequence->get($sequence, 0)),
                     'count_label' => 'Open tasks',
                 ];
             })
@@ -336,19 +360,29 @@ class MyWorkService
     /** @return list<int> */
     public function orderPhaseSourceIdsForName(string $phaseName): array
     {
-        $normalizedPhase = mb_strtolower(trim($phaseName));
-        if ($normalizedPhase === '') return [];
+        $expected = OrderStageResolver::sequenceFromName($phaseName);
+        if (!$expected) return [];
 
-        return DB::table('workflow_phases as my_work_source_phases')
-            ->join('workflow_templates as my_work_source_workflows', 'my_work_source_workflows.id', '=', 'my_work_source_phases.workflow_template_id')
-            ->where('my_work_source_workflows.applies_to', 'orders')
-            ->where('my_work_source_workflows.is_active', true)
-            ->where('my_work_source_phases.is_active', true)
-            ->whereRaw('LOWER(TRIM(my_work_source_phases.name)) = ?', [$normalizedPhase])
-            ->selectRaw('COALESCE(my_work_source_phases.source_workflow_phase_id, my_work_source_phases.id) AS source_phase_id')
-            ->pluck('source_phase_id')
-            ->map(fn ($id) => (int) $id)
-            ->filter(fn ($id) => $id > 0)
+        // Include live, historical and snapshot phase identities. The query is
+        // used only after the user selects one of the seven canonical stages,
+        // so legacy aliases can be safely folded into that operational stage.
+        return DB::table('workflow_phases')
+            // Historical/snapshot phase rows may be inactive after Workflow
+            // Setup changes, but active Orders can still legitimately point to
+            // them. Include those identities so the canonical filter remains
+            // correct until the maintenance rebind runs.
+            ->get(['id', 'source_workflow_phase_id', 'name', 'short_name', 'sequence'])
+            ->filter(fn ($phase): bool => OrderStageResolver::matchesSequence(
+                $expected,
+                $phase->name,
+                $phase->short_name,
+                $phase->sequence !== null ? (int) $phase->sequence : null,
+            ))
+            ->flatMap(fn ($phase): array => [
+                (int) $phase->id,
+                (int) ($phase->source_workflow_phase_id ?: 0),
+            ])
+            ->filter(fn (int $id): bool => $id > 0)
             ->unique()
             ->values()
             ->all();
@@ -424,31 +458,26 @@ class MyWorkService
      */
     public function activeVisibleTaskQuery(User $user): Builder
     {
-        $blockedStatuses = [
-            '',
-            'not start',
-            'not started',
-            'not ready',
-            'locked',
-            'skipped',
-            'not applicable',
-            'n/a',
-            'completed',
-            'cancelled',
-            'canceled',
-            'waiting for sample approval',
-            'waiting for qc issue resolution',
-        ];
-
-        $placeholders = implode(',', array_fill(0, count($blockedStatuses), '?'));
-
         $access = app(AccessControlService::class);
-        $query = Task::query();
+
+        // IMPORTANT: Do not infer "active" from the stored status alone.
+        // Older/cloud Orders can contain stale sibling statuses (for example
+        // more than one READY row) after workflow/task-pack changes. Order
+        // Details does not trust those statuses; it resolves one structural
+        // next task from the current phase and saved Task Pack. My Tasks must
+        // use the same rule or the two screens drift apart.
+        $query = Task::query()
+            ->select('tasks.*')
+            ->leftJoin('workflow_phases as my_work_active_phase', 'my_work_active_phase.id', '=', 'tasks.workflow_phase_id')
+            ->leftJoin('task_pack_items as my_work_active_template', function ($join): void {
+                $join->on('my_work_active_template.id', '=', 'tasks.task_pack_task_id')
+                    ->on('my_work_active_template.task_pack_id', '=', 'my_work_active_phase.task_pack_id');
+            });
 
         // Admin/Super Admin are intentionally exempt from the visibility
-        // participant check. Everyone else can see the active task when they
-        // are the assignee, the Order creator, or the task is included by their
-        // configured record-access scope.
+        // participant check. Everyone else can see the one active task when
+        // they are the assignee, the Order creator, or the task is included by
+        // their configured record-access scope.
         if (!$access->isAdministrator($user)) {
             $visibleByConfiguredAccess = app(TaskService::class)
                 ->visibleQuery($user)
@@ -462,21 +491,308 @@ class MyWorkService
             });
         }
 
-        return $query
+        $query
             ->whereNull('tasks.completed_at')
+            ->whereRaw("LOWER(TRIM(COALESCE(tasks.status, ''))) NOT IN ('completed','skipped','not applicable','n/a','cancelled','canceled')")
             ->whereHas('job', function (Builder $job): void {
                 $job
                     ->whereHas('client', fn (Builder $client) => $client->where('is_active', true))
                     ->whereNotIn('status', JobService::INACTIVE_STATUSES)
                     ->whereNull('completed_at')
                     ->whereRaw("LOWER(TRIM(flow_jobs.status)) != 'completed'")
-                    // A task from an earlier/future phase is never active work.
                     ->whereColumn('flow_jobs.workflow_phase_id', 'tasks.workflow_phase_id');
             })
-            ->whereRaw(
-                "LOWER(TRIM(COALESCE(tasks.status, ''))) NOT IN ($placeholders)",
-                $blockedStatuses,
-            );
+            // Match JobDetailPresenter::phaseTasks(): generated rows from an
+            // obsolete Task Pack are not part of the live Order workflow even
+            // when they still point at the same workflow_phase_id.
+            ->where(function (Builder $validPhaseTask): void {
+                $validPhaseTask
+                    ->whereNull('tasks.task_pack_task_id')
+                    ->orWhereNotNull('my_work_active_template.id');
+            });
+
+        $this->applyStructuralActiveTaskConstraint($query);
+
+        return $query;
+    }
+
+    /**
+     * Restrict an already-current-phase task query to exactly the task that
+     * Order Details considers actionable.
+     *
+     * Normal path: first incomplete REQUIRED generated Task Pack item.
+     * Conditional path: Sample Approval / QC Issue replaces its waiting
+     * required blocker while that branch is active.
+     * After generated required work: first manual task, then first activated
+     * optional Task Pack item.
+     *
+     * The query is structural rather than status-driven, so stale READY / IN
+     * PROGRESS values on cloud data cannot make sibling tasks appear active.
+     */
+    private function applyStructuralActiveTaskConstraint(Builder $query): void
+    {
+        $query->where(function (Builder $active): void {
+            // 1. First incomplete required generated task in the current saved
+            // Task Pack. Tie-break by task id exactly like Order Details.
+            $active->where(function (Builder $required): void {
+                $required
+                    ->whereNotNull('my_work_active_template.id')
+                    ->where(function (Builder $requiredFlag): void {
+                        $requiredFlag
+                            ->where('my_work_active_template.is_required', true)
+                            ->orWhereNull('my_work_active_template.is_required');
+                    })
+                    ->whereNotExists(function ($earlier): void {
+                        $earlier
+                            ->selectRaw('1')
+                            ->from('tasks as my_work_earlier_required')
+                            ->join('task_pack_items as my_work_earlier_required_template', 'my_work_earlier_required_template.id', '=', 'my_work_earlier_required.task_pack_task_id')
+                            ->whereColumn('my_work_earlier_required.flow_job_id', 'tasks.flow_job_id')
+                            ->whereColumn('my_work_earlier_required.workflow_phase_id', 'tasks.workflow_phase_id')
+                            ->whereColumn('my_work_earlier_required_template.task_pack_id', 'my_work_active_phase.task_pack_id')
+                            ->whereNull('my_work_earlier_required.deleted_at')
+                            ->whereNull('my_work_earlier_required.completed_at')
+                            ->whereRaw("LOWER(TRIM(COALESCE(my_work_earlier_required.status, ''))) NOT IN ('completed','skipped','not applicable','n/a','cancelled','canceled')")
+                            ->where(function ($requiredFlag): void {
+                                $requiredFlag
+                                    ->where('my_work_earlier_required_template.is_required', true)
+                                    ->orWhereNull('my_work_earlier_required_template.is_required');
+                            })
+                            ->where(function ($position): void {
+                                $position
+                                    ->whereColumn('my_work_earlier_required_template.sort_order', '<', 'my_work_active_template.sort_order')
+                                    ->orWhere(function ($tie): void {
+                                        $tie
+                                            ->whereColumn('my_work_earlier_required_template.sort_order', '=', 'my_work_active_template.sort_order')
+                                            ->whereColumn('my_work_earlier_required.id', '<', 'tasks.id');
+                                    });
+                            });
+                    })
+                    // A waiting required blocker is not the active UI row while
+                    // its explicit conditional child is available.
+                    ->where(function (Builder $normalRequired): void {
+                        $normalRequired
+                            ->whereRaw("LOWER(TRIM(COALESCE(tasks.status, ''))) NOT IN ('waiting for sample approval','waiting for qc issue resolution')")
+                            ->orWhere(function (Builder $missingBranch): void {
+                                $missingBranch
+                                    ->whereRaw("LOWER(TRIM(COALESCE(tasks.status, ''))) = 'waiting for sample approval'")
+                                    ->whereNotExists(fn ($branch) => $this->sampleApprovalBranchExistsSubquery($branch));
+                            })
+                            ->orWhere(function (Builder $missingBranch): void {
+                                $missingBranch
+                                    ->whereRaw("LOWER(TRIM(COALESCE(tasks.status, ''))) = 'waiting for qc issue resolution'")
+                                    ->whereNotExists(fn ($branch) => $this->qcIssueBranchExistsSubquery($branch));
+                            });
+                    });
+            });
+
+            // 2. Explicit conditional branches used by Order Details.
+            $active->orWhere(function (Builder $sample): void {
+                $sample
+                    ->whereNotNull('my_work_active_template.id')
+                    ->where(function (Builder $optional): void {
+                        $optional->where('my_work_active_template.is_required', false);
+                    })
+                    ->where(function (Builder $identity): void {
+                        $identity
+                            ->where('my_work_active_template.automation_key', 'ART_SAMPLE_APPROVAL')
+                            ->orWhereRaw("LOWER(TRIM(tasks.title)) = 'sample approval (when required)'");
+                    })
+                    ->where(function (Builder $activated): void {
+                        $activated
+                            ->where('tasks.progress', '>', 0)
+                            ->orWhereExists(fn ($documents) => $documents->selectRaw('1')->from('documents as my_work_sample_documents')->whereColumn('my_work_sample_documents.task_id', 'tasks.id'))
+                            ->orWhereExists(fn ($links) => $links->selectRaw('1')->from('task_links as my_work_sample_links')->whereColumn('my_work_sample_links.task_id', 'tasks.id'))
+                            ->orWhereRaw("LOWER(TRIM(COALESCE(tasks.status, ''))) NOT IN ('','not start','not started','not ready','locked')");
+                    })
+                    ->whereExists(fn ($blocker) => $this->waitingRequiredBlockerSubquery($blocker, 'waiting for sample approval'));
+            });
+
+            $active->orWhere(function (Builder $qcIssue): void {
+                $qcIssue
+                    ->whereNotNull('my_work_active_template.id')
+                    ->where('my_work_active_template.is_required', false)
+                    ->where(function (Builder $identity): void {
+                        $identity
+                            ->where('my_work_active_template.automation_key', 'QC_ISSUE')
+                            ->orWhereRaw("LOWER(TRIM(tasks.title)) = 'resolve qc issue (when needed)'");
+                    })
+                    ->whereExists(fn ($blocker) => $this->waitingRequiredBlockerSubquery($blocker, 'waiting for qc issue resolution'));
+            });
+
+            // 3. Manual Order tasks become active only after all required
+            // generated work in the phase is complete, and only one manual row
+            // is selected at a time.
+            $active->orWhere(function (Builder $manual): void {
+                $manual
+                    ->whereNull('tasks.task_pack_task_id')
+                    ->whereNotExists(fn ($required) => $this->openRequiredTaskSubquery($required))
+                    ->whereNotExists(function ($earlierManual): void {
+                        $earlierManual
+                            ->selectRaw('1')
+                            ->from('tasks as my_work_earlier_manual')
+                            ->whereColumn('my_work_earlier_manual.flow_job_id', 'tasks.flow_job_id')
+                            ->whereColumn('my_work_earlier_manual.workflow_phase_id', 'tasks.workflow_phase_id')
+                            ->whereNull('my_work_earlier_manual.task_pack_task_id')
+                            ->whereNull('my_work_earlier_manual.deleted_at')
+                            ->whereNull('my_work_earlier_manual.completed_at')
+                            ->whereRaw("LOWER(TRIM(COALESCE(my_work_earlier_manual.status, ''))) NOT IN ('completed','skipped','not applicable','n/a','cancelled','canceled')")
+                            ->whereColumn('my_work_earlier_manual.id', '<', 'tasks.id');
+                    });
+            });
+
+            // 4. Activated optional rows are a final fallback after required
+            // and manual work, matching OrderDetailPresenter::nextTask().
+            $active->orWhere(function (Builder $optional): void {
+                $optional
+                    ->whereNotNull('my_work_active_template.id')
+                    ->where('my_work_active_template.is_required', false)
+                    ->whereNotExists(fn ($required) => $this->openRequiredTaskSubquery($required))
+                    ->whereNotExists(function ($manual): void {
+                        $manual
+                            ->selectRaw('1')
+                            ->from('tasks as my_work_open_manual')
+                            ->whereColumn('my_work_open_manual.flow_job_id', 'tasks.flow_job_id')
+                            ->whereColumn('my_work_open_manual.workflow_phase_id', 'tasks.workflow_phase_id')
+                            ->whereNull('my_work_open_manual.task_pack_task_id')
+                            ->whereNull('my_work_open_manual.deleted_at')
+                            ->whereNull('my_work_open_manual.completed_at')
+                            ->whereRaw("LOWER(TRIM(COALESCE(my_work_open_manual.status, ''))) NOT IN ('completed','skipped','not applicable','n/a','cancelled','canceled')");
+                    })
+                    ->where(function (Builder $activated): void {
+                        $activated
+                            ->where('tasks.progress', '>', 0)
+                            ->orWhereExists(fn ($documents) => $documents->selectRaw('1')->from('documents as my_work_optional_documents')->whereColumn('my_work_optional_documents.task_id', 'tasks.id'))
+                            ->orWhereExists(fn ($links) => $links->selectRaw('1')->from('task_links as my_work_optional_links')->whereColumn('my_work_optional_links.task_id', 'tasks.id'))
+                            ->orWhereRaw("LOWER(TRIM(COALESCE(tasks.status, ''))) NOT IN ('','not start','not started','not ready','locked')");
+                    })
+                    ->whereNotExists(function ($earlierOptional): void {
+                        $earlierOptional
+                            ->selectRaw('1')
+                            ->from('tasks as my_work_earlier_optional')
+                            ->join('task_pack_items as my_work_earlier_optional_template', 'my_work_earlier_optional_template.id', '=', 'my_work_earlier_optional.task_pack_task_id')
+                            ->whereColumn('my_work_earlier_optional.flow_job_id', 'tasks.flow_job_id')
+                            ->whereColumn('my_work_earlier_optional.workflow_phase_id', 'tasks.workflow_phase_id')
+                            ->whereColumn('my_work_earlier_optional_template.task_pack_id', 'my_work_active_phase.task_pack_id')
+                            ->where('my_work_earlier_optional_template.is_required', false)
+                            ->whereNull('my_work_earlier_optional.deleted_at')
+                            ->whereNull('my_work_earlier_optional.completed_at')
+                            ->whereRaw("LOWER(TRIM(COALESCE(my_work_earlier_optional.status, ''))) NOT IN ('completed','skipped','not applicable','n/a','cancelled','canceled')")
+                            ->where(function ($activated): void {
+                                $activated
+                                    ->where('my_work_earlier_optional.progress', '>', 0)
+                                    ->orWhereExists(fn ($documents) => $documents->selectRaw('1')->from('documents as my_work_earlier_optional_documents')->whereColumn('my_work_earlier_optional_documents.task_id', 'my_work_earlier_optional.id'))
+                                    ->orWhereExists(fn ($links) => $links->selectRaw('1')->from('task_links as my_work_earlier_optional_links')->whereColumn('my_work_earlier_optional_links.task_id', 'my_work_earlier_optional.id'))
+                                    ->orWhereRaw("LOWER(TRIM(COALESCE(my_work_earlier_optional.status, ''))) NOT IN ('','not start','not started','not ready','locked')");
+                            })
+                            ->where(function ($position): void {
+                                $position
+                                    ->whereColumn('my_work_earlier_optional_template.sort_order', '<', 'my_work_active_template.sort_order')
+                                    ->orWhere(function ($tie): void {
+                                        $tie
+                                            ->whereColumn('my_work_earlier_optional_template.sort_order', '=', 'my_work_active_template.sort_order')
+                                            ->whereColumn('my_work_earlier_optional.id', '<', 'tasks.id');
+                                    });
+                            });
+                    });
+            });
+        });
+    }
+
+    private function openRequiredTaskSubquery($query)
+    {
+        return $query
+            ->selectRaw('1')
+            ->from('tasks as my_work_open_required')
+            ->join('task_pack_items as my_work_open_required_template', 'my_work_open_required_template.id', '=', 'my_work_open_required.task_pack_task_id')
+            ->whereColumn('my_work_open_required.flow_job_id', 'tasks.flow_job_id')
+            ->whereColumn('my_work_open_required.workflow_phase_id', 'tasks.workflow_phase_id')
+            ->whereColumn('my_work_open_required_template.task_pack_id', 'my_work_active_phase.task_pack_id')
+            ->whereNull('my_work_open_required.deleted_at')
+            ->whereNull('my_work_open_required.completed_at')
+            ->whereRaw("LOWER(TRIM(COALESCE(my_work_open_required.status, ''))) NOT IN ('completed','skipped','not applicable','n/a','cancelled','canceled')")
+            ->where(function ($required): void {
+                $required
+                    ->where('my_work_open_required_template.is_required', true)
+                    ->orWhereNull('my_work_open_required_template.is_required');
+            });
+    }
+
+    private function waitingRequiredBlockerSubquery($query, string $waitingStatus)
+    {
+        return $this->openRequiredTaskSubquery($query)
+            ->whereRaw('LOWER(TRIM(COALESCE(my_work_open_required.status, \'\'))) = ?', [$waitingStatus])
+            ->whereNotExists(function ($earlier): void {
+                $earlier
+                    ->selectRaw('1')
+                    ->from('tasks as my_work_blocker_earlier')
+                    ->join('task_pack_items as my_work_blocker_earlier_template', 'my_work_blocker_earlier_template.id', '=', 'my_work_blocker_earlier.task_pack_task_id')
+                    ->whereColumn('my_work_blocker_earlier.flow_job_id', 'my_work_open_required.flow_job_id')
+                    ->whereColumn('my_work_blocker_earlier.workflow_phase_id', 'my_work_open_required.workflow_phase_id')
+                    ->whereColumn('my_work_blocker_earlier_template.task_pack_id', 'my_work_open_required_template.task_pack_id')
+                    ->whereNull('my_work_blocker_earlier.deleted_at')
+                    ->whereNull('my_work_blocker_earlier.completed_at')
+                    ->whereRaw("LOWER(TRIM(COALESCE(my_work_blocker_earlier.status, ''))) NOT IN ('completed','skipped','not applicable','n/a','cancelled','canceled')")
+                    ->where(function ($required): void {
+                        $required
+                            ->where('my_work_blocker_earlier_template.is_required', true)
+                            ->orWhereNull('my_work_blocker_earlier_template.is_required');
+                    })
+                    ->where(function ($position): void {
+                        $position
+                            ->whereColumn('my_work_blocker_earlier_template.sort_order', '<', 'my_work_open_required_template.sort_order')
+                            ->orWhere(function ($tie): void {
+                                $tie
+                                    ->whereColumn('my_work_blocker_earlier_template.sort_order', '=', 'my_work_open_required_template.sort_order')
+                                    ->whereColumn('my_work_blocker_earlier.id', '<', 'my_work_open_required.id');
+                            });
+                    });
+            });
+    }
+
+    private function sampleApprovalBranchExistsSubquery($query)
+    {
+        return $query
+            ->selectRaw('1')
+            ->from('tasks as my_work_sample_branch')
+            ->join('task_pack_items as my_work_sample_branch_template', 'my_work_sample_branch_template.id', '=', 'my_work_sample_branch.task_pack_task_id')
+            ->whereColumn('my_work_sample_branch.flow_job_id', 'tasks.flow_job_id')
+            ->whereColumn('my_work_sample_branch.workflow_phase_id', 'tasks.workflow_phase_id')
+            ->whereColumn('my_work_sample_branch_template.task_pack_id', 'my_work_active_phase.task_pack_id')
+            ->whereNull('my_work_sample_branch.deleted_at')
+            ->whereNull('my_work_sample_branch.completed_at')
+            ->whereRaw("LOWER(TRIM(COALESCE(my_work_sample_branch.status, ''))) NOT IN ('completed','skipped','not applicable','n/a','cancelled','canceled')")
+            ->where(function ($identity): void {
+                $identity
+                    ->where('my_work_sample_branch_template.automation_key', 'ART_SAMPLE_APPROVAL')
+                    ->orWhereRaw("LOWER(TRIM(my_work_sample_branch.title)) = 'sample approval (when required)'");
+            })
+            ->where(function ($activated): void {
+                $activated
+                    ->where('my_work_sample_branch.progress', '>', 0)
+                    ->orWhereExists(fn ($documents) => $documents->selectRaw('1')->from('documents as my_work_sample_branch_documents')->whereColumn('my_work_sample_branch_documents.task_id', 'my_work_sample_branch.id'))
+                    ->orWhereExists(fn ($links) => $links->selectRaw('1')->from('task_links as my_work_sample_branch_links')->whereColumn('my_work_sample_branch_links.task_id', 'my_work_sample_branch.id'))
+                    ->orWhereRaw("LOWER(TRIM(COALESCE(my_work_sample_branch.status, ''))) NOT IN ('','not start','not started','not ready','locked')");
+            });
+    }
+
+    private function qcIssueBranchExistsSubquery($query)
+    {
+        return $query
+            ->selectRaw('1')
+            ->from('tasks as my_work_qc_branch')
+            ->join('task_pack_items as my_work_qc_branch_template', 'my_work_qc_branch_template.id', '=', 'my_work_qc_branch.task_pack_task_id')
+            ->whereColumn('my_work_qc_branch.flow_job_id', 'tasks.flow_job_id')
+            ->whereColumn('my_work_qc_branch.workflow_phase_id', 'tasks.workflow_phase_id')
+            ->whereColumn('my_work_qc_branch_template.task_pack_id', 'my_work_active_phase.task_pack_id')
+            ->whereNull('my_work_qc_branch.deleted_at')
+            ->whereNull('my_work_qc_branch.completed_at')
+            ->whereRaw("LOWER(TRIM(COALESCE(my_work_qc_branch.status, ''))) NOT IN ('completed','skipped','not applicable','n/a','cancelled','canceled')")
+            ->where(function ($identity): void {
+                $identity
+                    ->where('my_work_qc_branch_template.automation_key', 'QC_ISSUE')
+                    ->orWhereRaw("LOWER(TRIM(my_work_qc_branch.title)) = 'resolve qc issue (when needed)'");
+            });
     }
 
     /**
@@ -717,13 +1033,21 @@ class MyWorkService
         $master = app(MasterDataService::class);
         $statusColor = $master->colorFor('order_task_status', (string) $task->status);
         $flagColor = (!$completed && $flag !== 'No flag') ? $master->colorFor('order_task_flag', $flag) : null;
+        $taskStage = OrderStageResolver::resolve(
+            $task->getAttribute('my_work_phase_name'),
+            $task->getAttribute('my_work_phase_short_name'),
+            $task->getAttribute('my_work_phase_sequence') !== null ? (int) $task->getAttribute('my_work_phase_sequence') : null,
+            (string) $task->status,
+            $task->getAttribute('my_work_automation_key'),
+        );
 
         return [
             'id' => (int) $task->id,
             'number' => (string) $task->task_number,
             'title' => (string) $task->title,
-            'phase' => (string) ($task->getAttribute('my_work_phase_short_name') ?: $task->getAttribute('my_work_phase_name') ?: 'No phase'),
-            'phaseColor' => $task->getAttribute('my_work_phase_color'),
+            'phase' => (string) $taskStage['short_name'],
+            'phaseSequence' => (int) $taskStage['sequence'],
+            'phaseColor' => $task->getAttribute('my_work_phase_color') ?: $taskStage['color'],
             'taskColor' => \App\Support\MasterColor::normalize((string) $task->getAttribute('my_work_task_color'))
                 ?: \App\Support\MasterColor::normalize((string) $task->getAttribute('my_work_phase_color'))
                 ?: '#2563EB',

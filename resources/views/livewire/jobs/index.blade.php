@@ -63,6 +63,8 @@
             :workflow-phase-id="$workflowPhaseId"
             :owner-id="$ownerId"
             :job-items="$jobItems"
+            :order-title-preview="$orderTitlePreview"
+            :purchase-order-upload="$purchaseOrderUpload"
             :job-attachments="$jobAttachments"
             :catalog-ready="$createCatalogReady"
             :assignment-ready="$createAssignmentReady"
@@ -208,6 +210,9 @@
             :order-workflow-action-task-id="$orderWorkflowActionTaskId"
             :order-workflow-action-step="$orderWorkflowActionStep"
             :order-workflow-action-payload="$orderWorkflowActionPayload"
+            :order-workflow-email-fallback="$orderWorkflowEmailFallback"
+            :order-workflow-email-fallback-message="$orderWorkflowEmailFallbackMessage"
+            :order-workflow-email-fallback-attempts="$orderWorkflowEmailFallbackAttempts"
             wire:key="job-detail-{{ $selectedJob->id }}"
         />
     @else

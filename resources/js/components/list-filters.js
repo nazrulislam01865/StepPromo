@@ -14,6 +14,19 @@ const normaliseOptionValue = (value) => String(value ?? '')
         });
     };
 
+    // Central remote-dropdown sizing contract. Remote selectors should always
+    // reopen with a compact recent page. Search can still return a wider page,
+    // and Load more remains available, but those expanded rows must never leak
+    // into the next open and make the dropdown grow after repeated use.
+    const REMOTE_RECENT_PAGE_SIZE = 5;
+    const REMOTE_SEARCH_PAGE_SIZE = 20;
+    const REMOTE_MENU_HEIGHT_CAP = 280;
+
+    const normaliseRecentPageSize = (value) => {
+        const parsed = Number(value || REMOTE_RECENT_PAGE_SIZE);
+        return Math.max(1, Math.min(10, Number.isFinite(parsed) ? parsed : REMOTE_RECENT_PAGE_SIZE));
+    };
+
     const normalisePastedSearchText = (value) => String(value ?? '')
         .replace(/[\u200B-\u200D\uFEFF]/g, '')
         .replace(/\u00A0/g, ' ')
@@ -65,23 +78,57 @@ const normaliseOptionValue = (value) => String(value ?? '')
     }, true);
 
     const measureNaturalMenuHeight = (menu, heightCap) => {
-        // positionDropdown() runs while the menu may already have an inline
-        // max-height from an earlier scroll position. Measuring scrollHeight
-        // while that flex container is constrained can return the constrained
-        // height itself (for example 120px). Reusing that value on the next
-        // reposition made the dropdown permanently shrink after scrolling.
-        // Temporarily remove only that constraint, measure the real content,
-        // then restore it until Alpine applies the newly calculated style.
-        const previousMaxHeight = menu.style.getPropertyValue('max-height');
-        const previousPriority = menu.style.getPropertyPriority('max-height');
+        // Fixed remote menus are flex columns. After several open/search/select
+        // cycles the previous inline max-height can leave the scrollable option
+        // list with a zero flex height even though it still contains rows. Reading
+        // only menu.scrollHeight at that point reproduces the collapsed height and
+        // the next open looks "empty". Measure the list independently while both
+        // containers are unconstrained, then restore every inline style exactly.
+        const list = menu.querySelector('.ft-remote-filter-list');
+        const menuSnapshot = {
+            maxHeight: menu.style.getPropertyValue('max-height'),
+            maxHeightPriority: menu.style.getPropertyPriority('max-height'),
+            height: menu.style.getPropertyValue('height'),
+            heightPriority: menu.style.getPropertyPriority('height'),
+            overflow: menu.style.getPropertyValue('overflow'),
+            overflowPriority: menu.style.getPropertyPriority('overflow'),
+        };
+        const listSnapshot = list ? {
+            flex: list.style.getPropertyValue('flex'),
+            flexPriority: list.style.getPropertyPriority('flex'),
+            maxHeight: list.style.getPropertyValue('max-height'),
+            maxHeightPriority: list.style.getPropertyPriority('max-height'),
+            height: list.style.getPropertyValue('height'),
+            heightPriority: list.style.getPropertyPriority('height'),
+            overflow: list.style.getPropertyValue('overflow'),
+            overflowPriority: list.style.getPropertyPriority('overflow'),
+        } : null;
 
         menu.style.setProperty('max-height', 'none', 'important');
-        const measuredHeight = menu.scrollHeight;
+        menu.style.setProperty('height', 'auto', 'important');
+        menu.style.setProperty('overflow', 'visible', 'important');
+        if (list) {
+            list.style.setProperty('flex', '0 0 auto', 'important');
+            list.style.setProperty('max-height', 'none', 'important');
+            list.style.setProperty('height', 'auto', 'important');
+            list.style.setProperty('overflow', 'visible', 'important');
+        }
 
-        if (previousMaxHeight) {
-            menu.style.setProperty('max-height', previousMaxHeight, previousPriority);
-        } else {
-            menu.style.removeProperty('max-height');
+        const measuredHeight = Math.max(menu.scrollHeight || 0, menu.getBoundingClientRect().height || 0);
+
+        const restore = (node, property, value, priority) => {
+            if (!node) return;
+            if (value) node.style.setProperty(property, value, priority);
+            else node.style.removeProperty(property);
+        };
+        restore(menu, 'max-height', menuSnapshot.maxHeight, menuSnapshot.maxHeightPriority);
+        restore(menu, 'height', menuSnapshot.height, menuSnapshot.heightPriority);
+        restore(menu, 'overflow', menuSnapshot.overflow, menuSnapshot.overflowPriority);
+        if (list && listSnapshot) {
+            restore(list, 'flex', listSnapshot.flex, listSnapshot.flexPriority);
+            restore(list, 'max-height', listSnapshot.maxHeight, listSnapshot.maxHeightPriority);
+            restore(list, 'height', listSnapshot.height, listSnapshot.heightPriority);
+            restore(list, 'overflow', listSnapshot.overflow, listSnapshot.overflowPriority);
         }
 
         return Math.min(heightCap, Math.max(120, measuredHeight || heightCap));
@@ -166,7 +213,7 @@ const normaliseOptionValue = (value) => String(value ?? '')
 
         const roomBelow = Math.max(0, viewportHeight - rect.bottom - edge - gap);
         const roomAbove = Math.max(0, rect.top - edge - gap);
-        const heightCap = component.searchable === false ? 300 : 360;
+        const heightCap = component.searchable === false ? 300 : Number(component.menuMaxHeight || REMOTE_MENU_HEIGHT_CAP);
         const naturalHeight = measureNaturalMenuHeight(menu, heightCap);
         const openAbove = roomBelow < Math.min(190, naturalHeight) && roomAbove > roomBelow;
         const availableHeight = Math.max(120, Math.min(naturalHeight, openAbove ? roomAbove : roomBelow || naturalHeight));
@@ -274,8 +321,12 @@ export const createFloatingActionMenu = () => ({
 
 export const createRemoteFilter = (config) => {
         const initialItems = Array.isArray(config.initialItems) ? config.initialItems : [];
+        const recentPageSize = normaliseRecentPageSize(config.recentPageSize);
+        const initialRecentItems = initialItems.slice(0, recentPageSize);
+        // Do not seed the remote-response cache from render-time items. They do
+        // not carry pagination metadata, so treating them as a real page-one
+        // response can incorrectly hide Load more after a Livewire morph.
         const initialCache = new Map();
-        if (initialItems.length) initialCache.set('', initialItems);
         const initialLabels = new Map(
             initialItems.map((item) => [String(item?.id ?? ''), String(item?.label ?? '')])
         );
@@ -284,26 +335,31 @@ export const createRemoteFilter = (config) => {
             ...positioningMethods,
             searchable: true,
             menuWidth: Number(config.menuWidth || 320),
+            menuMaxHeight: Number(config.menuMaxHeight || REMOTE_MENU_HEIGHT_CAP),
             fixedMenu: config.fixedMenu === true,
             externalAnchorEl: null,
             externalAnchorRect: null,
             open: false,
             query: '',
             loading: false,
-            items: initialItems,
+            items: initialRecentItems,
+            recentItems: initialRecentItems,
+            recentHasMore: initialItems.length > recentPageSize,
+            recentNextPage: initialItems.length > recentPageSize ? 2 : null,
+            recentPageSize,
             params: config.params && typeof config.params === 'object' ? {...config.params} : {},
             selectedValue: String(config.value || ''),
             selectedLabel: config.selectedLabel || config.placeholder,
             message: 'Recent options shown instantly. Type 2 characters to search.',
             page: 1,
-            perPage: 0,
-            hasMore: false,
-            nextPage: null,
+            perPage: recentPageSize,
+            hasMore: initialItems.length > recentPageSize,
+            nextPage: initialItems.length > recentPageSize ? 2 : null,
             minSearchLength: 2,
             controller: null,
             cache: initialCache,
             knownLabels: initialLabels,
-            recentLoaded: initialItems.length > 0,
+            recentLoaded: initialRecentItems.length > 0,
             requestSequence: 0,
             pendingValue: '',
             pendingLabel: '',
@@ -321,12 +377,21 @@ export const createRemoteFilter = (config) => {
                     if (id && label) this.knownLabels.set(id, label);
                 });
             },
+            restoreCompactRecentPage() {
+                this.items = [...this.recentItems];
+                this.page = 1;
+                this.perPage = this.recentPageSize;
+                this.hasMore = this.recentHasMore;
+                this.nextPage = this.recentNextPage;
+                this.message = this.resultMessage('');
+            },
             toggle() {
                 if (config.disabled) return;
                 this.open ? this.close() : this.openMenu();
             },
             openMenu() {
                 if (config.disabled) return;
+                this.restoreCompactRecentPage();
                 this.openPositionedMenu();
                 // Show the render-provided recent options immediately, then refresh
                 // them in the background so each open reflects current source data.
@@ -338,6 +403,7 @@ export const createRemoteFilter = (config) => {
             },
             close() {
                 this.open = false;
+                this.menuStyle = '';
                 this.externalAnchorEl = null;
                 this.externalAnchorRect = null;
                 this.query = '';
@@ -345,6 +411,7 @@ export const createRemoteFilter = (config) => {
                 this.requestSequence++;
                 this.controller?.abort();
                 this.controller = null;
+                this.restoreCompactRecentPage();
             },
             closeAfterSelection() {
                 // A searched option can still have a debounced search response or
@@ -415,8 +482,7 @@ export const createRemoteFilter = (config) => {
                     if (q) url.searchParams.set('q', q);
                     if (config.context) url.searchParams.set('context', config.context);
                     url.searchParams.set('page', String(requestedPage));
-                    if (q) url.searchParams.set('per_page', '20');
-                    else if (this.perPage > 0) url.searchParams.set('per_page', String(this.perPage));
+                    url.searchParams.set('per_page', String(q ? REMOTE_SEARCH_PAGE_SIZE : this.recentPageSize));
                     if (this.selectedValue) url.searchParams.append('selected[]', this.selectedValue);
                     Object.entries(this.params || {}).forEach(([name, value]) => {
                         if (value !== null && value !== undefined && String(value) !== '') {
@@ -439,9 +505,14 @@ export const createRemoteFilter = (config) => {
                     this.rememberItems([...selectedItems, ...pageItems]);
                     this.items = append ? uniqueOptions([...this.items, ...pageItems]) : pageItems;
                     this.page = Number(payload.pagination?.page || requestedPage);
-                    this.perPage = Number(payload.pagination?.per_page || (q ? 20 : this.perPage || 5));
+                    this.perPage = Number(payload.pagination?.per_page || (q ? REMOTE_SEARCH_PAGE_SIZE : this.recentPageSize));
                     this.hasMore = payload.pagination?.has_more === true;
                     this.nextPage = payload.pagination?.next_page ? Number(payload.pagination.next_page) : null;
+                    if (!q && requestedPage === 1 && !append) {
+                        this.recentItems = pageItems.slice(0, this.recentPageSize);
+                        this.recentHasMore = this.hasMore;
+                        this.recentNextPage = this.nextPage;
+                    }
                     this.minSearchLength = Number(payload.query?.min_length || this.minSearchLength || 2);
                     this.cache.set(key, {
                         items: pageItems,
@@ -491,14 +562,16 @@ export const createRemoteFilter = (config) => {
                     this.controller?.abort();
                     this.requestSequence++;
                     this.params = nextParams;
-                    this.items = freshItems;
+                    this.recentItems = freshItems.slice(0, this.recentPageSize);
+                    this.items = [...this.recentItems];
                     this.cache = new Map();
-                    if (freshItems.length) this.cache.set('', freshItems);
-                    this.recentLoaded = freshItems.length > 0;
+                    this.recentHasMore = freshItems.length > this.recentPageSize;
+                    this.recentNextPage = this.recentHasMore ? 2 : null;
+                    this.recentLoaded = this.recentItems.length > 0;
                     this.page = 1;
-                    this.perPage = 0;
-                    this.hasMore = false;
-                    this.nextPage = null;
+                    this.perPage = this.recentPageSize;
+                    this.hasMore = this.recentHasMore;
+                    this.nextPage = this.recentNextPage;
                     this.query = '';
                     this.message = 'Recent options shown instantly. Type 2 characters to search.';
                 }
@@ -613,11 +686,14 @@ export const createSearchSelect = (config) => createRemoteFilter(config);
 
 export const createMultiSelect = (config) => {
         const initialItems = Array.isArray(config.initialItems) ? config.initialItems : [];
+        const recentPageSize = normaliseRecentPageSize(config.recentPageSize);
+        const initialRecentItems = initialItems.slice(0, recentPageSize);
         const initialSelected = Array.isArray(config.values) ? config.values.map((value) => String(value)) : [];
 
         return {
             ...positioningMethods,
             menuWidth: Number(config.menuWidth || 320),
+            menuMaxHeight: Number(config.menuMaxHeight || REMOTE_MENU_HEIGHT_CAP),
             fixedMenu: config.fixedMenu === true,
             remote: config.remote === true,
             disabled: config.disabled === true,
@@ -625,13 +701,17 @@ export const createMultiSelect = (config) => {
             open: false,
             query: '',
             loading: false,
-            items: initialItems,
+            items: config.remote === true ? initialRecentItems : initialItems,
+            recentItems: initialRecentItems,
+            recentHasMore: initialItems.length > recentPageSize,
+            recentNextPage: initialItems.length > recentPageSize ? 2 : null,
+            recentPageSize,
             selected: [...new Set(initialSelected)],
             params: config.params && typeof config.params === 'object' ? {...config.params} : {},
             page: 1,
-            perPage: 0,
-            hasMore: false,
-            nextPage: null,
+            perPage: config.remote === true ? recentPageSize : 0,
+            hasMore: config.remote === true && initialItems.length > recentPageSize,
+            nextPage: config.remote === true && initialItems.length > recentPageSize ? 2 : null,
             minSearchLength: 2,
             controller: null,
             requestSequence: 0,
@@ -651,20 +731,37 @@ export const createMultiSelect = (config) => {
                     if (id) this.knownItems.set(id, item);
                 });
             },
+            restoreCompactRecentPage() {
+                if (!this.remote) return;
+                this.items = [...this.recentItems];
+                this.page = 1;
+                this.perPage = this.recentPageSize;
+                this.hasMore = this.recentHasMore;
+                this.nextPage = this.recentNextPage;
+                this.message = this.hasMore
+                    ? `${this.items.length} recent options · more available`
+                    : 'Recent options shown instantly. Type 2 characters to search.';
+            },
             toggle() {
                 if (this.disabled) return;
                 this.open ? this.close() : this.openMenu();
             },
             openMenu() {
                 if (this.disabled) return;
+                if (this.remote) this.restoreCompactRecentPage();
                 this.openPositionedMenu();
                 if (this.remote) this.searchOptions(true);
                 this.$nextTick(() => { this.reposition(); this.$refs.search?.focus(); });
             },
             close() {
                 this.open = false;
+                this.menuStyle = '';
                 this.query = '';
+                this.loading = false;
+                this.requestSequence++;
                 this.controller?.abort();
+                this.controller = null;
+                this.restoreCompactRecentPage();
             },
             isSelected(id) {
                 return this.selected.includes(String(id));
@@ -687,13 +784,17 @@ export const createMultiSelect = (config) => {
                 const nextParams = params && typeof params === 'object' ? {...params} : {};
                 if (JSON.stringify(this.params) !== JSON.stringify(nextParams)) {
                     this.params = nextParams;
-                    this.items = Array.isArray(items) ? items : [];
+                    const freshItems = Array.isArray(items) ? items : [];
+                    this.recentItems = freshItems.slice(0, this.recentPageSize);
+                    this.items = this.remote ? [...this.recentItems] : freshItems;
+                    this.recentHasMore = freshItems.length > this.recentPageSize;
+                    this.recentNextPage = this.recentHasMore ? 2 : null;
                     this.knownItems = new Map();
-                    this.remember(this.items);
+                    this.remember(freshItems);
                     this.page = 1;
-                    this.perPage = 0;
-                    this.hasMore = false;
-                    this.nextPage = null;
+                    this.perPage = this.remote ? this.recentPageSize : 0;
+                    this.hasMore = this.remote && this.recentHasMore;
+                    this.nextPage = this.remote ? this.recentNextPage : null;
                 } else {
                     this.remember(Array.isArray(items) ? items : []);
                 }
@@ -724,8 +825,7 @@ export const createMultiSelect = (config) => {
                     if (q) url.searchParams.set('q', q);
                     if (config.context) url.searchParams.set('context', config.context);
                     url.searchParams.set('page', String(requestedPage));
-                    if (q) url.searchParams.set('per_page', '20');
-                    else if (this.perPage > 0) url.searchParams.set('per_page', String(this.perPage));
+                    url.searchParams.set('per_page', String(q ? REMOTE_SEARCH_PAGE_SIZE : this.recentPageSize));
                     this.selected.forEach((value) => url.searchParams.append('selected[]', value));
                     Object.entries(this.params || {}).forEach(([name, value]) => {
                         if (value !== null && value !== undefined && String(value) !== '') url.searchParams.set(name, String(value));
@@ -745,9 +845,14 @@ export const createMultiSelect = (config) => {
                     this.remember([...selectedItems, ...pageItems]);
                     this.items = append ? uniqueOptions([...this.items, ...pageItems]) : pageItems;
                     this.page = Number(payload.pagination?.page || requestedPage);
-                    this.perPage = Number(payload.pagination?.per_page || (q ? 20 : this.perPage || 5));
+                    this.perPage = Number(payload.pagination?.per_page || (q ? REMOTE_SEARCH_PAGE_SIZE : this.recentPageSize));
                     this.hasMore = payload.pagination?.has_more === true;
                     this.nextPage = payload.pagination?.next_page ? Number(payload.pagination.next_page) : null;
+                    if (!q && requestedPage === 1 && !append) {
+                        this.recentItems = pageItems.slice(0, this.recentPageSize);
+                        this.recentHasMore = this.hasMore;
+                        this.recentNextPage = this.nextPage;
+                    }
                     this.minSearchLength = Number(payload.query?.min_length || 2);
                     this.message = q
                         ? (this.items.length ? `${this.items.length} result${this.items.length === 1 ? '' : 's'}${this.hasMore ? ' · more available' : ''}` : 'No matching options.')

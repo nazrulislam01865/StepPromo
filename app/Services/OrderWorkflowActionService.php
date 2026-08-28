@@ -570,6 +570,54 @@ class OrderWorkflowActionService
         }, 3);
     }
 
+    /**
+     * Explicit escape hatch for the two email-blocking workflow handoffs.
+     * This can only be called with the server-side failure marker created after
+     * the current user exhausted all three delivery attempts for this task.
+     *
+     * @param array<string,mixed> $failure
+     */
+    public function completeEmailHandoffAfterFailure(Task $task, User $actor, array $failure): Task
+    {
+        return DB::transaction(function () use ($task, $actor, $failure): Task {
+            $locked = Task::query()
+                ->whereKey($task->id)
+                ->lockForUpdate()
+                ->with(['job.phase', 'setupTemplate'])
+                ->firstOrFail();
+            $job = FlowJob::query()
+                ->whereKey($locked->flow_job_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            abort_unless((int) $locked->workflow_phase_id === (int) $job->workflow_phase_id, 422, 'This task is locked until its workflow stage is active.');
+            app(OrderTaskSequenceService::class)->assertStatusActionable($locked);
+
+            $key = $this->automationKey($locked);
+            abort_unless(in_array($key, ['NEW_SEND_PO_ARTWORK', 'ART_SEND_ORDER_TEAM'], true), 422, 'This task does not support manual completion after email failure.');
+            abort_unless((int) ($failure['task_id'] ?? 0) === (int) $locked->id, 422, 'The email-failure confirmation does not belong to this task.');
+            abort_unless((string) ($failure['handoff_key'] ?? '') === (string) $key, 422, 'The email-failure confirmation is no longer valid for this task.');
+            abort_unless((int) ($failure['attempts'] ?? 0) >= 3, 422, 'Manual completion is available only after three failed email delivery attempts.');
+
+            $attachmentLabel = $key === 'ART_SEND_ORDER_TEAM' ? 'Artwork' : 'Purchase Order';
+            $job->activities()->create([
+                'user_id' => $actor->id,
+                'event' => 'job.workflow_email_manual_completion',
+                'description' => $attachmentLabel.' email delivery failed after three attempts. The task was manually completed so the file can be sent outside FlowTrack.',
+                'meta' => [
+                    'task_id' => (int) $locked->id,
+                    'document_id' => (int) ($failure['document_id'] ?? 0) ?: null,
+                    'document_name' => (string) ($failure['document_name'] ?? ''),
+                    'delivery_attempts' => (int) ($failure['attempts'] ?? 3),
+                    'tracking_id' => (string) ($failure['tracking_id'] ?? ''),
+                    'manual_delivery_required' => true,
+                ],
+            ]);
+
+            return $this->complete($locked, $actor);
+        }, 3);
+    }
+
     public function afterDocumentAdded(Task $task, User $actor): void
     {
         $task->refresh()->loadMissing(['job.phase', 'setupTemplate']);

@@ -1,4 +1,4 @@
-@props(['job', 'task', 'config' => [], 'step' => 'main', 'payload' => []])
+@props(['job', 'task', 'config' => [], 'step' => 'main', 'payload' => [], 'emailFallback' => false, 'emailFallbackMessage' => '', 'emailFallbackAttempts' => 0])
 @php
     $variant = (string) ($config['variant'] ?? 'confirm');
     $title = (string) ($config['title'] ?? 'Task action');
@@ -25,12 +25,27 @@
     $emailHandoffPreview = in_array($variant, ['purchase_order_email', 'artwork_email'], true)
         ? app(\App\Services\Orders\OrderWorkflowEmailService::class)->preview($task, auth()->user())
         : [];
+    $emailServiceEnabled = (bool) ($emailHandoffPreview['email_service_enabled'] ?? true);
+    if (! $emailServiceEnabled && in_array($variant, ['purchase_order_email', 'artwork_email'], true)) {
+        $title = $variant === 'artwork_email' ? 'Complete Artwork Handoff' : 'Complete Purchase Order Handoff';
+        $copy = 'Order email service is disabled by an administrator. Review the handoff details, then continue without sending email.';
+    }
+    $emailFallbackDocumentId = (int) ($emailHandoffPreview['document_id'] ?? 0);
+    $emailFallbackDocument = $emailFallbackDocumentId > 0
+        ? $job->documents->firstWhere('id', $emailFallbackDocumentId)
+        : null;
+    $emailFallbackAttachmentLabel = $variant === 'artwork_email' ? 'Artwork' : 'Purchase Order';
 
     // Only the main Artwork preview/handoff screens need the large landscape
     // layout. Revision/issue follow-up steps must stay on the normal compact
     // dialog size even when they originate from an Artwork task.
     $isArtworkPreviewModal = $step === 'main'
         && in_array($variant, ['artwork_review', 'artwork_email', 'client_erp'], true);
+    // Billing and Payment render validation inside a two-column form. Give
+    // those dialogs a stable validation layout so field errors never resize
+    // or horizontally shift the popup after submit.
+    $usesStableFinanceValidation = $step === 'main'
+        && in_array($variant, ['invoice_prepare', 'payment'], true);
     $modalWide = $variant === 'courier_label';
 
     if ($step === 'sample') {
@@ -47,7 +62,7 @@
     }
 @endphp
 <div class="ft-order-task-document-modal-backdrop" wire:key="order-workflow-action-modal-{{ $task->id }}-{{ $step }}" wire:click.self="closeOrderWorkflowAction">
-    <section class="ft-order-task-document-modal ft-order-workflow-action-modal {{ $isArtworkPreviewModal ? 'ft-order-workflow-action-modal--artwork-preview' : ($modalWide ? 'ft-order-workflow-action-modal--wide' : '') }}" data-ft-feedback-scope="form" role="dialog" aria-modal="true" aria-labelledby="order-workflow-action-modal-title">
+    <section class="ft-order-task-document-modal ft-order-workflow-action-modal {{ $isArtworkPreviewModal ? 'ft-order-workflow-action-modal--artwork-preview' : ($modalWide ? 'ft-order-workflow-action-modal--wide' : '') }} {{ $usesStableFinanceValidation ? 'ft-order-workflow-action-modal--stable-finance-validation' : '' }}" data-ft-feedback-scope="form" role="dialog" aria-modal="true" aria-labelledby="order-workflow-action-modal-title">
         <header class="ft-order-task-document-modal-head">
             <div><h2 id="order-workflow-action-modal-title">{{ $title }}</h2><p>{{ $copy }}</p></div>
             <button type="button" wire:click="closeOrderWorkflowAction" aria-label="Close">×</button>
@@ -168,7 +183,13 @@
                 </div>
                 <label class="ft-prototype-field ft-prototype-field--top">
                     <span>Estimated delivery date</span>
-                    <input type="date" wire:model="orderWorkflowActionPayload.estimated_delivery_date">
+                    <input
+                        type="date"
+                        class="ft-prototype-clickable-date"
+                        wire:model="orderWorkflowActionPayload.estimated_delivery_date"
+                        onclick="this.focus({ preventScroll: true }); if (typeof this.showPicker === 'function') { try { this.showPicker(); } catch (e) {} }"
+                        aria-label="Estimated delivery date. Click anywhere in the field to open the calendar."
+                    >
                     @error('orderWorkflowActionPayload.estimated_delivery_date')<p class="validation-error">{{ $message }}</p>@enderror
                 </label>
             @elseif($variant === 'production_check')
@@ -237,6 +258,18 @@
             @else
                 <div class="ft-order-task-document-target"><span class="ft-order-task-document-target-icon">⌘</span><div><small>WORKFLOW TASK</small><strong>{{ $task->title }}</strong><span>{{ $task->phase?->name ?? 'Order workflow' }}</span></div><em>{{ $task->status ?: 'Ready' }}</em></div>
             @endif
+
+            @if($emailFallback && $emailServiceEnabled && in_array($variant, ['purchase_order_email', 'artwork_email'], true))
+                <div class="ft-prototype-email-preview ft-prototype-email-preview--error" role="alert" aria-live="polite">
+                    <b>Email delivery failed after {{ max(3, (int) $emailFallbackAttempts) }} attempts</b>
+                    <span>{{ $emailFallbackMessage }}</span>
+                    @if($emailFallbackDocument)
+                        <div class="ft-prototype-artwork-actions">
+                            <a href="{{ route('documents.download', $emailFallbackDocument) }}">Download {{ $emailFallbackAttachmentLabel }}</a>
+                        </div>
+                    @endif
+                </div>
+            @endif
         </div>
 
         @php
@@ -253,9 +286,17 @@
                     <button type="button" class="primary" wire:click="submitOrderWorkflowAction('revise')" wire:loading.attr="disabled" wire:target="submitOrderWorkflowAction">{{ $automationKey === 'ART_INTERNAL_REVIEW' ? 'Request Revision' : 'Activate Revision Task' }}</button>
                 @elseif($step === 'issue')
                     <button type="button" class="danger" wire:click="submitOrderWorkflowAction('issue')" wire:loading.attr="disabled" wire:target="submitOrderWorkflowAction">Report Issue</button>
+                @elseif($emailFallback && $emailServiceEnabled && in_array($variant, ['purchase_order_email', 'artwork_email'], true))
+                    <button type="button" class="secondary" wire:click="submitOrderWorkflowAction('confirm')" wire:loading.attr="disabled" wire:target="submitOrderWorkflowAction">Try email again</button>
+                    <button type="button" class="primary" wire:click="completeOrderWorkflowEmailTaskAfterFailure" wire:loading.attr="disabled" wire:target="completeOrderWorkflowEmailTaskAfterFailure">Complete task</button>
                 @else
                     @foreach($choices as $decision => $label)
-                        <button type="button" class="{{ in_array($decision, ['revise','issue'], true) ? 'danger' : 'primary' }}" wire:click="submitOrderWorkflowAction('{{ $decision }}')" wire:loading.attr="disabled" wire:target="submitOrderWorkflowAction">{{ $label }}</button>
+                        @php
+                            $actionLabel = ! $emailServiceEnabled && in_array($variant, ['purchase_order_email', 'artwork_email'], true)
+                                ? 'Complete without email'
+                                : $label;
+                        @endphp
+                        <button type="button" class="{{ in_array($decision, ['revise','issue'], true) ? 'danger' : 'primary' }}" wire:click="submitOrderWorkflowAction('{{ $decision }}')" wire:loading.attr="disabled" wire:target="submitOrderWorkflowAction">{{ $actionLabel }}</button>
                     @endforeach
                 @endif
             </footer>

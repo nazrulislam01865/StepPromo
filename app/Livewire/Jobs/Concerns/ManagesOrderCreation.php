@@ -402,8 +402,7 @@ trait ManagesOrderCreation
         }
 
         $data = $this->validate([
-            'jobTitle' => ['required','string','max:255'],
-            'referenceNumber' => ['nullable','string','max:255'],
+            'referenceNumber' => ['required','string','max:255'],
             'isRepeatedOrder' => ['boolean'],
             'repeatedOrderNumber' => [Rule::requiredIf($this->isRepeatedOrder), 'nullable', 'string', 'max:255'],
             'shipmentUrgencyIds' => ['array', 'max:1'],
@@ -420,7 +419,9 @@ trait ManagesOrderCreation
             'workflowPhaseId' => ['required','integer'],
             'ownerId' => ['required','exists:users,id'],
             'coordinatorId' => ['nullable','exists:users,id'],
-            'deliveryDate' => ['required','date'],
+            // Order hand date is intentionally optional on Create Order.
+            // The DTO already normalizes an empty value to null and the database column is nullable.
+            'deliveryDate' => ['nullable','date'],
             'estimatedDeliveryDate' => ['nullable','date'],
             'description' => ['nullable','string'],
             'shippingAddress' => ['required','string','max:2000'],
@@ -458,22 +459,25 @@ trait ManagesOrderCreation
             'jobItems.*.quantity' => ['required','integer','min:1','max:999999999'],
             'jobItems.*.unit_price' => ['nullable','numeric','min:0','max:999999999999.99'],
             'jobItems.*.notes' => ['nullable','string','max:2000'],
+            // Optional PO uploaded during Create Order. It is attached to the
+            // NEW_UPLOAD_PO workflow task after the Order and its tasks exist.
+            'purchaseOrderUpload' => AttachmentUpload::nullableRules(AttachmentUpload::DOCUMENTS_WITH_AI, 20480),
             'jobAttachments.*' => AttachmentUpload::itemRules(AttachmentUpload::DOCUMENTS, 20480),
         ], [
+            'referenceNumber.required' => 'Client Reference Number is required.',
             'repeatedOrderNumber.required' => 'Enter the previous reference number for this repeated Order.',
             'jobItems.required' => 'Select at least one product for this Order.',
             'jobItems.min' => 'Select at least one product for this Order.',
             'shippingAddress.required' => 'Shipping address is required.',
-            // CHANGE 2026-08-24: validation copy follows the renamed Create Order field.
-            'deliveryDate.required' => 'Order hand date is required.',
             'deliveryDate.date' => 'Order hand date must be a valid date.',
             'shippingPostalCode.required' => 'Postal code is required.',
             'shippingPhoneCountryCode.regex' => 'Choose a valid international phone code.',
             'shippingPhoneCountryCode.exists' => 'Choose an active phone country code from Master Data.',
             'shippingPhone.regex' => 'Enter a valid shipping contact phone number.',
+            'purchaseOrderUpload.max' => 'The Purchase Order is too large. Maximum file size is 20 MB.',
         ]);
 
-        if (count($this->jobAttachments) > 0) {
+        if ($this->purchaseOrderUpload || count($this->jobAttachments) > 0) {
             abort_unless(auth()->user()->canModule('documents', 'create'), 403);
         }
 
@@ -545,6 +549,7 @@ trait ManagesOrderCreation
 
         $job = app(CreateOrder::class)->handle(
             $data,
+            $this->purchaseOrderUpload,
             $this->jobAttachments,
             $draft,
             auth()->user(),
@@ -643,7 +648,6 @@ trait ManagesOrderCreation
     {
         $this->resetValidation();
         $this->reset([
-            'jobTitle',
             'referenceNumber',
             'isRepeatedOrder',
             'repeatedOrderNumber',
@@ -682,6 +686,7 @@ trait ManagesOrderCreation
             'newProductName',
             'newProductSupplierId',
             'newProductImage',
+            'purchaseOrderUpload',
             'jobAttachments',
             'createCatalogReady',
             'createAssignmentReady',

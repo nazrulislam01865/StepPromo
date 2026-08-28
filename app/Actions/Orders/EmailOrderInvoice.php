@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Queries\Orders\VisibleOrderQuery;
 use App\Services\AccessControlService;
 use App\Services\Email\EmailService;
+use App\Services\Email\ModuleEmailControlService;
 
 /** Send the existing Order invoice email and mark the invoice as emailed. */
 final class EmailOrderInvoice
@@ -16,6 +17,7 @@ final class EmailOrderInvoice
         private readonly VisibleOrderQuery $orders,
         private readonly AccessControlService $access,
         private readonly EmailService $email,
+        private readonly ModuleEmailControlService $emailControl,
     ) {
     }
 
@@ -24,7 +26,7 @@ final class EmailOrderInvoice
         $job = $this->orders->base($actor, (int) $invoice->flow_job_id);
         abort_unless($this->access->can($actor, 'finance', 'create'), 403);
 
-        if (! $invoice->billing_contact_email) return;
+        if (! $this->emailControl->orderEnabled() || ! $invoice->billing_contact_email) return;
 
         $job->loadMissing('client');
         $subject = 'Invoice '.$invoice->invoice_number.' · '.($job->displayOrderNumber() ?? 'Order');

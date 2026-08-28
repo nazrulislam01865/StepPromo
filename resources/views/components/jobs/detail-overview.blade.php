@@ -48,6 +48,9 @@
     'orderWorkflowActionTaskId' => null,
     'orderWorkflowActionStep' => 'main',
     'orderWorkflowActionPayload' => [],
+    'orderWorkflowEmailFallback' => false,
+    'orderWorkflowEmailFallbackMessage' => '',
+    'orderWorkflowEmailFallbackAttempts' => 0,
 ])
 @php
     // Presentation only: all relationships were eager-loaded in JobService.
@@ -186,7 +189,16 @@
             $workflowActionModal = data_get($orderDetailContext, 'taskActionModals.'.(int) $orderWorkflowActionTaskId, []);
         @endphp
         @if($workflowActionTask)
-            <x-jobs.order-detail.workflow-action-modal :job="$job" :task="$workflowActionTask" :config="$workflowActionModal" :step="$orderWorkflowActionStep" :payload="$orderWorkflowActionPayload" />
+            <x-jobs.order-detail.workflow-action-modal
+                :job="$job"
+                :task="$workflowActionTask"
+                :config="$workflowActionModal"
+                :step="$orderWorkflowActionStep"
+                :payload="$orderWorkflowActionPayload"
+                :email-fallback="$orderWorkflowEmailFallback"
+                :email-fallback-message="$orderWorkflowEmailFallbackMessage"
+                :email-fallback-attempts="$orderWorkflowEmailFallbackAttempts"
+            />
         @endif
     @endif
 

@@ -10,6 +10,7 @@ use App\Models\RoleModuleAccess;
 use App\Models\TaskPack;
 use App\Models\User;
 use App\Models\WorkspaceMembership;
+use App\Services\Email\ModuleEmailControlService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
@@ -506,6 +507,27 @@ class AdminService
             ['name' => $current['label'], 'metadata' => ['enabled' => !$current['enabled']], 'status' => 'active', 'sort_order' => 0],
         );
         $this->audit($actor, 'access.security_changed', $current['label'].' '.(!$current['enabled'] ? 'enabled' : 'disabled'), $actor);
+    }
+
+
+    /** @return array<int,array{module:string,code:string,label:string,description:string,enabled:bool}> */
+    public function emailServiceSettings(): array
+    {
+        return app(ModuleEmailControlService::class)->settings();
+    }
+
+    public function toggleEmailService(string $module, User $actor): bool
+    {
+        $this->assertAdministrator($actor);
+
+        return app(ModuleEmailControlService::class)->toggle($module, $actor);
+    }
+
+    public function setEmailService(string $module, bool $enabled, User $actor): bool
+    {
+        $this->assertAdministrator($actor);
+
+        return app(ModuleEmailControlService::class)->setEnabled($module, $enabled, $actor);
     }
 
     public function toggleRule(int $id): void

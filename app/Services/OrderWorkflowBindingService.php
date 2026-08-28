@@ -7,9 +7,9 @@ use App\Models\FlowJobPhaseHistory;
 use App\Models\Task;
 use App\Models\Workflow;
 use App\Models\WorkflowPhase;
+use App\Support\OrderStageResolver;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 /**
  * Keeps active Orders synchronized with the Order workflow they were created
@@ -40,7 +40,7 @@ class OrderWorkflowBindingService
                         $legacy->whereNull('source_workflow_id')->where('workflow_id', $workflowId);
                     });
             })
-            ->with('phase:id,name,sequence')
+            ->with('phase:id,name,short_name,sequence')
             ->orderBy('id')
             ->get(['id', 'workflow_phase_id', 'status'])
             ->each(function (FlowJob $job) use (&$targets): void {
@@ -146,7 +146,7 @@ class OrderWorkflowBindingService
         DB::transaction(function () use ($jobId, $workflow, $phases, $targetSequenceOverride): void {
             $job = FlowJob::query()
                 ->lockForUpdate()
-                ->with(['phase:id,name,sequence', 'workflow:id,is_snapshot,source_workflow_id'])
+                ->with(['phase:id,name,short_name,sequence', 'workflow:id,is_snapshot,source_workflow_id'])
                 ->findOrFail($jobId);
 
             $targetSequence = $targetSequenceOverride !== null
@@ -239,22 +239,17 @@ class OrderWorkflowBindingService
 
     private function targetSequence(FlowJob $job, int $stageCount): int
     {
-        $name = Str::lower(trim((string) ($job->phase?->name ?? '')));
-        $status = Str::lower(trim((string) $job->status));
+        // Keep physical workflow rebinding and every operational read model on
+        // one mapping contract. This prevents the maintenance sync from
+        // re-introducing a different interpretation of historical stages than
+        // Orders / My Tasks / All Tasks use.
+        $sequence = OrderStageResolver::resolve(
+            $job->phase?->name,
+            $job->phase?->short_name,
+            $job->phase?->sequence,
+            (string) $job->status,
+        )['sequence'];
 
-        if (Str::contains($name, ['new order', 'order intake', 'intake'])) return 1;
-        if (Str::contains($name, ['artwork', 'sample'])) return min(2, $stageCount);
-        if (Str::contains($name, ['production'])) return min(3, $stageCount);
-
-        if (Str::contains($name, ['receiving', 'qc', 'dispatch'])) {
-            if (Str::contains($status, ['ship', 'dispatch', 'courier', 'tracking'])) return min(5, $stageCount);
-            return min(4, $stageCount);
-        }
-
-        if (Str::contains($name, ['shipment'])) return min(5, $stageCount);
-        if (Str::contains($name, ['billing', 'invoice'])) return min(6, $stageCount);
-        if (Str::contains($name, ['payment'])) return min(7, $stageCount);
-
-        return max(1, min($stageCount, (int) ($job->phase?->sequence ?: 1)));
+        return max(1, min($stageCount, (int) $sequence));
     }
 }

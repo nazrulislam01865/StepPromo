@@ -627,3 +627,51 @@
 .ft-create-job-page .ft-create-workflow-preview{
     border-top-color:#d7e9e6;
 }
+
+/* Create Order attachment upload progress - 2026-08-28.
+   Keep Purchase Order and Other document feedback local to each dropzone. */
+.ft-create-job-page .ft-create-upload-wrap{
+    display:grid;
+    gap:8px;
+}
+.ft-create-job-page .ft-create-upload-progress{
+    width:100%;
+    padding:0 2px 2px;
+}
+.ft-create-job-page .ft-create-upload-progress-meta{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:5px;
+    color:#52677f;
+    font-size:.625rem;
+    font-weight:700;
+    line-height:1.3;
+}
+.ft-create-job-page .ft-create-upload-progress-meta b{
+    flex:0 0 auto;
+    color:var(--ft-order-create-accent);
+    font-size:.625rem;
+    font-weight:800;
+}
+.ft-create-job-page .ft-create-upload-progress-track{
+    width:100%;
+    height:6px;
+    overflow:hidden;
+    border-radius:999px;
+    background:color-mix(in srgb, var(--ft-order-create-accent) 12%, #edf2f6);
+}
+.ft-create-job-page .ft-create-upload-progress-track>span{
+    display:block;
+    width:0;
+    height:100%;
+    border-radius:inherit;
+    background:var(--ft-order-create-accent);
+    transition:width .12s linear;
+}
+@media(max-width:700px){
+    .ft-create-job-page .ft-create-upload-progress-meta{
+        font-size:.6875rem;
+    }
+}

@@ -19,8 +19,10 @@ use Throwable;
  */
 final class EmailService
 {
-    public function __construct(private readonly EmailTransport $transport)
-    {
+    public function __construct(
+        private readonly EmailTransport $transport,
+        private readonly ModuleEmailControlService $moduleControl,
+    ) {
     }
 
     public function send(EmailMessage $message): string
@@ -52,6 +54,16 @@ final class EmailService
     public function deliver(EmailMessage $message, string $trackingId): void
     {
         $startedAt = hrtime(true);
+        $module = $this->moduleControl->moduleForContext($message->context);
+
+        if ($module !== null && ! $this->moduleControl->isEnabled($module)) {
+            Log::info('flowtrack.email.suppressed', array_merge(
+                $this->logContext($message, $trackingId),
+                ['module' => $module, 'reason' => 'module_email_service_disabled'],
+            ));
+
+            return;
+        }
 
         try {
             $this->transport->send($message, $trackingId);

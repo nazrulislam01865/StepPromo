@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\WorkflowPhase;
 use App\Support\OrderArtworkListState;
 use App\Support\OrderDetailPresenter;
+use App\Support\OrderStageResolver;
 use App\Support\MasterColor;
 use App\Support\UserLocalTime;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -83,38 +84,50 @@ class OrderListPrototypeService
             ->orderBy('sequence')
             ->get(['id','workflow_template_id','name','short_name','sequence','color']);
 
-        $phaseIds = $phaseRows->pluck('id')->map(fn ($id) => (int) $id)->all();
-        if ($phaseIds === []) {
-            $rawCounts = collect();
-        } else {
-            $countQuery = app(JobService::class)
-                ->visibleQuery($user)
-                ->whereNull('flow_jobs.completed_at')
-                ->whereNotIn('flow_jobs.status', JobService::INACTIVE_STATUSES);
+        // Count by the canonical seven-stage runtime contract instead of by
+        // raw workflow phase IDs. Historical Orders can still reference retired
+        // rows such as "Order Intake"; those rows must count under New Order
+        // without forcing an expensive/destructive workflow rewrite on list load.
+        $countQuery = app(JobService::class)
+            ->visibleQuery($user)
+            ->whereNull('flow_jobs.completed_at')
+            ->whereNotIn('flow_jobs.status', JobService::INACTIVE_STATUSES);
 
-            if ($myTasksOnly) {
-                $countQuery->whereIn(
-                    'flow_jobs.id',
-                    app(MyWorkService::class)->personalOpenOrderIdsQuery($user),
-                );
-            }
-
-            $rawCounts = $countQuery
-                ->where(function (Builder $query) use ($phaseIds): void {
-                    $query->whereIn('flow_jobs.source_workflow_phase_id', $phaseIds)
-                        ->orWhere(function (Builder $legacy) use ($phaseIds): void {
-                            $legacy->whereNull('flow_jobs.source_workflow_phase_id')
-                                ->whereIn('flow_jobs.workflow_phase_id', $phaseIds);
-                        });
-                })
-                ->selectRaw('COALESCE(flow_jobs.source_workflow_phase_id, flow_jobs.workflow_phase_id) as phase_key, COUNT(*) as aggregate')
-                ->groupByRaw('COALESCE(flow_jobs.source_workflow_phase_id, flow_jobs.workflow_phase_id)')
-                ->pluck('aggregate', 'phase_key');
+        if ($myTasksOnly) {
+            $countQuery->whereIn(
+                'flow_jobs.id',
+                app(MyWorkService::class)->personalOpenOrderIdsQuery($user),
+            );
         }
 
-        $countBySequence = $phaseRows->groupBy('sequence')->map(function (Collection $rows) use ($rawCounts): int {
-            return (int) $rows->sum(fn ($phase) => (int) ($rawCounts[(int) $phase->id] ?? 0));
-        });
+        $rawCounts = $countQuery
+            ->leftJoin('workflow_phases as order_list_count_phases', 'order_list_count_phases.id', '=', 'flow_jobs.workflow_phase_id')
+            ->reorder()
+            ->select([
+                'flow_jobs.workflow_phase_id',
+                'flow_jobs.status',
+                'order_list_count_phases.name as phase_name',
+                'order_list_count_phases.short_name as phase_short_name',
+                'order_list_count_phases.sequence as phase_sequence',
+            ])
+            ->selectRaw('COUNT(flow_jobs.id) as aggregate')
+            ->groupBy([
+                'flow_jobs.workflow_phase_id',
+                'flow_jobs.status',
+                'order_list_count_phases.name',
+                'order_list_count_phases.short_name',
+                'order_list_count_phases.sequence',
+            ])
+            ->get();
+
+        $countBySequence = $rawCounts
+            ->groupBy(fn ($row) => OrderStageResolver::resolve(
+                $row->phase_name,
+                $row->phase_short_name,
+                $row->phase_sequence !== null ? (int) $row->phase_sequence : null,
+                $row->status,
+            )['sequence'])
+            ->map(fn (Collection $rows): int => (int) $rows->sum(fn ($row) => (int) $row->aggregate));
 
         $preferredWorkflowId = OrderWorkflowSetupService::orderWorkflowQuery()
             ->where('is_active', true)
@@ -522,9 +535,17 @@ class OrderListPrototypeService
         $phaseId = (int) ($job->workflow_phase_id ?: 0);
         $phaseTasks = $job->tasks->filter(fn (Task $task) => (int) $task->workflow_phase_id === $phaseId)->values();
         $nextTask = $this->nextTaskFromLoaded($phaseTasks);
+        $stage = OrderStageResolver::resolve(
+            $job->phase?->name,
+            $job->phase?->short_name,
+            $job->phase?->sequence,
+            $job->status,
+            $nextTask?->setupTemplate?->automation_key,
+        );
+        $stageSequence = (int) $stage['sequence'];
         $hasEvidence = $nextTask?->documents?->isNotEmpty() ?? false;
         $next = $nextTask ? app(OrderWorkflowActionService::class)->descriptor($nextTask, $hasEvidence) : ['label' => 'Open order'];
-        $stageAssignee = (int) ($job->phase?->sequence ?? 0) === 1
+        $stageAssignee = $stageSequence === 1
             ? $job->owner
             : ($nextTask?->assignee ?: $phaseTasks->first(fn (Task $task) => $task->assignee)?->assignee ?: $job->owner);
         $stageDue = $nextTask?->due_date ?: $job->delivery_date;
@@ -558,7 +579,7 @@ class OrderListPrototypeService
 
         $poDocument = $latestTaskDocument('NEW_UPLOAD_PO');
 
-        $artworkListState = (int) ($job->phase?->sequence ?? 0) === 2
+        $artworkListState = $stageSequence === 2
             ? OrderArtworkListState::resolve($phaseTasks, $nextTask, $job->latestArtworkRevisionActivity)
             : null;
         if ($artworkListState) {
@@ -570,11 +591,11 @@ class OrderListPrototypeService
         // is intentionally stricter: only real PO document evidence turns the
         // row green; without a file the row remains plain white. The same rule
         // also overrides the active-task tint in the all-stage view.
-        $stageQuickKey = $this->resolveStageQuickKey($job, $phaseTasks, $artworkListState);
-        $stageQuickMeta = data_get(self::quickFilterMeta((int) ($job->phase?->sequence ?? 0)), $stageQuickKey, []);
+        $stageQuickKey = $this->resolveStageQuickKey($job, $phaseTasks, $artworkListState, $stageSequence);
+        $stageQuickMeta = data_get(self::quickFilterMeta($stageSequence), $stageQuickKey, []);
         $stageQuickColor = MasterColor::normalize((string) data_get($stageQuickMeta, 'color', ''));
 
-        if ((int) ($job->phase?->sequence ?? 0) === 1) {
+        if ($stageSequence === 1) {
             $purchaseOrderEvidenceColor = $poDocument ? '#159A68' : null;
             $activeTaskColor = $purchaseOrderEvidenceColor;
             $stageQuickColor = $purchaseOrderEvidenceColor;
@@ -615,9 +636,9 @@ class OrderListPrototypeService
             'product_detail' => $items->count() === 1 ? number_format($totalUnits).' pcs' : number_format($totalUnits).' pcs · '.$productNames->take(2)->implode(' · '),
             'supplier' => $suppliers->count() === 1 ? (string) $suppliers->first() : ($suppliers->count() > 1 ? $suppliers->count().' linked suppliers' : 'Not linked'),
             'quantity' => $totalUnits,
-            'phase_name' => (string) ($job->phase?->name ?: '—'),
-            'phase_sequence' => (int) ($job->phase?->sequence ?: 1),
-            'phase_color' => (string) ($job->phase?->color ?: '#2d72d9'),
+            'phase_name' => (string) $stage['name'],
+            'phase_sequence' => $stageSequence,
+            'phase_color' => (string) ($job->phase?->color ?: $stage['color']),
             'status' => (string) ($job->status ?: 'New'),
             'flag' => (string) ($job->orderFlag?->name ?: ($job->attention_requested ? 'Needs attention' : '')),
             'owner' => (string) ($job->owner?->name ?: 'Unassigned'),
@@ -672,9 +693,8 @@ class OrderListPrototypeService
      * its current phase. It intentionally uses already-loaded relations only,
      * so row coloring introduces no extra database queries.
      */
-    private function resolveStageQuickKey(FlowJob $job, Collection $phaseTasks, ?array $artworkListState): string
+    private function resolveStageQuickKey(FlowJob $job, Collection $phaseTasks, ?array $artworkListState, int $sequence): string
     {
-        $sequence = (int) ($job->phase?->sequence ?? 0);
         $taskByKey = fn (string $key): ?Task => $phaseTasks->first(
             fn (Task $task) => (string) ($task->setupTemplate?->automation_key ?? '') === $key
         );
@@ -792,17 +812,24 @@ class OrderListPrototypeService
     {
         if ($sequence < 1 || $sequence > count(OrderWorkflowSetupService::fixedStages())) return [];
 
-        $workflowIds = OrderWorkflowSetupService::orderWorkflowQuery()
-            ->where('is_active', true)
-            ->pluck('id');
-        if ($workflowIds->isEmpty()) return [];
-
+        // Include historical/snapshot phase IDs as aliases of the current
+        // seven-stage runtime. This keeps the New Order filter correct for old
+        // rows still named "Order Intake" and does the same for the retired
+        // combined QC/Dispatch and Invoice/Payment stages.
         return WorkflowPhase::query()
-            ->whereIn('workflow_template_id', $workflowIds)
-            ->where('is_active', true)
-            ->where('sequence', $sequence)
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
+            ->get(['id', 'source_workflow_phase_id', 'name', 'short_name', 'sequence'])
+            ->filter(fn (WorkflowPhase $phase): bool => OrderStageResolver::matchesSequence(
+                $sequence,
+                $phase->name,
+                $phase->short_name,
+                $phase->sequence,
+            ))
+            ->flatMap(fn (WorkflowPhase $phase): array => [
+                (int) $phase->id,
+                (int) ($phase->source_workflow_phase_id ?: 0),
+            ])
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
             ->values()
             ->all();
     }

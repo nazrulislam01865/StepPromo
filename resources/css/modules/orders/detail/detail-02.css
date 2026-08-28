@@ -1535,6 +1535,18 @@
     color: #6b7c92;
 }
 
+/*
+ * Production estimated-delivery picker: the complete date control is an
+ * explicit calendar trigger, not only the browser's small calendar icon.
+ */
+.ft-order-prototype-detail .ft-prototype-clickable-date {
+    cursor: pointer;
+}
+
+.ft-order-prototype-detail .ft-prototype-clickable-date::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+}
+
 .ft-order-prototype-detail .ft-prototype-field>.validation-error {
     display: block;
     width: 100%;
@@ -1551,6 +1563,48 @@
 .ft-order-prototype-detail .ft-prototype-field:has(>.validation-error) select,
 .ft-order-prototype-detail .ft-prototype-field:has(>.validation-error) textarea {
     border-color: #e97b73;
+}
+
+/*
+ * Billing / Payment validation must not resize the workflow popup.
+ *
+ * The third explicit grid row is a permanent validation-message slot. It is
+ * present before submit as well as after an error, so adding an error changes
+ * only the text/border state and never the field height. The slightly tighter
+ * row rhythm offsets that reserved slot, keeping the normal (no-error) dialog
+ * visually the same size as before. A stable scrollbar gutter also prevents a
+ * horizontal content jump on shorter viewports where the body needs scrolling.
+ */
+.ft-order-prototype-detail .ft-order-workflow-action-modal--stable-finance-validation {
+    width: min(680px, calc(100vw - 36px));
+    box-sizing: border-box;
+    overflow-x: hidden;
+    scrollbar-gutter: stable;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--stable-finance-validation .ft-prototype-form-grid {
+    row-gap: 8px;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--stable-finance-validation .ft-prototype-field {
+    grid-template-rows: auto auto 13px;
+    gap: 4px;
+    margin-bottom: 0;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--stable-finance-validation .ft-prototype-field>.validation-error {
+    min-height: 13px;
+    max-height: 13px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    line-height: 13px;
+}
+
+/* Notes sits outside the two-column payment grid; preserve the same reserved
+   validation slot there so a Notes error cannot resize the dialog either. */
+.ft-order-prototype-detail .ft-order-workflow-action-modal--stable-finance-validation .ft-prototype-form-grid + .ft-prototype-field {
+    margin-top: 8px;
 }
 
 .ft-order-prototype-detail .ft-prototype-choice-grid {
@@ -1805,6 +1859,17 @@
     margin-top: 4px;
 }
 
+.ft-order-prototype-detail .ft-prototype-email-preview--error {
+    border-color: var(--ft-border-danger, #f4b8b8);
+    background: var(--ft-bg-danger, #fff0f0);
+    color: var(--ft-text-danger, #b42318);
+}
+
+.ft-order-prototype-detail .ft-prototype-email-preview--error > b,
+.ft-order-prototype-detail .ft-prototype-email-preview--error > span {
+    color: var(--ft-text-danger, #b42318);
+}
+
 .ft-order-prototype-detail .ft-prototype-file-placeholder {
     display: grid;
     gap: 4px;
@@ -1951,6 +2016,17 @@
 }
 
 @media(max-width:760px) {
+
+    .ft-order-prototype-detail .ft-order-workflow-action-modal--stable-finance-validation .ft-prototype-field {
+        grid-template-rows: auto auto 28px;
+    }
+
+    .ft-order-prototype-detail .ft-order-workflow-action-modal--stable-finance-validation .ft-prototype-field>.validation-error {
+        min-height: 28px;
+        max-height: 28px;
+        white-space: normal;
+        line-height: 14px;
+    }
 
     .ft-order-prototype-detail .ft-prototype-form-grid,
     .ft-order-prototype-detail .ft-prototype-choice-grid,
@@ -2943,4 +3019,12 @@
     .ft-order-prototype-detail .ft-order-email-preview-frame {
         height: 360px;
     }
+}
+
+/* Order owner picker repeated-open stability - 2026-08-28.
+   The shared menu remains fixed-positioned; only its option viewport gets a
+   small usable floor so populated owner rows cannot collapse to zero height. */
+.ft-order-prototype-detail .header-owner-picker .ft-remote-filter-list:has(.ft-remote-filter-option),
+.ft-order-prototype-detail .ft-order-owner-picker .ft-remote-filter-list:has(.ft-remote-filter-option){
+    min-height:108px;
 }

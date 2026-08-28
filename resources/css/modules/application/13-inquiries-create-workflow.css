@@ -396,7 +396,7 @@
 .ft-inquiry-prototype .ft-inquiry-prototype-dropzone {
     position: relative;
     display: grid;
-    grid-template-columns: 46px minmax(0, 1fr) auto;
+    grid-template-columns: 46px minmax(0, 1fr);
     align-items: center;
     min-height: 94px;
     padding: 12px 14px;
@@ -444,6 +444,46 @@
     padding: 0 13px;
     border-radius: 7px;
     font-size: .53125rem
+}
+
+
+.ft-inquiry-prototype .ft-inquiry-create-upload-progress {
+    margin-top: 8px
+}
+
+.ft-inquiry-prototype .ft-inquiry-create-upload-progress .ft-inquiry-upload-progress-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 5px;
+    color: #71839a;
+    font-size: .5625rem;
+    line-height: 1.2
+}
+
+.ft-inquiry-prototype .ft-inquiry-create-upload-progress .ft-inquiry-upload-progress-meta>b {
+    color: var(--ft-theme-primary);
+    font-size: .5625rem;
+    font-weight: 850;
+    font-variant-numeric: tabular-nums
+}
+
+.ft-inquiry-prototype .ft-inquiry-create-upload-progress .ft-inquiry-upload-progress-track {
+    width: 100%;
+    height: 5px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #e6efed
+}
+
+.ft-inquiry-prototype .ft-inquiry-create-upload-progress .ft-inquiry-upload-progress-track>span {
+    display: block;
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--ft-theme-primary);
+    transition: width .12s linear
 }
 
 .ft-inquiry-prototype .ft-inquiry-next-section {
@@ -867,10 +907,6 @@
         text-align: left
     }
 
-    .ft-inquiry-prototype .ft-inquiry-prototype-dropzone .inquiry-dropzone-button {
-        grid-column: 1/-1;
-        width: 100%
-    }
 
     .ft-inquiry-prototype .ft-inquiry-modal-grid {
         grid-template-columns: 1fr

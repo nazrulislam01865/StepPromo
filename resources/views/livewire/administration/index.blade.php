@@ -2,7 +2,7 @@
     <div class="ft-access-head">
         <div>
             <h1>{{ $tab === 'branding' ? 'System Branding' : ($tab === 'settings' ? 'System Settings' : 'Access Roles & Permissions') }}</h1>
-            <p>{{ $tab === 'branding' ? 'Manage the logo and browser favicon used across FlowTrack.' : ($tab === 'settings' ? 'Configure workspace-wide display settings used throughout FlowTrack.' : 'Control who can view, create, edit, assign, delete, link, export or manage every FlowTrack module.') }}</p>
+            <p>{{ $tab === 'branding' ? 'Manage the logo and browser favicon used across FlowTrack.' : ($tab === 'settings' ? 'Configure workspace-wide operational settings used throughout FlowTrack.' : 'Control who can view, create, edit, assign, delete, link, export or manage every FlowTrack module.') }}</p>
         </div>
         @if(!in_array($tab, ['branding','settings'], true))
             <div class="ft-access-actions"><button class="ghost" wire:click="setTab('audit')">Audit Log</button><button class="primary" wire:click="openRole">＋ New Role</button></div>
@@ -299,6 +299,56 @@
         <div class="ft-access-grid-2 ft-system-settings-grid">
             <section class="card ft-access-panel ft-workspace-settings-card">
                 <div class="section-head">
+                    <div><h3>Email service controls</h3><div class="small muted">Enable or disable Inquiry and Order business emails independently. Only Admin and Super Admin can change these switches.</div></div>
+                </div>
+                @foreach($emailServiceSettings as $emailSetting)
+                    <div class="ft-security-row ft-email-service-row" wire:key="email-service-{{ $emailSetting['module'] }}">
+                        <div>
+                            <b>{{ $emailSetting['label'] }}</b>
+                            <span>{{ $emailSetting['description'] }}</span>
+                        </div>
+                        <div class="ft-email-service-toggle">
+                            <div class="ft-email-service-state {{ $emailSetting['enabled'] ? 'is-enabled' : 'is-disabled' }}" aria-live="polite">
+                                <span class="ft-email-service-state-dot" aria-hidden="true"></span>
+                                <span>{{ $emailSetting['enabled'] ? 'Email sending is on' : 'Email sending is off' }}</span>
+                            </div>
+                            <div class="ft-email-service-segmented" role="group" aria-label="{{ $emailSetting['label'] }}">
+                                <button
+                                    type="button"
+                                    class="ft-email-service-option is-on {{ $emailSetting['enabled'] ? 'is-active' : '' }}"
+                                    wire:click="setEmailService('{{ $emailSetting['module'] }}', true)"
+                                    wire:loading.attr="disabled"
+                                    wire:target="setEmailService('{{ $emailSetting['module'] }}')"
+                                    aria-pressed="{{ $emailSetting['enabled'] ? 'true' : 'false' }}"
+                                    @disabled($emailSetting['enabled'])
+                                >
+                                    <span class="ft-email-service-option-icon" aria-hidden="true">✓</span>
+                                    <span>On</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    class="ft-email-service-option is-off {{ ! $emailSetting['enabled'] ? 'is-active' : '' }}"
+                                    wire:click="requestDisableEmailService('{{ $emailSetting['module'] }}')"
+                                    wire:loading.attr="disabled"
+                                    wire:target="requestDisableEmailService('{{ $emailSetting['module'] }}')"
+                                    aria-pressed="{{ ! $emailSetting['enabled'] ? 'true' : 'false' }}"
+                                    @disabled(! $emailSetting['enabled'])
+                                >
+                                    <span class="ft-email-service-option-icon" aria-hidden="true">×</span>
+                                    <span>Off</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
+                <div class="ft-control-note ft-email-service-note">
+                    <b>Safe workflow behavior</b>
+                    <span>Turning a module off blocks outbound email only. Inquiry RFQ records and Order workflow tasks continue normally, and each skipped delivery is recorded for audit.</span>
+                </div>
+            </section>
+
+            <section class="card ft-access-panel ft-workspace-settings-card">
+                <div class="section-head">
                     <div><h3>Company & invoice identity</h3><div class="small muted">Legal company, address, tax, contact and payment details used on newly generated invoices.</div></div>
                 </div>
                 <div class="ft-workspace-setting-row">
@@ -316,6 +366,94 @@
                 </div>
             </section>
         </div>
+
+    @endif
+
+    @if($tab === 'settings' && $pendingEmailServiceModule)
+        <div
+            class="overlay livewire-overlay ft-email-service-confirm-overlay"
+            wire:click.self="cancelDisableEmailService"
+            wire:key="email-service-disable-overlay-{{ $pendingEmailServiceModule }}"
+        ></div>
+        <section
+            class="modal livewire-modal ft-email-service-confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="ft-email-service-confirm-title"
+            aria-describedby="ft-email-service-confirm-description"
+            wire:key="email-service-disable-modal-{{ $pendingEmailServiceModule }}"
+            x-data
+            x-on:keydown.escape.window="$wire.cancelDisableEmailService()"
+        >
+            <div class="ft-email-service-confirm-head">
+                <div class="ft-email-service-confirm-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none">
+                        <path d="M4.75 6.75h14.5v10.5H4.75z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+                        <path d="m5.4 7.4 6.6 5 6.6-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M5 5 19 19" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                <button
+                    type="button"
+                    class="ft-email-service-confirm-close"
+                    wire:click="cancelDisableEmailService"
+                    aria-label="Close confirmation"
+                >×</button>
+            </div>
+
+            <div class="ft-email-service-confirm-body">
+                <span class="ft-email-service-confirm-eyebrow">Email service control</span>
+                <h2 id="ft-email-service-confirm-title">
+                    Turn off {{ $pendingEmailServiceModule === 'inquiry' ? 'Inquiry email service' : 'Order email service' }}?
+                </h2>
+                <p id="ft-email-service-confirm-description">
+                    Outbound {{ ucfirst($pendingEmailServiceModule) }} emails will pause immediately and remain paused until an Admin or Super Admin turns the service back on.
+                </p>
+
+                <div class="ft-email-service-confirm-impact">
+                    <div class="ft-email-service-confirm-impact-icon" aria-hidden="true">!</div>
+                    <div>
+                        <b>Emails affected</b>
+                        <span>
+                            {{ $pendingEmailServiceModule === 'inquiry'
+                                ? 'RFQ invitations, quotation acknowledgements and supplier award notifications.'
+                                : 'Order workflow handoffs, invoice emails and payment reminders.' }}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="ft-email-service-confirm-safe">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="m7.5 12.2 2.9 2.9 6.2-6.2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/>
+                    </svg>
+                    <div>
+                        <b>Workflow remains active</b>
+                        <span>Inquiry and Order records, tasks and workflow actions continue normally. Only outbound email delivery for this module is blocked.</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ft-email-service-confirm-actions">
+                <button
+                    type="button"
+                    class="ft-email-service-confirm-cancel"
+                    wire:click="cancelDisableEmailService"
+                    wire:loading.attr="disabled"
+                    wire:target="confirmDisableEmailService"
+                >Keep email on</button>
+                <button
+                    type="button"
+                    class="ft-email-service-confirm-danger"
+                    wire:click="confirmDisableEmailService"
+                    wire:loading.attr="disabled"
+                    wire:target="confirmDisableEmailService"
+                >
+                    <span wire:loading.remove wire:target="confirmDisableEmailService">Turn off email service</span>
+                    <span wire:loading wire:target="confirmDisableEmailService">Turning off…</span>
+                </button>
+            </div>
+        </section>
     @endif
 
     @if($tab === 'branding')

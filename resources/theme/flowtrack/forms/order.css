@@ -93,3 +93,28 @@
     font-size: var(--ft-form-button-size);
     font-weight: var(--ft-form-button-weight);
 }
+
+/* Create Order: keep the shared workflow picker header visually identical to
+   the standard numbered section header (e.g. Purchase Order). */
+.ft-form-standard--order .ft-order-workflow-create-section .ft-create-workflow-heading {
+    gap: 9px;
+    margin-bottom: 11px;
+}
+
+.ft-form-standard--order .ft-order-workflow-create-section .ft-create-workflow-heading > span {
+    width: var(--ft-form-step-size);
+    height: var(--ft-form-step-size);
+    flex: 0 0 var(--ft-form-step-size);
+    border-radius: 50%;
+    background: var(--ft-theme-primary);
+    color: #fff;
+    font-size: var(--ft-form-breadcrumb-size);
+    font-weight: var(--ft-form-label-weight);
+}
+
+.ft-form-standard--order .ft-order-workflow-create-section .ft-create-workflow-heading h2 {
+    color: var(--ft-form-section-title-color);
+    font-size: var(--ft-form-section-title-size);
+    font-weight: var(--ft-form-section-title-weight);
+    line-height: normal;
+}

@@ -29,6 +29,27 @@ trait ManagesInquiryRfq
             $invitation = app(InquiryRfqService::class)->invite($inquiry, $supplierId, auth()->user());
             $this->rfqSupplierSearch = '';
             $this->resetPage('inquiryActivityPage');
+            if ($invitation->email_status === 'Delivered') {
+                session()->flash('success', 'RFQ invitation sent to '.$invitation->supplier?->name.'.');
+            } elseif ($invitation->email_status === 'Email disabled') {
+                session()->flash('success', ($invitation->supplier?->name ?: 'Supplier').' added to the RFQ. Inquiry email service is disabled, so no email was sent.');
+            } else {
+                session()->flash('success', ($invitation->supplier?->name ?: 'Supplier').' added to the RFQ. No email was sent because the supplier has no configured email address.');
+            }
+        } catch (Throwable $exception) {
+            report($exception);
+            $this->addError('rfqSupplierSearch', $exception->getMessage() ?: 'The RFQ invitation could not be sent.');
+        }
+    }
+
+    public function sendExistingRfqInvitation(int $invitationId): void
+    {
+        $inquiry = $this->selectedInquiry();
+        abort_unless(app(InquiryDetailQuery::class)->canEditVisible(auth()->user(), $inquiry) && ! $inquiry->result, 403);
+
+        try {
+            $invitation = app(InquiryRfqService::class)->sendExistingInvitation($inquiry, $invitationId, auth()->user());
+            $this->resetPage('inquiryActivityPage');
             session()->flash('success', 'RFQ invitation sent to '.$invitation->supplier?->name.'.');
         } catch (Throwable $exception) {
             report($exception);
@@ -45,7 +66,11 @@ trait ManagesInquiryRfq
             $result = app(InquiryRfqService::class)->award($inquiry, $invitationId, auth()->user());
             $name = $result['winner']->supplier?->name ?: 'Supplier';
             $failures = (int) ($result['email_failures'] ?? 0);
-            session()->flash('success', $name.' was awarded the quotation.'.($failures ? ' '.$failures.' notification email(s) could not be delivered.' : ' Supplier emails were sent.'));
+            $emailDisabled = (bool) ($result['email_service_disabled'] ?? false);
+            $deliveryMessage = $emailDisabled
+                ? ' Inquiry email service is disabled, so supplier notification emails were skipped.'
+                : ($failures ? ' '.$failures.' notification email(s) could not be delivered.' : ' Supplier emails were sent.');
+            session()->flash('success', $name.' was awarded the quotation.'.$deliveryMessage);
             $this->resetPage('inquiryActivityPage');
         } catch (Throwable $exception) {
             report($exception);

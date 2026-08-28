@@ -1,5 +1,5 @@
 @props([
-    'clients','workflows','categories','priorities','clientId','workflowId','ownerId','jobItems','jobAttachments',
+    'clients','workflows','categories','priorities','clientId','workflowId','ownerId','jobItems','jobAttachments','purchaseOrderUpload'=>null,
     'priority'=>'Medium','productionUrgencies'=>collect(),'shipmentUrgencies'=>collect(),'productionUrgencyIds'=>[],'shipmentUrgencyIds'=>[],'isRepeatedOrder'=>false,'repeatedOrderNumber'=>'',
     'clientFilterOptions'=>collect(),'ownerFilterOptions'=>collect(),'workflowFilterOptions'=>collect(),'categoryFilterOptions'=>collect(),
     'productCategories'=>collect(),'productSearchResults'=>collect(),'productSearchSuppliers'=>collect(),'selectedProductDetails'=>collect(),'selectedProductSuppliers'=>collect(),'createOrderSupplierSkipProductIds'=>[],'activeProductCount'=>0,'productResultTotal'=>0,
@@ -10,7 +10,7 @@
     'newProductCode'=>'','newProductCategoryId'=>null,'newProductCategorySearch'=>'','newProductCategoryName'=>'','newProductName'=>'','newProductSupplierId'=>null,
     'catalogReady'=>false,'assignmentReady'=>false,'workflowReady'=>false,'workflowSelectorVersion'=>0,'workflowPhaseId'=>null,'mentionUsers'=>collect(),
     'savedShippingAddresses'=>collect(),'showSavedShippingAddressPicker'=>false,'shippingSourceAddressId'=>null,
-    'phoneCountryCodeOptions'=>collect(),'shippingPhoneCountryCode'=>'',
+    'phoneCountryCodeOptions'=>collect(),'shippingPhoneCountryCode'=>'','orderTitlePreview'=>'',
 ])
 @php
     $selectedClient = $clients->firstWhere('id', (int)$clientId);
@@ -58,7 +58,8 @@
                     @error('clientId')<small class="validation-error">{{ $message }}</small>@enderror
                 </div>
                 <label class="ft-create-field"><b>Client contact</b><input value="{{ $selectedClient?->contact_name ?? 'No contact recorded' }}" readonly></label>
-                <label class="ft-create-field"><b>Reference number</b><input wire:model="referenceNumber" placeholder="e.g. REF-00028 or customer PO number">@error('referenceNumber')<small class="validation-error">{{ $message }}</small>@enderror</label>
+                <label class="ft-create-field"><b>Client Reference Number *</b><input wire:model.live.debounce.300ms="referenceNumber" required aria-required="true" placeholder="e.g. FO-333119 or customer PO number">@error('referenceNumber')<small class="validation-error">{{ $message }}</small>@enderror</label>
+                <label class="ft-create-field"><b>Order Title</b><input value="{{ $orderTitlePreview }}" readonly aria-readonly="true" placeholder="Generated automatically after adding a product"></label>
                 <div class="ft-create-field ft-repeat-order-option">
                     <b>Repeated order</b>
                     <label class="ft-repeat-order-check">
@@ -74,7 +75,6 @@
                         @error('repeatedOrderNumber')<small class="validation-error">{{ $message }}</small>@enderror
                     </label>
                 @endif
-                <label class="ft-create-field"><b>Order title *</b><input wire:model="jobTitle" placeholder="e.g. Conference merchandise order">@error('jobTitle')<small class="validation-error">{{ $message }}</small>@enderror</label>
                 <div class="ft-create-field ft-mention-host"><b>Request description</b><textarea class="ft-mention-input" data-rich-text wire:model="description" rows="4" autocomplete="off" data-mention-users="{{ $mentionUsers->toJson() }}" placeholder="Type @ to mention a user. Add specifications, target price or customization requirements..."></textarea>@error('description')<small class="validation-error">{{ $message }}</small>@enderror</div>
             </div>
         </section>
@@ -254,10 +254,31 @@
             <x-jobs.create-section-placeholder number="4" title="Schedule & owner" section="assignment" :rows="5" />
         @endif
 
+        <section class="ft-create-section">
+            <div class="ft-create-section-title"><span>5</span><h2>Purchase Order</h2></div>
+            @if(auth()->user()->canModule('documents','create'))
+                <x-ui.create-attachment-dropzone
+                    input-id="job-create-purchase-order"
+                    model="purchaseOrderUpload"
+                    headline="Drop Purchase Order here"
+                    browse-text="browse files"
+                    helper="PDF, Office files, JPG, PNG, ZIP, AI, EPS or ESP · Max 20 MB per file"
+                    progress-label="Uploading Purchase Order..."
+                    progress-aria-label="Purchase Order upload progress"
+                />
+            @else
+                <div class="ft-create-note">Your role does not allow Purchase Order uploads during Order creation.</div>
+            @endif
+            @if($purchaseOrderUpload)
+                <div class="ft-create-upload-list"><span>{{ $purchaseOrderUpload->getClientOriginalName() }}</span></div>
+            @endif
+            @error('purchaseOrderUpload')<small class="validation-error">{{ $message }}</small>@enderror
+        </section>
+
         @if($workflowReady)
             <x-ui.create-workflow-picker
                 class="ft-create-section ft-order-workflow-create-section"
-                step="5"
+                step="6"
                 title="What happens next"
                 :workflow-options="$workflowFilterOptions"
                 :selected-workflow-id="$workflowId"
@@ -284,20 +305,22 @@
                 wire:key="create-order-workflow-picker-{{ $clientId ?: 'none' }}-{{ $workflowSelectorVersion }}-{{ $workflowId ?: 'none' }}"
             />
         @else
-            <x-jobs.create-section-placeholder number="5" title="What happens next" section="workflow" :rows="2" />
+            <x-jobs.create-section-placeholder number="6" title="What happens next" section="workflow" :rows="2" />
         @endif
 
         <section class="ft-create-section">
-            <div class="ft-create-section-title"><span>6</span><h2>Attachments</h2></div>
+            <div class="ft-create-section-title"><span>7</span><h2>Other document</h2></div>
             @if(auth()->user()->canModule('documents','create'))
-                <div class="ft-create-upload-wrap">
-                <div class="ft-create-upload ft-livewire-upload-zone" data-file-dropzone>
-                    <span class="ft-create-paperclip">⌕</span>
-                    <div><b>Drop files here or <label for="job-create-files">browse</label></b><small data-drop-status>PDF, Office files, JPG, PNG, ZIP, EPS or ESP · Max 20 MB</small></div>
-                    @if(auth()->user()->canModule('document_archive','view'))<a href="{{ route('documents.index') }}" wire:navigate>Open Documents</a>@endif
-                    <input id="job-create-files" type="file" wire:model="jobAttachments" multiple hidden accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.zip,.txt,.csv,.eps,.esp">
-                </div>
-                </div>
+                <x-ui.create-attachment-dropzone
+                    input-id="job-create-files"
+                    model="jobAttachments"
+                    :multiple="true"
+                    headline="Drop files here"
+                    browse-text="browse files"
+                    helper="PDF, Office files, JPG, PNG, ZIP, AI, EPS or ESP · Max 20 MB per file"
+                    progress-label="Uploading selected files..."
+                    progress-aria-label="Order document upload progress"
+                />
             @else
                 <div class="ft-create-note">Your role does not allow document uploads during Order creation.</div>
             @endif
@@ -307,8 +330,8 @@
 
         <div class="ft-create-actions">
             <button type="button" class="ft-create-cancel" wire:click="closeCreate">Cancel</button>
-            <button type="button" class="ft-create-draft" wire:click="saveDraft" @disabled(!$createReady)>Save draft</button>
-            <button type="button" class="ft-create-primary" wire:click="createJob" @disabled(!$createReady)>Create order</button>
+            <button type="button" class="ft-create-draft" wire:click="saveDraft" wire:loading.attr="disabled" wire:target="purchaseOrderUpload,jobAttachments,saveDraft" @disabled(!$createReady)>Save draft</button>
+            <button type="button" class="ft-create-primary" wire:click="createJob" wire:loading.attr="disabled" wire:target="purchaseOrderUpload,jobAttachments,createJob" @disabled(!$createReady)>Create order</button>
         </div>
         @error('createLoading')<div class="validation-error">{{ $message }}</div>@enderror
     </div>

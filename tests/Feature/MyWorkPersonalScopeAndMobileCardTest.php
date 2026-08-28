@@ -18,7 +18,7 @@ class MyWorkPersonalScopeAndMobileCardTest extends TestCase
         $this->assertStringContainsString("->where('tasks.assignee_id', \$user->id)", $service);
         $this->assertStringContainsString("->whereColumn('flow_jobs.workflow_phase_id', 'tasks.workflow_phase_id')", $service);
         $this->assertStringContainsString('activeAssignedTaskQuery', $service);
-        $this->assertStringContainsString('if (!$administrator)', $service);
+        $this->assertStringContainsString('if (!$access->isAdministrator($user))', $service);
         $this->assertStringContainsString('Only Orders whose current active task is assigned to you appear here.', $view);
         $this->assertStringContainsString('My Tasks', $view);
         $this->assertStringNotContainsString('Needs my action', $view);

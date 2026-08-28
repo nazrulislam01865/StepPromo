@@ -156,7 +156,7 @@
 
             @unless($prototypeUpload)
                 <label class="ft-order-task-document-note"><span>Document note (optional)</span><input type="text" wire:model="overviewTaskDocumentNote" placeholder="Add a short note...">@error('overviewTaskDocumentNote')<p class="validation-error">{{ $message }}</p>@enderror</label>
-                <div class="ft-order-task-document-info">This document remains linked to this task and is also visible in Order attachments.</div>
+                <div class="ft-order-task-document-info">This document remains linked to this task and is available from the task and Documents archive.</div>
             @else
                 <div class="ft-prototype-upload-meta"><span>Task</span><b>{{ $task->title }}</b><span>Order</span><b>{{ $job->displayOrderNumber() }}</b></div>
             @endunless

@@ -20,7 +20,7 @@ class InquiryCreateRfqModuleTest extends TestCase
         $this->assertStringContainsString('wire:model.live="{{ $model }}"', $choice);
         $this->assertStringContainsString('wire:model="createRfqDueDate"', $component);
         $this->assertStringContainsString('wire:model="createRfqMessage"', $component);
-        $this->assertStringContainsString('Suppliers remain RFQ participants only.', $component);
+        $this->assertStringNotContainsString('Suppliers remain RFQ participants only.', $component);
         $this->assertStringContainsString('supplierChoicesForWorkspace', $pageData);
         $this->assertStringContainsString('public function candidateSuppliersForWorkspace', $rfq);
         $this->assertStringContainsString('public function supplierChoicesForWorkspace', $rfq);

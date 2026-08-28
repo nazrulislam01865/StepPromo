@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Jobs\Concerns;
 
+use App\DTOs\Orders\OrderCreateData;
 use App\Queries\Inquiries\InquiryDetailQuery;
 use App\Queries\Orders\OrderListQuery;
 use App\Queries\Orders\VisibleOrderQuery;
@@ -223,6 +224,15 @@ trait BuildsOrderPageData
             }
         }
 
+        $orderTitlePreview = '';
+        $hasPreviewProduct = collect($this->jobItems)->contains(
+            fn (array $item): bool => filled(trim((string) ($item['product'] ?? '')))
+        );
+
+        if (filled(trim($this->referenceNumber)) && $hasPreviewProduct) {
+            $orderTitlePreview = OrderCreateData::generateTitle($this->referenceNumber, $this->jobItems);
+        }
+
         return [
             'selectedJob' => null,
             'selectedTask' => null,
@@ -279,6 +289,7 @@ trait BuildsOrderPageData
             'newProductHasExactCategory' => $newProductHasExactCategory,
             'newProductImagePreview' => $newProductImagePreview,
             'mentionUsers' => app(\App\Services\MentionService::class)->optionsForCreate($user),
+            'orderTitlePreview' => $orderTitlePreview,
         ];
     }
 

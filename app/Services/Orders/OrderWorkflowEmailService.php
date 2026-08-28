@@ -11,9 +11,12 @@ use App\Models\User;
 use App\Services\BrandingService;
 use App\Services\CompanyProfileService;
 use App\Services\Email\EmailService;
+use App\Services\Email\ModuleEmailControlService;
 use App\Services\SecureDocumentStorage;
 use App\Services\SetupContext;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
@@ -28,6 +31,7 @@ final class OrderWorkflowEmailService
 {
     private const PURCHASE_ORDER_HANDOFF = 'NEW_SEND_PO_ARTWORK';
     private const ARTWORK_HANDOFF = 'ART_SEND_ORDER_TEAM';
+    private const DELIVERY_ATTEMPTS = 3;
 
     /** @var array<string,string> */
     private const SOURCE_TASK_KEYS = [
@@ -44,6 +48,7 @@ final class OrderWorkflowEmailService
 
     public function __construct(
         private readonly EmailService $email,
+        private readonly ModuleEmailControlService $emailControl,
         private readonly SecureDocumentStorage $storage,
         private readonly BrandingService $branding,
         private readonly CompanyProfileService $companyProfile,
@@ -68,6 +73,7 @@ final class OrderWorkflowEmailService
 
         $job->loadMissing(['client', 'owner', 'coordinator', 'items']);
         $actor ??= auth()->user() instanceof User ? auth()->user() : ($job->owner ?: $job->coordinator);
+        $emailServiceEnabled = $this->emailControl->orderEnabled();
 
         $recipients = $this->recipients($job, $key);
         $document = $this->sourceDocument($job, $key);
@@ -104,7 +110,8 @@ final class OrderWorkflowEmailService
             'from_name' => $this->senderName($brand),
             'from_address' => $this->senderAddress(),
             'reply_to' => $actor && filter_var((string) $actor->email, FILTER_VALIDATE_EMAIL) ? (string) $actor->email : '',
-            'delivery' => $this->deliveryLabel(),
+            'email_service_enabled' => $emailServiceEnabled,
+            'delivery' => $emailServiceEnabled ? $this->deliveryLabel() : 'Order email service disabled',
             'html' => $previewHtml,
         ];
     }
@@ -121,6 +128,32 @@ final class OrderWorkflowEmailService
         $job = FlowJob::query()
             ->with(['client', 'owner', 'coordinator', 'items'])
             ->findOrFail($handoffTask->flow_job_id);
+
+        if (! $this->emailControl->orderEnabled()) {
+            $trackingId = 'disabled-'.Str::uuid();
+            $attachmentLabel = $key === self::PURCHASE_ORDER_HANDOFF ? 'Purchase Order' : 'Artwork';
+
+            $job->activities()->create([
+                'user_id' => $actor->id,
+                'event' => 'job.workflow_email_skipped',
+                'description' => $attachmentLabel.' email handoff was skipped because the Order email service is disabled by an administrator.',
+                'meta' => [
+                    'task_id' => (int) $handoffTask->id,
+                    'tracking_id' => $trackingId,
+                    'email_service_disabled' => true,
+                    'module' => ModuleEmailControlService::ORDER,
+                ],
+            ]);
+
+            Log::info('flowtrack.order_workflow_email.skipped', [
+                'flow_job_id' => (int) $job->id,
+                'task_id' => (int) $handoffTask->id,
+                'handoff_key' => $key,
+                'reason' => 'order_email_service_disabled',
+            ]);
+
+            return $trackingId;
+        }
 
         $recipients = $this->recipients($job, $key);
         if ($recipients->isEmpty()) {
@@ -161,30 +194,62 @@ final class OrderWorkflowEmailService
             filled($document->mime_type) ? (string) $document->mime_type : null,
         );
 
-        try {
-            $trackingId = $this->email->sendNow(new EmailMessage(
-                to: $recipients->pluck('email')->all(),
-                subject: $subject,
-                view: 'emails.orders.workflow-handoff',
-                viewData: $viewData,
-                replyTo: $replyTo,
-                attachments: [$attachment],
-                context: [
-                    'type' => $key === self::PURCHASE_ORDER_HANDOFF ? 'order_purchase_order_handoff' : 'order_artwork_handoff',
-                    'reference' => $orderNumber,
+        $message = new EmailMessage(
+            to: $recipients->pluck('email')->all(),
+            subject: $subject,
+            view: 'emails.orders.workflow-handoff',
+            viewData: $viewData,
+            replyTo: $replyTo,
+            attachments: [$attachment],
+            context: [
+                'type' => $key === self::PURCHASE_ORDER_HANDOFF ? 'order_purchase_order_handoff' : 'order_artwork_handoff',
+                'reference' => $orderNumber,
+                'flow_job_id' => (int) $job->id,
+                'task_id' => (int) $handoffTask->id,
+                'document_id' => (int) $document->id,
+            ],
+        );
+
+        // Workflow handoff email is synchronous because task completion depends
+        // on provider acceptance. Retry the same idempotent delivery three times
+        // before exposing the manual-send fallback. Reusing one tracking ID is
+        // important for providers (such as e2a) that support idempotency keys.
+        $trackingId = (string) Str::uuid();
+        $attemptsUsed = 0;
+        $lastException = null;
+
+        for ($attempt = 1; $attempt <= self::DELIVERY_ATTEMPTS; $attempt++) {
+            $attemptsUsed = $attempt;
+
+            try {
+                $this->email->deliver($message, $trackingId);
+                $lastException = null;
+                break;
+            } catch (Throwable $exception) {
+                $lastException = $exception;
+
+                Log::warning('flowtrack.order_workflow_email.retry', [
+                    'tracking_id' => $trackingId,
                     'flow_job_id' => (int) $job->id,
                     'task_id' => (int) $handoffTask->id,
                     'document_id' => (int) $document->id,
-                ],
-            ));
-        } catch (ValidationException $exception) {
-            throw $exception;
-        } catch (Throwable $exception) {
-            report($exception);
-            throw ValidationException::withMessages([
-                'orderWorkflowActionEmail' => 'The email could not be sent. The workflow task was not completed. Please check the email service and try again.',
-            ]);
+                    'attempt' => $attempt,
+                    'max_attempts' => self::DELIVERY_ATTEMPTS,
+                ]);
+
+                // Small bounded backoff gives transient provider/network errors
+                // a chance to recover without making the UI unnecessarily slow.
+                if ($attempt < self::DELIVERY_ATTEMPTS) {
+                    usleep(250_000 * $attempt);
+                }
+            }
         }
+
+        if ($lastException) {
+            report($lastException);
+            throw $lastException;
+        }
+
 
         $job->activities()->create([
             'user_id' => $actor->id,
@@ -200,11 +265,13 @@ final class OrderWorkflowEmailService
                 'recipient_count' => $recipients->count(),
                 'business_unit' => $key === self::ARTWORK_HANDOFF ? $this->orderBusinessUnit($job) : null,
                 'tracking_id' => $trackingId,
+                'delivery_attempts' => $attemptsUsed,
             ],
         ]);
 
         return $trackingId;
     }
+
 
     /** @return Collection<int,User> */
     private function recipients(FlowJob $job, string $handoffKey): Collection

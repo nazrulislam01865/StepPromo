@@ -50,7 +50,7 @@ unset($__defined_vars, $__key, $__value); ?>
         if ($route === 'jobs.index') $isActive = $isActive || request()->routeIs('orders.bulk-import*');
     }
 ?>
-<a href="<?php echo e(route($route, $params)); ?>" wire:navigate class="nav-btn <?php echo e($child ? 'ft-sidebar-child-link' : ''); ?> <?php echo e($isActive ? 'active' : ''); ?>" <?php if($isActive): ?> aria-current="page" <?php endif; ?>>
+<a href="<?php echo e(route($route, $params)); ?>" wire:navigate data-ft-nav-route="<?php echo e($route); ?>" class="nav-btn <?php echo e($child ? 'ft-sidebar-child-link' : ''); ?> <?php echo e($isActive ? 'active' : ''); ?>" <?php if($isActive): ?> aria-current="page" <?php endif; ?>>
     <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php switch($icon):
         case ('dashboard'): ?><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?><?php break; ?>
         <?php case ('work'): ?><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?><?php break; ?>

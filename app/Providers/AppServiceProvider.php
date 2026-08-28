@@ -114,7 +114,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(JobFailed::class, function (JobFailed $event): void {
             app(OperationsMetrics::class)->recordQueueFailure($event->job->resolveName(), $event->job->getQueue());
             Log::error('flowtrack.queue.failed', [
-                'connection' => $event->connectionNameName,
+                'connection' => $event->connectionName,
                 'queue' => $event->job->getQueue(),
                 'job' => $event->job->resolveName(),
                 'exception' => $event->exception->getMessage(),

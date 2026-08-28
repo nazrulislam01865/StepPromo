@@ -496,7 +496,7 @@
                         <header class="ft-inquiry-task-document-modal-head">
                             <div>
                                 <h2 id="task-document-modal-title">{{ $completeAfterTaskDocument ? 'Required file needed to complete task' : 'Add new document to task' }}</h2>
-                                <p>{{ $completeAfterTaskDocument ? 'Add the required file now. The task will be completed automatically after the document is saved.' : 'Upload a new file or choose a document that already exists.' }}</p>
+                                <p>{{ $completeAfterTaskDocument ? 'Add the required file now. The task will be completed automatically after the document is saved.' : 'Upload a new file to this task.' }}</p>
                             </div>
                             <button type="button" class="ft-inquiry-task-document-modal-close" wire:click="closeTaskDocumentModal" aria-label="Close">×</button>
                         </header>
@@ -514,47 +514,48 @@
                             </div>
 
                             <div class="ft-inquiry-task-document-source-label">Document source</div>
-                            <div class="ft-inquiry-task-document-source-tabs">
-                                <button type="button" class="{{ $taskDocumentSource === 'upload' ? 'active' : '' }}" wire:click="setTaskDocumentSource('upload')" @disabled(!$canCreateDocuments)>
+                            <div class="ft-inquiry-task-document-source-tabs is-single-source">
+                                <button type="button" class="active" disabled aria-current="true">
                                     <span>↥</span> Upload new
-                                </button>
-                                <button type="button" class="{{ $taskDocumentSource === 'existing' ? 'active' : '' }}" wire:click="setTaskDocumentSource('existing')" @disabled(!$canLinkDocuments)>
-                                    <span>▤</span> Choose existing
                                 </button>
                             </div>
 
-                            @if($taskDocumentSource === 'upload' && $canCreateDocuments)
-                                <label class="ft-inquiry-task-document-dropzone">
-                                    <input type="file" wire:model="taskDocumentUpload" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.zip,.txt,.csv,.ai,.eps,.esp">
-                                    <span class="ft-inquiry-task-document-upload-icon">⇧</span>
-                                    @if($taskDocumentUpload)
-                                        <strong>{{ $taskDocumentUpload->getClientOriginalName() }}</strong>
-                                        <b>File selected — choose another file</b>
-                                        <small>{{ number_format(max(1, (int) ceil($taskDocumentUpload->getSize() / 1024))) }} KB · ready to add</small>
-                                    @else
-                                        <strong>Drop a file here</strong>
-                                        <b>or browse files</b>
-                                        <small>PDF, Office files, JPG, PNG, ZIP, AI, EPS or ESP · Max 20 MB</small>
-                                    @endif
-                                </label>
-                                @error('taskDocumentUpload')<p class="ft-inquiry-task-document-error">{{ $message }}</p>@enderror
-                            @else
-                                <div class="ft-inquiry-task-document-existing">
-                                    @if($availableTaskDocuments->isEmpty())
-                                        <div class="ft-inquiry-task-document-existing-empty">No existing client documents are available.</div>
-                                    @else
-                                        <label>
-                                            <span>Choose an existing document</span>
-                                            <select wire:model="taskExistingDocumentId">
-                                                <option value="">Select a document...</option>
-                                                @foreach($availableTaskDocuments as $sourceDocument)
-                                                    <option value="{{ $sourceDocument->id }}">{{ $sourceDocument->name }}</option>
-                                                @endforeach
-                                            </select>
-                                        </label>
-                                    @endif
+                            @if($canCreateDocuments)
+                                <div
+                                    class="ft-inquiry-task-document-upload-field"
+                                    x-data="{ uploading: false, progress: 0 }"
+                                    x-on:livewire-upload-start="uploading = true; progress = 0"
+                                    x-on:livewire-upload-progress="progress = $event.detail.progress"
+                                    x-on:livewire-upload-finish="progress = 100; window.setTimeout(() => { uploading = false; progress = 0 }, 250)"
+                                    x-on:livewire-upload-error="uploading = false; progress = 0"
+                                    x-on:livewire-upload-cancel="uploading = false; progress = 0"
+                                >
+                                    <label class="ft-inquiry-task-document-dropzone">
+                                        <input type="file" wire:model="taskDocumentUpload" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.zip,.txt,.csv,.ai,.eps,.esp">
+                                        <span class="ft-inquiry-task-document-upload-icon">⇧</span>
+                                        @if($taskDocumentUpload)
+                                            <strong>{{ $taskDocumentUpload->getClientOriginalName() }}</strong>
+                                            <b>File selected — choose another file</b>
+                                            <small>{{ number_format(max(1, (int) ceil($taskDocumentUpload->getSize() / 1024))) }} KB · ready to add</small>
+                                        @else
+                                            <strong>Drop a file here</strong>
+                                            <b>or browse files</b>
+                                            <small>PDF, Office files, JPG, PNG, ZIP, AI, EPS or ESP · Max 20 MB</small>
+                                        @endif
+                                    </label>
+
+                                    <div class="ft-inquiry-task-document-upload-progress" x-cloak x-show="uploading" x-transition.opacity.duration.120ms>
+                                        <div class="ft-inquiry-upload-progress-meta">
+                                            <span>Uploading file...</span>
+                                            <b x-text="`${progress}%`">0%</b>
+                                        </div>
+                                        <div class="ft-inquiry-upload-progress-track" role="progressbar" aria-label="File upload progress" aria-valuemin="0" aria-valuemax="100" x-bind:aria-valuenow="progress">
+                                            <span x-bind:style="`width: ${progress}%`"></span>
+                                        </div>
+                                    </div>
+
+                                    @error('taskDocumentUpload')<p class="ft-inquiry-task-document-error">{{ $message }}</p>@enderror
                                 </div>
-                                @error('taskExistingDocumentId')<p class="ft-inquiry-task-document-error">{{ $message }}</p>@enderror
                             @endif
 
                             <label class="ft-inquiry-task-document-note">
@@ -575,7 +576,7 @@
                         <footer class="ft-inquiry-task-document-modal-actions">
                             <button type="button" class="secondary" wire:click="closeTaskDocumentModal">Cancel</button>
                             <button type="button" class="primary" wire:click="saveTaskDocument" wire:loading.attr="disabled" wire:target="saveTaskDocument,taskDocumentUpload"
-                                @disabled($taskDocumentSource === 'upload' ? !$taskDocumentUpload : !$taskExistingDocumentId)>
+                                @disabled(!$taskDocumentUpload)>
                                 <span wire:loading.remove wire:target="saveTaskDocument">{{ $completeAfterTaskDocument ? 'Add file & complete' : 'Add document' }}</span>
                                 <span wire:loading wire:target="saveTaskDocument">{{ $completeAfterTaskDocument ? 'Adding & completing...' : 'Adding...' }}</span>
                             </button>

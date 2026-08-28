@@ -72,6 +72,7 @@
                     :hide-label="true"
                     :fixed-menu="true"
                     :menu-width="300"
+                    action="applyOwnerFilter"
                     wire:key="order-v5-owner-filter-{{ filled($ownerFilter) ? $ownerFilter : 'all' }}"
                 />
 

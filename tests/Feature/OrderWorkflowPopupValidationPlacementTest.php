@@ -53,6 +53,13 @@ class OrderWorkflowPopupValidationPlacementTest extends TestCase
         $this->assertStringContainsString('align-content:start;', $css);
         $this->assertStringContainsString('.ft-order-popup-field>.validation-error', $css);
         $this->assertStringContainsString('.field:has(>.validation-error)>input', $css);
+
+        // Billing and Payment errors must occupy a pre-reserved row rather
+        // than increasing the modal dimensions after validation.
+        $this->assertStringContainsString('ft-order-workflow-action-modal--stable-finance-validation', $workflowModal);
+        $this->assertStringContainsString("in_array(\$variant, ['invoice_prepare', 'payment'], true)", $workflowModal);
+        $this->assertStringContainsString('grid-template-rows:auto auto 13px;', $css);
+        $this->assertStringContainsString('scrollbar-gutter:stable;', $css);
     }
 
     public function test_workflow_payload_validation_returns_all_missing_field_errors_together(): void
