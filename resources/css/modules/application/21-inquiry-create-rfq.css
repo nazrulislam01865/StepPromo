@@ -468,3 +468,206 @@
     background: #f5f8fb;
     border-color: #c7d3e1;
 }
+
+/* Selected RFQ participants are rendered below the picker just like selected
+   product rows. This gives immediate confirmation without coupling selection to
+   Inquiry persistence or the supplier search result currently on screen. */
+.ft-inquiry-prototype .ft-create-rfq-selected-section {
+    margin-top: -1px;
+    padding: 12px 10px 14px;
+    border-bottom: 1px solid var(--ft-border-default);
+    background: var(--ft-bg-surface-subtle);
+}
+
+.ft-inquiry-prototype .ft-create-rfq-selected-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 9px;
+    padding: 0 2px;
+}
+
+.ft-inquiry-prototype .ft-create-rfq-selected-head > div {
+    min-width: 0;
+}
+
+.ft-inquiry-prototype .ft-create-rfq-selected-head h3 {
+    margin: 0;
+    color: #17263d;
+    font-size: .71875rem;
+    font-weight: 800;
+    letter-spacing: -.01em;
+    line-height: 1.25;
+}
+
+.ft-inquiry-prototype .ft-create-rfq-selected-head p {
+    margin: 3px 0 0;
+    color: #718198;
+    font-size: .53125rem;
+    line-height: 1.4;
+}
+
+.ft-inquiry-prototype .ft-create-rfq-selected-head > span {
+    flex: 0 0 auto;
+    color: #607189;
+    font-size: .53125rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.ft-inquiry-prototype .ft-create-rfq-selected-list {
+    display: grid;
+    gap: 8px;
+}
+
+.ft-inquiry-prototype .ft-create-rfq-selected-card {
+    box-sizing: border-box;
+    min-width: 0;
+    min-height: 64px;
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr) max-content 88px;
+    align-items: center;
+    gap: 10px 12px;
+    padding: 10px 12px;
+    border: 1px solid #d5e0ec;
+    border-radius: 9px;
+    background: var(--ft-bg-surface);
+    box-shadow: 0 1px 2px rgba(16, 24, 40, .025);
+}
+
+.ft-inquiry-prototype .ft-create-rfq-selected-avatar {
+    display: grid;
+    width: 42px;
+    height: 42px;
+    place-items: center;
+    border-radius: 8px;
+    background: linear-gradient(145deg, #0b6170, #13958f);
+    color: #fff;
+    font-size: .59375rem;
+    font-weight: 900;
+    letter-spacing: .03em;
+}
+
+.ft-inquiry-prototype .ft-create-rfq-selected-copy {
+    min-width: 0;
+    display: grid;
+    gap: 4px;
+}
+
+.ft-inquiry-prototype .ft-create-rfq-selected-copy strong,
+.ft-inquiry-prototype .ft-create-rfq-selected-copy small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ft-inquiry-prototype .ft-create-rfq-selected-copy strong {
+    color: #17263d;
+    font-size: .6875rem;
+    font-weight: 800;
+    line-height: 1.25;
+}
+
+.ft-inquiry-prototype .ft-create-rfq-selected-copy small {
+    color: #6a7f99;
+    font-size: .5625rem;
+    line-height: 1.3;
+}
+
+.ft-inquiry-prototype .ft-create-rfq-selected-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 8px;
+    border-radius: 999px;
+    background: #eaf8ef;
+    color: #16854f;
+    font-size: .5rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.ft-inquiry-prototype .ft-create-rfq-selected-status svg {
+    width: 11px;
+    height: 11px;
+    stroke: currentColor;
+    stroke-width: 2.3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.ft-inquiry-prototype .ft-create-rfq-selected-remove {
+    min-width: 88px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 1px solid #e5c9c9;
+    border-radius: 7px;
+    background: #fff;
+    color: #9f3d3d;
+    padding: 0 10px;
+    font: inherit;
+    font-size: .5625rem;
+    font-weight: 750;
+    cursor: pointer;
+    transition: border-color .15s ease, background .15s ease;
+}
+
+.ft-inquiry-prototype .ft-create-rfq-selected-remove:hover,
+.ft-inquiry-prototype .ft-create-rfq-selected-remove:focus-visible {
+    border-color: #d8aaaa;
+    background: #fff8f8;
+    outline: 0;
+}
+
+.ft-inquiry-prototype .ft-create-rfq-selected-remove:disabled {
+    cursor: wait;
+    opacity: .65;
+}
+
+.ft-inquiry-prototype .ft-create-rfq-selected-remove svg {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 auto;
+}
+
+@media (max-width: 640px) {
+    .ft-inquiry-prototype .ft-create-rfq-selected-section {
+        padding: 10px 8px 12px;
+    }
+
+    .ft-inquiry-prototype .ft-create-rfq-selected-head {
+        align-items: flex-start;
+    }
+
+    .ft-inquiry-prototype .ft-create-rfq-selected-card {
+        grid-template-columns: 38px minmax(0, 1fr) max-content;
+        gap: 8px 10px;
+        padding: 9px 10px;
+    }
+
+    .ft-inquiry-prototype .ft-create-rfq-selected-avatar {
+        width: 38px;
+        height: 38px;
+    }
+
+    .ft-inquiry-prototype .ft-create-rfq-selected-status {
+        grid-column: 2;
+        justify-self: start;
+    }
+
+    .ft-inquiry-prototype .ft-create-rfq-selected-remove {
+        grid-column: 3;
+        grid-row: 1 / span 2;
+        min-width: 36px;
+        width: 36px;
+        padding: 0;
+    }
+
+    .ft-inquiry-prototype .ft-create-rfq-selected-remove > span {
+        display: none;
+    }
+}

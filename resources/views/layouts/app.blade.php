@@ -15,6 +15,10 @@
     @endauth
     <title>{{ ($title ?? null) ? $title.' — ' : '' }}STEP PROMO</title>
     <link rel="icon" href="{{ $branding['favicon_url'] ?? asset('images/step-promo/step-promo-icon.webp') }}">
+    <script
+        src="{{ asset('js/flowtrack-image-fallback.js') }}?v={{ \App\Support\FrontendBuildVersion::current() }}"
+        data-fallback-src="{{ asset('images/flowtrack-image-fallback.svg') }}"
+    ></script>
     @vite('resources/css/application/prelude.css')
     @auth
         <meta name="flowtrack-notification-count-url" content="{{ route('notifications.unread-count') }}">

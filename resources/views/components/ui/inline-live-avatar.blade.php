@@ -11,6 +11,7 @@
             alt=""
             aria-hidden="true"
             decoding="async"
+            data-ft-image-fallback="managed"
             x-on:error="avatarUrl = ''; savedAvatarUrl = ''"
         >
     </template>

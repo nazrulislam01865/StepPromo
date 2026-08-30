@@ -55,12 +55,21 @@
         </button>
     @endunless
 
+    @if($fixedMenu)
+        {{--
+            Fixed inline pickers live inside tables/cards that may use overflow,
+            containment, or content-visibility for performance. Render the menu
+            at <body> level so it cannot be clipped or offset by those ancestors.
+            This mirrors the shared search-select fixed-menu contract.
+        --}}
+        <template x-teleport="body">
+    @endif
     <div
         x-ref="menu"
         class="ft-remote-filter-menu ft-inline-remote-user-menu"
+        data-ft-inline-remote-menu
         x-cloak
-        x-show="open"
-        x-bind:style="menuStyle"
+        x-bind:style="open ? menuStyle + ';display:flex!important;' : 'display:none!important;'"
         x-on:click.outside="close()"
         x-on:keydown.arrow-down.prevent="moveOption(1)"
         x-on:keydown.arrow-up.prevent="moveOption(-1)"
@@ -111,4 +120,7 @@
         <button type="button" class="ft-search-select__load-more" x-show="hasMore && !loading" x-on:click="loadMore()">Load more</button>
         <div class="ft-remote-filter-message" x-text="message"></div>
     </div>
+    @if($fixedMenu)
+        </template>
+    @endif
 </div>

@@ -129,11 +129,21 @@
                         <button type="button" class="ft-order-product-select-button {{ in_array((int) $product->id, $selectedIds, true) ? 'is-selected' : '' }}" wire:click="selectCreateProduct({{ $product->id }})">Select</button>
                     </div>
                 @empty
-                    <div class="ft-order-product-no-results">
-                        <strong>{{ $showCreateProductSuggestion ? 'No matching product found.' : 'No products found' }}</strong>
-                        <span>{{ $showCreateProductSuggestion ? 'You can create a new product from this search.' : 'Try another product name, product code or reference code.' }}</span>
+                    <div class="ft-order-product-no-results {{ $showCreateProductSuggestion && $canCreateCatalogProduct ? 'has-create-action' : '' }}">
+                        <span class="ft-order-product-empty-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="M11 8v6M8 11h6"/></svg>
+                        </span>
+                        <strong>{{ $showCreateProductSuggestion ? 'No matching product found' : 'No products found' }}</strong>
+                        <span>{{ $showCreateProductSuggestion ? 'Nothing in the catalog matches “'.$productSearchValue.'”.' : 'Try another product name, product code or reference code.' }}</span>
                         @if($showCreateProductSuggestion && $canCreateCatalogProduct)
-                            <button type="button" class="ft-order-product-select-button" wire:click="openCreateOrderProductModalFromSearch">Create new product</button>
+                            <button type="button" class="ft-order-product-create-cta" wire:click="openCreateOrderProductModalFromSearch">
+                                <span class="ft-order-product-create-cta-icon" aria-hidden="true">+</span>
+                                <span class="ft-order-product-create-cta-copy">
+                                    <strong>Create “{{ $productSearchValue }}”</strong>
+                                    <small>Add it to the catalog and this Order</small>
+                                </span>
+                                <svg class="ft-order-product-create-cta-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+                            </button>
                         @endif
                     </div>
                 @endforelse

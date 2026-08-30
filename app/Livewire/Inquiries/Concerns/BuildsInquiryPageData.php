@@ -66,11 +66,49 @@ trait BuildsInquiryPageData
         $productSearchSuppliers = collect();
         $activeProductCount = 0;
         $productResultTotal = 0;
-        $createRfqSupplierCandidates = app(InquiryRfqService::class)->supplierChoicesForWorkspace(
-            $workspaceId,
-            $this->createRfqSupplierSearch,
-            trim($this->createRfqSupplierSearch) === '' ? 100 : 50,
-        );
+        $rfqService = app(InquiryRfqService::class);
+        $selectedRfqSupplierIds = collect($this->createProductRfqRows)
+            ->flatMap(fn ($state) => is_array($state) ? ($state['supplier_ids'] ?? []) : [])
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+        $selectedRfqSupplierRecords = $rfqService
+            ->selectableSuppliersByIds($workspaceId, $selectedRfqSupplierIds->all())
+            ->keyBy(fn (MasterRecord $supplier) => (int) $supplier->id);
+        $createProductRfqSelectedSuppliers = collect($this->createProductRows)
+            ->map(function (array $row, int $index) use ($selectedRfqSupplierRecords) {
+                $ids = collect(data_get($this->createProductRfqRows, $index.'.supplier_ids', []))
+                    ->map(fn ($id) => (int) $id)
+                    ->filter()
+                    ->unique();
+
+                return $ids->map(function (int $supplierId) use ($selectedRfqSupplierRecords): ?array {
+                    $supplier = $selectedRfqSupplierRecords->get($supplierId);
+                    if (! $supplier) return null;
+                    $email = trim((string) data_get($supplier->metadata, 'email'));
+                    return [
+                        'id' => (int) $supplier->id,
+                        'name' => (string) $supplier->name,
+                        'code' => trim((string) $supplier->code),
+                        'email' => $email,
+                        'contact' => trim((string) data_get($supplier->metadata, 'contact_person')),
+                        'email_ready' => filter_var($email, FILTER_VALIDATE_EMAIL) !== false,
+                    ];
+                })->filter()->values();
+            });
+        $createRfqSelectedSuppliers = $selectedRfqSupplierRecords->values()->map(function (MasterRecord $supplier): array {
+            return [
+                'id' => (int) $supplier->id,
+                'name' => (string) $supplier->name,
+                'code' => trim((string) $supplier->code),
+                'email' => trim((string) data_get($supplier->metadata, 'email')),
+                'contact' => trim((string) data_get($supplier->metadata, 'contact_person')),
+            ];
+        });
+        // Kept for backward-compatible view data; the prototype picker itself is
+        // remote and does not hydrate the full Supplier directory on page load.
+        $createRfqSupplierCandidates = collect();
         $createRfqProductCount = collect($this->createProductRows)
             ->filter(fn (array $row): bool => (int) ($row['product_id'] ?? 0) > 0 || trim((string) ($row['product'] ?? '')) !== '')
             ->count();
@@ -216,7 +254,9 @@ trait BuildsInquiryPageData
             'newProductImagePreview' => $newProductImagePreview,
             'createPriorityOptions' => app(MasterDataService::class)->active('priority'),
             'createRfqSupplierCandidates' => $createRfqSupplierCandidates,
+            'createRfqSelectedSuppliers' => $createRfqSelectedSuppliers,
             'createRfqProductCount' => $createRfqProductCount,
+            'createProductRfqSelectedSuppliers' => $createProductRfqSelectedSuppliers,
         ];
     }
 
@@ -243,9 +283,6 @@ trait BuildsInquiryPageData
             $detailSectionsReady['documents'] = true;
         }
         if ($this->inquiryActivityTab !== 'all') {
-            $detailSectionsReady['activity'] = true;
-        }
-        if ($this->detailTab === 'activity') {
             $detailSectionsReady['activity'] = true;
         }
         $rfqContext = in_array($this->detailTab, ['rfq', 'comparison'], true) || $this->showRfqEmailPreview;
@@ -299,7 +336,14 @@ trait BuildsInquiryPageData
 
         $inquiryProductMasters = collect();
         $inquiryProductSuppliers = collect();
-        if ($canViewInquiryProducts && $detailSectionsReady['products'] && $inquiry->relationLoaded('items')) {
+        $inquiryProductAllSuppliers = collect();
+        $inquiryProductRfqOverview = [
+            'stats' => ['products' => 0, 'supplier_assignments' => 0, 'invitations_sent' => 0, 'quotations_received' => 0],
+            'rows' => collect(),
+            'product_count' => 0,
+            'total_units' => 0.0,
+        ];
+        if ((($canViewInquiryProducts && $detailSectionsReady['products']) || $rfqContext) && $inquiry->relationLoaded('items')) {
             $productNames = $inquiry->items
                 ->pluck('item_name')
                 ->filter(fn ($name) => filled($name))
@@ -318,8 +362,21 @@ trait BuildsInquiryPageData
                 // Resolve Product Master suppliers in one bounded query so the
                 // Inquiry and Order detail cards can share the same Supplier column
                 // without introducing any relationship queries inside Blade.
-                $inquiryProductSuppliers = app(\App\Services\ProductCatalogService::class)
-                    ->suppliersForProducts($inquiryProductMasters->values()->keyBy('id'));
+                $catalog = app(\App\Services\ProductCatalogService::class);
+                $productsById = $inquiryProductMasters->values()->keyBy('id');
+                $inquiryProductSuppliers = $catalog->suppliersForProducts($productsById);
+                $inquiryProductAllSuppliers = $catalog->allSuppliersForProducts($productsById);
+            }
+
+            if ($this->detailTab === 'overview') {
+                $overviewInvitations = app(\App\Services\Inquiries\InquiryRfqService::class)
+                    ->overviewInvitations($inquiry);
+                $inquiryProductRfqOverview = \App\Support\InquiryProductRfqOverviewPresenter::build(
+                    $inquiry,
+                    $inquiryProductMasters,
+                    $inquiryProductAllSuppliers,
+                    $overviewInvitations,
+                );
             }
         }
 
@@ -379,9 +436,9 @@ trait BuildsInquiryPageData
 
         // Documents and Activity remain part of Overview, but no longer have separate tabs.
         $documents = $this->detailTab === 'overview' && $detailSectionsReady['documents'] && $user->canModule('documents', 'view') ? $detailQuery->documents($user, $inquiry) : null;
-        $activities = in_array($this->detailTab, ['overview', 'activity'], true) && $detailSectionsReady['activity'] ? $detailQuery->activity($user, $inquiry, 30, $this->inquiryActivityTab) : null;
+        $activities = $this->detailTab === 'overview' && $detailSectionsReady['activity'] ? $detailQuery->activity($user, $inquiry, 30, $this->inquiryActivityTab) : null;
         $needsMentionUsers = $detailSectionsReady['activity'] || $this->showInquiryAttentionModal || $this->showTaskAttentionModal;
-        $mentionUsers = in_array($this->detailTab, ['overview', 'activity'], true) && $needsMentionUsers ? app(MentionService::class)->optionsForCreate($user) : collect();
+        $mentionUsers = $this->detailTab === 'overview' && $needsMentionUsers ? app(MentionService::class)->optionsForCreate($user) : collect();
         $availableInquiryDocuments = $detailSectionsReady['documents'] && $this->showInquiryDocumentPicker && $this->detailTab === 'overview'
             ? app(AccessControlService::class)->applyDocumentScope(Document::query(), $user)
                 ->where('client_id', $inquiry->client_id)
@@ -435,12 +492,55 @@ trait BuildsInquiryPageData
         $rfqInvitations = collect();
         $rfqDefaultSuppliers = collect();
         $rfqSupplierCandidates = collect();
+        $rfqAssignableProducts = collect();
+        $rfqWorkspace = null;
         $rfqEmailPreviews = [];
         if ($rfqContext) {
-            $rfqInvitations = $rfq->invitations($inquiry);
+            $rfqInvitations = $this->detailTab === 'rfq'
+                ? $rfq->overviewInvitations($inquiry)
+                : $rfq->invitations($inquiry);
             if ($this->detailTab === 'rfq') {
-                $rfqDefaultSuppliers = $rfq->defaultSuppliersAwaitingSend($inquiry);
-                $rfqSupplierCandidates = $rfq->candidateSuppliers($inquiry, $this->rfqSupplierSearch, 100);
+                $emailEnabled = $rfq->emailEnabled();
+                $rfqWorkspace = \App\Support\InquiryRfqProductWorkspacePresenter::build(
+                    $inquiry,
+                    $inquiryProductMasters,
+                    $inquiryProductAllSuppliers,
+                    $rfqInvitations,
+                    $emailEnabled,
+                    $this->rfqTableSearch,
+                    $this->rfqEmailStatusFilter,
+                    $this->rfqSelectedProductSupplierKeys,
+                    $this->rfqTablePage,
+                );
+
+                $rfqAssignableProducts = collect($inquiry->items ?? collect())
+                    ->map(function ($item) use ($inquiryProductMasters): ?array {
+                        $product = $inquiryProductMasters->get(mb_strtolower(trim((string) $item->item_name)));
+                        if (! $product) return null;
+                        return [
+                            'id' => (int) $product->id,
+                            'name' => (string) $item->item_name,
+                            'code' => $product->productDisplayCode() ?: trim((string) $product->code),
+                        ];
+                    })
+                    ->filter()
+                    ->unique('id')
+                    ->values();
+
+                // Product-scoped assignment keeps the prototype behavior clear:
+                // the same Supplier can be linked to more than one Product, while
+                // already-assigned suppliers are removed from that Product picker.
+                if ($this->showRfqSupplierPicker && $this->rfqSupplierProductId) {
+                    $productId = (int) $this->rfqSupplierProductId;
+                    $assignedIds = collect($inquiryProductAllSuppliers->get($productId, collect()))
+                        ->pluck('id')->map(fn ($id) => (int) $id)->filter()->unique()->values()->all();
+                    $rfqSupplierCandidates = $rfq->supplierChoicesForWorkspace(
+                        (int) $inquiry->workspace_id,
+                        $this->rfqSupplierSearch,
+                        50,
+                        $assignedIds,
+                    );
+                }
             }
             if ($this->showRfqEmailPreview) {
                 $rfqEmailPreviews = $rfq->previewHtml($inquiry);
@@ -457,8 +557,11 @@ trait BuildsInquiryPageData
             'rfqInvitations' => $rfqInvitations,
             'rfqDefaultSuppliers' => $rfqDefaultSuppliers,
             'rfqSupplierCandidates' => $rfqSupplierCandidates,
+            'rfqAssignableProducts' => $rfqAssignableProducts,
+            'rfqWorkspace' => $rfqWorkspace,
             'rfqEmailPreviews' => $rfqEmailPreviews,
             'canManageInquiryRfq' => $canManageInquiryRfq,
+            'canEditSuppliers' => $user->canModule('suppliers', 'edit'),
             'inquiryDocuments' => $documents,
             'inquiryActivities' => $activities,
             'inquiryMentionUsers' => $mentionUsers,
@@ -477,6 +580,8 @@ trait BuildsInquiryPageData
             'canDeleteInquiryProducts' => $canManageInquiryRecord && $canViewInquiryProducts && $access->can($user, 'catalog_products', 'delete'),
             'inquiryProductMasters' => $inquiryProductMasters,
             'inquiryProductSuppliers' => $inquiryProductSuppliers,
+            'inquiryProductAllSuppliers' => $inquiryProductAllSuppliers,
+            'inquiryProductRfqOverview' => $inquiryProductRfqOverview,
             'inquiryCurrencySymbol' => $inquiryCurrencySymbol,
             'inquiryProductSearchResults' => $inquiryProductSearchResults,
             'inquiryProductSearchSuppliers' => $inquiryProductSearchSuppliers,

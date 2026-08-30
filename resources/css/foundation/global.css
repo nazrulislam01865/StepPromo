@@ -133,3 +133,24 @@
         display: none;
     }
 }
+
+/* --------------------------------------------------------------------------
+   Global image failure fallback
+   --------------------------------------------------------------------------
+   The browser's native broken-image glyph is intentionally never shown.
+   Generic images are swapped to the shared fallback icon by
+   public/js/flowtrack-image-fallback.js. Identity components can opt into a
+   sibling fallback (initials, etc.) without changing their existing layout.
+*/
+@layer ft-foundation {
+    :where(img.ft-image-fallback) {
+        object-fit: contain !important;
+        object-position: center !important;
+    }
+
+    :where(img[data-ft-image-fallback="sibling"][hidden]),
+    :where(img[data-ft-image-fallback="sibling"] + [hidden]),
+    :where(.ft-client-logo-fallback[hidden]) {
+        display: none !important;
+    }
+}

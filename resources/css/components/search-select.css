@@ -51,6 +51,76 @@
         white-space: nowrap;
     }
 
+    /* Fixed menus are teleported to <body>, so person-option styling must live
+       on the shared component classes instead of a page-container selector. */
+    .ft-search-select__selected-user {
+        display: flex;
+        align-items: center;
+        gap: var(--ft-space-2);
+        min-width: 0;
+    }
+
+    .ft-search-select__avatar {
+        width: 30px;
+        height: 30px;
+        flex: 0 0 30px;
+        display: inline-grid;
+        place-items: center;
+        overflow: hidden;
+        border: var(--ft-border-width-thin) var(--ft-border-style-default) var(--ft-border-default);
+        border-radius: var(--ft-radius-pill);
+        background: var(--ft-color-brand-primary-soft);
+        color: var(--ft-text-link-hover);
+        font-size: var(--ft-font-size-xs);
+        font-weight: var(--ft-font-weight-bold);
+        line-height: 1;
+    }
+
+    .ft-search-select__avatar--trigger {
+        width: 24px;
+        height: 24px;
+        flex-basis: 24px;
+    }
+
+    .ft-search-select__avatar img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        max-width: 100%;
+        object-fit: cover;
+    }
+
+    .ft-search-select__user-option {
+        display: flex;
+        align-items: center;
+        gap: var(--ft-space-2);
+        min-width: 0;
+    }
+
+    .ft-search-select__user-copy {
+        display: grid;
+        gap: var(--ft-space-1);
+        min-width: 0;
+    }
+
+    .ft-search-select__user-copy strong,
+    .ft-search-select__user-copy small {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .ft-search-select__user-copy strong {
+        color: var(--ft-text-primary);
+        font-size: var(--ft-font-size-sm);
+    }
+
+    .ft-search-select__user-copy small,
+    .ft-search-select__selected-mark {
+        color: var(--ft-text-secondary);
+        font-size: var(--ft-font-size-xs);
+    }
+
     .ft-search-select__menu {
         z-index: var(--ft-z-dropdown);
         padding: var(--ft-space-2);

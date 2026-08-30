@@ -60,7 +60,7 @@ unset($__defined_vars, $__key, $__value); ?>
             aria-hidden="true"
             loading="lazy"
             decoding="async"
-            onerror="this.hidden=true;this.nextElementSibling.hidden=false"
+            data-ft-image-fallback="sibling"
         >
         <span class="avatar-initials" hidden aria-hidden="true"><?php echo e($initials ?: 'FT'); ?></span>
     <?php else: ?>

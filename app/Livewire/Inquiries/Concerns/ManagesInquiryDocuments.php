@@ -95,6 +95,7 @@ trait ManagesInquiryDocuments
 
         $note = trim($this->taskDocumentNote);
         $note = $note !== '' ? $note : null;
+        $shouldCompleteAfterDocument = (bool) $task->requires_submission && ! $task->completed_at;
 
         if ($this->taskDocumentSource === 'upload') {
             abort_unless(auth()->user()->canModule('documents', 'create'), 403);
@@ -111,18 +112,22 @@ trait ManagesInquiryDocuments
             app(\App\Actions\Inquiries\LinkExistingInquiryTaskDocument::class)->handle($task, $source, auth()->user(), $note);
         }
 
-        $completedAfterUpload = (int) ($this->pendingCompletionTaskId ?? 0) === (int) $task->id;
-        if ($completedAfterUpload) {
-            // The document now exists, so the normal service-level completion
-            // guard succeeds and completed_at/status are written atomically.
-            $task = app(\App\Actions\Inquiries\CompleteInquiryTask::class)->handle($task->fresh(), auth()->user());
+        $task = $task->fresh();
+        if ($shouldCompleteAfterDocument && ! $task->completed_at) {
+            // UploadInquiryDocument completes required-document tasks centrally.
+            // Keep this fallback for the legacy existing-document source so both
+            // ways of supplying a required document follow the same rule.
+            $task = app(\App\Actions\Inquiries\CompleteInquiryTask::class)->handle($task, auth()->user());
+        }
+        $completedAfterDocument = $shouldCompleteAfterDocument && $task->completed_at !== null;
+        if ($completedAfterDocument) {
             $this->metrics = app(\App\Queries\Inquiries\InquiryListQuery::class)->metrics(auth()->user());
         }
 
         $this->showTaskDocumentModal = false;
         $this->pendingCompletionTaskId = null;
         $this->resetTaskDocumentModal();
-        session()->flash('success', $completedAfterUpload
+        session()->flash('success', $completedAfterDocument
             ? 'Document added and '.$task->title.' completed.'
             : 'Document added to '.$task->title.'.');
     }
@@ -131,7 +136,11 @@ trait ManagesInquiryDocuments
     {
         $this->validate(['taskUpload' => AttachmentUpload::requiredRules(AttachmentUpload::DOCUMENTS_WITH_AI, 20480)]);
         $task = app(\App\Queries\Inquiries\InquiryDetailQuery::class)->task(auth()->user(), (int) $this->selectedTaskId, ['inquiry']);
+        $shouldCompleteAfterDocument = (bool) $task->requires_submission && ! $task->completed_at;
         app(\App\Actions\Inquiries\UploadInquiryDocument::class)->handle($task->inquiry, $this->taskUpload, auth()->user(), $task);
+        if ($shouldCompleteAfterDocument) {
+            $this->metrics = app(\App\Queries\Inquiries\InquiryListQuery::class)->metrics(auth()->user());
+        }
         $this->taskUpload = null;
     }
 
@@ -141,7 +150,11 @@ trait ManagesInquiryDocuments
         if (!$upload) return;
         $this->validate(["taskQuickUploads.$taskId" => AttachmentUpload::itemRules(AttachmentUpload::DOCUMENTS_WITH_AI, 20480)]);
         $task = app(\App\Queries\Inquiries\InquiryDetailQuery::class)->task(auth()->user(), $taskId, ['inquiry']);
+        $shouldCompleteAfterDocument = (bool) $task->requires_submission && ! $task->completed_at;
         app(\App\Actions\Inquiries\UploadInquiryDocument::class)->handle($task->inquiry, $upload, auth()->user(), $task);
+        if ($shouldCompleteAfterDocument) {
+            $this->metrics = app(\App\Queries\Inquiries\InquiryListQuery::class)->metrics(auth()->user());
+        }
         unset($this->taskQuickUploads[$taskId]);
     }
 

@@ -151,13 +151,6 @@
                         @include('components.inquiries.create-products')
                     @endif
 
-                    <x-inquiries.create-rfq
-                        :suppliers="$createRfqSupplierCandidates"
-                        :selected-supplier-ids="$createRfqSupplierIds"
-                        :supplier-search="$createRfqSupplierSearch"
-                        :product-count="$createRfqProductCount"
-                        wire:key="create-inquiry-rfq-selector"
-                    />
 
                     <section class="section ft-inquiry-create-section ft-inquiry-attachments-section">
                         <div class="sectiontitle ft-inquiry-step-title ft-inquiry-step-title-inline">

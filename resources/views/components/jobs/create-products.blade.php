@@ -4,13 +4,13 @@
     $hasDuplicateCode = (bool) $duplicateProduct;
     $hasSimilarProductName = $newProductSimilarProducts->isNotEmpty();
     $manualProductCode = trim((string) $newProductCode);
-    $productCodeFormatValid = $manualProductCode !== ''
-        && mb_strlen($manualProductCode) <= 40
-        && preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]*$/', $manualProductCode) === 1;
+    $productCodeFormatValid = $manualProductCode === ''
+        || (mb_strlen($manualProductCode) <= 40
+            && preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]*$/', $manualProductCode) === 1);
     $productCodeReady = $productCodeFormatValid && !$hasDuplicateCode;
     $productCategoryReady = $productCodeReady && (bool) $newProductSelectedCategory;
     $productNameReady = $productCategoryReady && trim((string) $newProductName) !== '';
-    $productSupplierReady = $productNameReady && (int) ($newProductSupplierId ?? 0) > 0;
+    $productSupplierReady = $productNameReady;
 @endphp
 
 @if($catalogReady && $canUseOrderProductSelector)

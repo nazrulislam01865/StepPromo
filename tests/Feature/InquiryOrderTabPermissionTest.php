@@ -27,7 +27,7 @@ class InquiryOrderTabPermissionTest extends TestCase
         $view = $this->inquiryViewSource();
         $productCard = file_get_contents(resource_path('views/components/catalog/detail-products-card.blade.php'));
 
-        $this->assertStringContainsString('<x-catalog.detail-products-card', $view);
+        $this->assertStringContainsString('<x-inquiries.product-rfq-overview', $view);
         $this->assertStringContainsString("'title' => 'Products & quantities'", $productCard);
         $this->assertStringContainsString('@if($canViewInquiryProducts)', $view);
         $this->assertStringContainsString("can(\$user, 'catalog_products', 'view')", $component);

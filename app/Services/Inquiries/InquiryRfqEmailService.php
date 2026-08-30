@@ -30,7 +30,12 @@ final class InquiryRfqEmailService
 
     public function sendInvitation(InquiryRfqInvitation $invitation, string $token): string
     {
-        $inquiry = $invitation->inquiry()->with('items')->firstOrFail();
+        $inquiry = $invitation->relationLoaded('inquiry')
+            && $invitation->inquiry
+            && $invitation->inquiry->relationLoaded('items')
+                ? $invitation->inquiry
+                : $invitation->inquiry()->with('items')->firstOrFail();
+
         return $this->email->sendNow(EmailMessage::view(
             $invitation->supplierEmail(),
             'Quotation requested — '.$inquiry->inquiry_number,

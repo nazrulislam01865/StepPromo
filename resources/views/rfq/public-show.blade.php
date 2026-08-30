@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="robots" content="noindex,nofollow">
     <title>{{ $invitation->inquiry->inquiry_number }} · Supplier quotation</title>
+    <script
+        src="{{ asset('js/flowtrack-image-fallback.js') }}?v={{ \App\Support\FrontendBuildVersion::current() }}"
+        data-fallback-src="{{ asset('images/flowtrack-image-fallback.svg') }}"
+    ></script>
     @vite(['resources/theme/flowtrack/core.css', 'resources/css/app.css'])
 </head>
 <body class="ft-public-rfq-page">

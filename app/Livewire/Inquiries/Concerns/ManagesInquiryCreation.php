@@ -351,10 +351,12 @@ trait ManagesInquiryCreation
         // canonical Product catalog are normalized here before validation.
         $this->createProductRows = collect($this->createProductRows)
             ->map(fn (array $row): array => [
+                'row_key' => trim((string) ($row['row_key'] ?? '')),
                 'product_id' => (int) ($row['product_id'] ?? 0),
                 'category' => trim((string) ($row['category'] ?? '')),
                 'product' => trim((string) ($row['product'] ?? '')),
                 'quantity' => $row['quantity'] ?? 1,
+                'unit' => trim((string) ($row['unit'] ?? 'units')) ?: 'units',
                 'unit_price' => $row['unit_price'] ?? '',
                 'notes' => trim((string) ($row['notes'] ?? '')),
             ])
@@ -387,6 +389,7 @@ trait ManagesInquiryCreation
             'createProductRows.*.category' => ['required', 'string', 'max:255'],
             'createProductRows.*.product' => ['required', 'string', 'max:255'],
             'createProductRows.*.quantity' => ['required', 'integer', 'min:1', 'max:999999999'],
+            'createProductRows.*.unit' => ['required', 'string', 'max:32'],
             'createProductRows.*.unit_price' => ['nullable', 'numeric', 'min:0', 'max:999999999999.99'],
             'createProductRows.*.notes' => ['nullable', 'string', 'max:2000'],
             'createAttachments.*' => AttachmentUpload::itemRules(AttachmentUpload::DOCUMENTS_WITH_AI, 20480),
@@ -481,19 +484,8 @@ trait ManagesInquiryCreation
         }
         if ($catalogInvalid) return;
 
-        $createRfqSupplierIds = $this->validatedCreateRfqSupplierIds();
-        if ($this->getErrorBag()->has('createRfqSupplierIds')) return;
-        if ($createRfqSupplierIds !== []) {
-            if ($this->createRfqDueDate === '') {
-                $this->addError('createRfqDueDate', 'Choose a quotation due date when inviting suppliers.');
-                return;
-            }
-            $rfqDueDate = \Illuminate\Support\Carbon::createFromFormat('Y-m-d', $this->createRfqDueDate)->startOfDay();
-            if ($rfqDueDate->lt(app(WorkspaceSettingsService::class)->localToday()->startOfDay())) {
-                $this->addError('createRfqDueDate', 'Quotation due date cannot be in the past.');
-                return;
-            }
-        }
+        $createRfqPlan = $this->validatedCreateProductRfqPlan();
+        if ($createRfqPlan === null) return;
 
         $workflowQuery = app(\App\Queries\Inquiries\InquiryWorkflowQuery::class);
         $canonicalRows = $workflowQuery->rows(
@@ -528,7 +520,7 @@ trait ManagesInquiryCreation
                 'name' => trim((string) $row['product']),
                 'quantity' => (int) $row['quantity'],
                 'unit_price' => filled($row['unit_price'] ?? null) ? round((float) $row['unit_price'], 2) : null,
-                'unit' => 'pcs',
+                'unit' => trim((string) ($row['unit'] ?? 'units')) ?: 'units',
                 'notes' => trim((string) ($row['notes'] ?? '')),
             ], $data['createProductRows']),
             'tasks' => $tasks,
@@ -538,9 +530,9 @@ trait ManagesInquiryCreation
 
         foreach ($this->createAttachments as $upload) app(\App\Actions\Inquiries\UploadInquiryDocument::class)->handle($inquiry, $upload, auth()->user());
 
-        $rfqDelivery = ['sent' => 0, 'added_without_email' => 0, 'failed' => 0];
-        if (! $draft && $createRfqSupplierIds !== []) {
-            $rfqDelivery = $this->sendCreateRfqInvitations($inquiry, $user, $createRfqSupplierIds);
+        $rfqDelivery = ['sent' => 0, 'drafted' => 0, 'added_without_email' => 0, 'failed' => 0];
+        if (! $draft && $createRfqPlan !== []) {
+            $rfqDelivery = $this->sendCreateProductRfqPlan($inquiry, $user, $createRfqPlan);
         }
 
         $this->showCreate = false;
@@ -554,6 +546,10 @@ trait ManagesInquiryCreation
             $message = $inquiry->inquiry_number.' created with its taskflow tasks.';
             if ($rfqDelivery['sent'] > 0) {
                 $message .= ' '.$rfqDelivery['sent'].' RFQ '.\Illuminate\Support\Str::plural('invitation', $rfqDelivery['sent']).' sent.';
+            }
+            if (($rfqDelivery['drafted'] ?? 0) > 0) {
+                $count = (int) $rfqDelivery['drafted'];
+                $message .= ' '.$count.' RFQ '.\Illuminate\Support\Str::plural('invitation', $count).' saved as draft.';
             }
             if (($rfqDelivery['added_without_email'] ?? 0) > 0) {
                 $count = (int) $rfqDelivery['added_without_email'];
@@ -676,6 +672,7 @@ trait ManagesInquiryCreation
         $this->createAttachments = [];
         $this->resetCreateRfqState();
         $this->createProductRows = [];
+        $this->createProductRfqRows = [];
         $this->createProductCategoryOptions = [];
         $this->createProductSearch = '';
         $this->createProductCategoryFilter = '';

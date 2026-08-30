@@ -268,14 +268,62 @@ const normaliseOptionValue = (value) => String(value ?? '')
         ].join(';');
     };
 
+    const focusElementWithoutScroll = (element) => {
+        if (!element) return null;
+
+        const scrollLeft = window.scrollX;
+        const scrollTop = window.scrollY;
+
+        try {
+            element.focus({preventScroll: true});
+        } catch (_) {
+            // Older engines may not support FocusOptions. Restore the viewport
+            // immediately so opening a teleported search field can never move
+            // the page to the menu's temporary pre-positioned location.
+            element.focus();
+        }
+
+        if (window.scrollX !== scrollLeft || window.scrollY !== scrollTop) {
+            window.scrollTo(scrollLeft, scrollTop);
+        }
+
+        return {scrollLeft, scrollTop};
+    };
+
+    const positionAndFocusDropdown = (component) => {
+        // Position synchronously inside Alpine's post-render tick before focus.
+        // Calling component.reposition() here would add a second tick, allowing
+        // the browser to scroll to the teleported menu before it is anchored.
+        positionDropdown(component);
+        const viewportBeforeFocus = focusElementWithoutScroll(component.$refs?.search);
+
+        // Images, fonts and remote rows can settle after the first measurement.
+        // Re-anchor once more without moving focus or changing page scroll.
+        window.requestAnimationFrame(() => {
+            if (
+                viewportBeforeFocus
+                && (window.scrollX !== viewportBeforeFocus.scrollLeft || window.scrollY !== viewportBeforeFocus.scrollTop)
+            ) {
+                window.scrollTo(viewportBeforeFocus.scrollLeft, viewportBeforeFocus.scrollTop);
+            }
+            if (component.open) positionDropdown(component);
+        });
+    };
+
     const positioningMethods = {
         menuStyle: '',
         reposition() {
             this.$nextTick(() => positionDropdown(this));
         },
         openPositionedMenu() {
+            // A teleported menu initially lives at the end of <body>. Keep that
+            // intermediate frame hidden until its viewport coordinates exist.
+            this.menuStyle = 'visibility:hidden!important;pointer-events:none!important';
             this.open = true;
             this.reposition();
+        },
+        focusSearchWithoutScroll() {
+            positionAndFocusDropdown(this);
         },
     };
 
@@ -337,6 +385,7 @@ export const createRemoteFilter = (config) => {
             menuWidth: Number(config.menuWidth || 320),
             menuMaxHeight: Number(config.menuMaxHeight || REMOTE_MENU_HEIGHT_CAP),
             fixedMenu: config.fixedMenu === true,
+            disabled: config.disabled === true,
             externalAnchorEl: null,
             externalAnchorRect: null,
             open: false,
@@ -386,19 +435,18 @@ export const createRemoteFilter = (config) => {
                 this.message = this.resultMessage('');
             },
             toggle() {
-                if (config.disabled) return;
+                if (this.disabled) return;
                 this.open ? this.close() : this.openMenu();
             },
             openMenu() {
-                if (config.disabled) return;
+                if (this.disabled) return;
                 this.restoreCompactRecentPage();
                 this.openPositionedMenu();
                 // Show the render-provided recent options immediately, then refresh
                 // them in the background so each open reflects current source data.
                 this.searchOptions(true);
                 this.$nextTick(() => {
-                    this.reposition();
-                    this.$refs.search?.focus();
+                    this.focusSearchWithoutScroll();
                 });
             },
             close() {
@@ -545,6 +593,10 @@ export const createRemoteFilter = (config) => {
             },
             sync(value, label) {
                 this.syncSelection({ value, label }, this.params, this.items);
+            },
+            syncDisabled(disabled = false) {
+                this.disabled = disabled === true;
+                if (this.disabled && this.open) this.close();
             },
             syncSelection(selection, params = {}, serverItems = []) {
                 const nextParams = params && typeof params === 'object' ? {...params} : {};
@@ -751,7 +803,7 @@ export const createMultiSelect = (config) => {
                 if (this.remote) this.restoreCompactRecentPage();
                 this.openPositionedMenu();
                 if (this.remote) this.searchOptions(true);
-                this.$nextTick(() => { this.reposition(); this.$refs.search?.focus(); });
+                this.$nextTick(() => this.focusSearchWithoutScroll());
             },
             close() {
                 this.open = false;
@@ -908,12 +960,12 @@ export const createLocalFilter = (config) => ({
 
             this.openPositionedMenu();
             this.$nextTick(() => {
-                this.reposition();
-                this.$refs.search?.focus();
+                this.focusSearchWithoutScroll();
             });
         },
         close() {
             this.open = false;
+            this.menuStyle = '';
             this.query = '';
         },
         focusFirst() {

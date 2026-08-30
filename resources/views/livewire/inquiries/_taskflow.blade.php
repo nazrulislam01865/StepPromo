@@ -69,9 +69,11 @@
                         <x-ui.inline-save-state compact />
                     @endif
                 </div>
+                <div class="ft-inquiry-task-status-resources">
                 <div class="task-status-cell">
                     <span
                         class="ft-task-inline-status-shell ft-inline-edit-shell"
+                        wire:key="inquiry-task-status-{{ $task->id }}-{{ md5((string) $task->status.'|'.($task->completed_at?->getTimestamp() ?? 'open')) }}"
                         x-data="window.FlowTrack.ui.inlineEdit({ key: @js('inquiry-task-'.$task->id.'-status'), label: 'task status', value: @js($task->status), display: @js($task->status) })"
                         :class="{ 'is-inline-saving': status === 'saving', 'is-inline-error': status === 'error' }"
                     >
@@ -133,6 +135,7 @@
                         </div>
                     @endif
                     <span class="ft-inquiry-task-resource-count"><b>{{ $task->documents_count }}</b> file{{ $task->documents_count === 1 ? '' : 's' }}@if($taskLinkCount > 0) · <b>{{ $taskLinkCount }}</b> link{{ $taskLinkCount === 1 ? '' : 's' }}@endif</span>
+                </div>
                 </div>
                 <div class="ft-inquiry-task-action">
                     @if($state === 'done')

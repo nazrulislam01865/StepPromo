@@ -340,3 +340,9 @@ button {
         transform: none;
     }
 }
+
+/* Login uses its own stylesheet instead of app.css. */
+img.ft-image-fallback {
+    object-fit: contain !important;
+    object-position: center !important;
+}

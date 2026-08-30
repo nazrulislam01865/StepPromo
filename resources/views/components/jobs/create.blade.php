@@ -4,13 +4,13 @@
     'clientFilterOptions'=>collect(),'ownerFilterOptions'=>collect(),'workflowFilterOptions'=>collect(),'categoryFilterOptions'=>collect(),
     'productCategories'=>collect(),'productSearchResults'=>collect(),'productSearchSuppliers'=>collect(),'selectedProductDetails'=>collect(),'selectedProductSuppliers'=>collect(),'createOrderSupplierSkipProductIds'=>[],'activeProductCount'=>0,'productResultTotal'=>0,
     'canUseOrderProductSelector'=>false,'canCreateCatalogProduct'=>false,'canViewProductCategories'=>false,'canCreateProductCategory'=>false,'duplicateProduct'=>null,'newProductCategoryMatches'=>collect(),'newProductSimilarCategories'=>collect(),
-    'newProductSimilarProducts'=>collect(),'newProductSelectedCategory'=>null,'newProductHasExactCategory'=>false,'newProductImagePreview'=>null,
+    'newProductSimilarProducts'=>collect(),'newProductSelectedCategory'=>null,'newProductHasExactCategory'=>false,'newProductImagePreview'=>null,'newProductSupplierOptions'=>collect(),
     'createProductSearch'=>'','createProductCategoryFilter'=>'','createProductShowAllResults'=>false,'showCreateOrderProductModal'=>false,
     'showMissingProductSupplierModal'=>false,'missingProductSupplierName'=>'',
     'newProductCode'=>'','newProductCategoryId'=>null,'newProductCategorySearch'=>'','newProductCategoryName'=>'','newProductName'=>'','newProductSupplierId'=>null,
     'catalogReady'=>false,'assignmentReady'=>false,'workflowReady'=>false,'workflowSelectorVersion'=>0,'workflowPhaseId'=>null,'mentionUsers'=>collect(),
     'savedShippingAddresses'=>collect(),'showSavedShippingAddressPicker'=>false,'shippingSourceAddressId'=>null,
-    'phoneCountryCodeOptions'=>collect(),'shippingPhoneCountryCode'=>'','orderTitlePreview'=>'',
+    'phoneCountryCodeOptions'=>collect(),'shippingPhoneCountryCode'=>'',
 ])
 @php
     $selectedClient = $clients->firstWhere('id', (int)$clientId);
@@ -59,7 +59,6 @@
                 </div>
                 <label class="ft-create-field"><b>Client contact</b><input value="{{ $selectedClient?->contact_name ?? 'No contact recorded' }}" readonly></label>
                 <label class="ft-create-field"><b>Client Reference Number *</b><input wire:model.live.debounce.300ms="referenceNumber" required aria-required="true" placeholder="e.g. FO-333119 or customer PO number">@error('referenceNumber')<small class="validation-error">{{ $message }}</small>@enderror</label>
-                <label class="ft-create-field"><b>Order Title</b><input value="{{ $orderTitlePreview }}" readonly aria-readonly="true" placeholder="Generated automatically after adding a product"></label>
                 <div class="ft-create-field ft-repeat-order-option">
                     <b>Repeated order</b>
                     <label class="ft-repeat-order-check">

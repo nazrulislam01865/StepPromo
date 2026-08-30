@@ -19,14 +19,14 @@
 
         <div class="ft-product-create-body">
             <div class="ft-product-create-field ft-product-sequence-field is-current-step">
-                <label><b class="ft-product-step-number">1</b> SKU / Product code <span>*</span></label>
+                <label><b class="ft-product-step-number">1</b> SKU / Product code <em>Optional</em></label>
                 <div class="ft-product-create-input-wrap {{ $hasDuplicateCode ? 'is-duplicate' : (($manualProductCode !== '' && !$productCodeFormatValid) ? 'has-warning' : ($productCodeReady ? 'is-valid' : '')) }}">
                     <input
                         type="text"
                         wire:model.live.debounce.220ms="newProductCode"
                         maxlength="40"
                         autocomplete="off"
-                        placeholder="Enter product code, e.g. TS-SUB-001"
+                        placeholder="Leave blank to generate automatically"
                         aria-describedby="ft-new-product-code-help"
                     >
                     @if($hasDuplicateCode || ($manualProductCode !== '' && !$productCodeFormatValid))
@@ -60,7 +60,7 @@
                     @if($manualProductCode !== '' && !$productCodeFormatValid)
                         <small id="ft-new-product-code-help" class="ft-product-step-error">Use letters, numbers, dots, dashes or underscores only. Maximum 40 characters.</small>
                     @else
-                        <small id="ft-new-product-code-help">Enter the SKU / product code manually. It must be unique. Category selection unlocks after a valid code is entered.</small>
+                        <small id="ft-new-product-code-help">Optional. Enter your own unique SKU, or leave this blank and FlowTrack will generate one automatically.</small>
                     @endif
                 @endif
                 @error('newProductCode')<div class="validation-error">{{ $message }}</div>@enderror
@@ -78,7 +78,7 @@
                             x-on:focus="categoryOpen = true"
                             x-on:click="categoryOpen = true"
                             x-on:keydown.escape="categoryOpen = false"
-                            placeholder="{{ $productCodeReady ? 'Search or create a category' : 'Enter product code first' }}"
+                            placeholder="{{ $productCodeReady ? 'Search or create a category' : 'Fix the SKU format first' }}"
                             autocomplete="off"
                             aria-label="Product category"
                             @disabled(!$productCodeReady)
@@ -144,7 +144,7 @@
                     </div>
                 </div>
                 @if(!$productCodeReady)
-                    <small class="ft-product-step-hint">Complete step 1 with a valid, unused SKU / product code to unlock category selection.</small>
+                    <small class="ft-product-step-hint">Fix the SKU before continuing, or clear it to let FlowTrack generate one automatically.</small>
                 @elseif(!$newProductSelectedCategory)
                     <small class="ft-product-step-hint">Select an existing category or create a new category before continuing.</small>
                 @endif
@@ -186,38 +186,33 @@
                 @error('newProductName')<div class="validation-error">{{ $message }}</div>@enderror
             </div>
 
-            <div class="ft-product-create-field ft-product-sequence-field {{ !$productNameReady ? 'is-step-locked' : '' }}">
-                <label><b class="ft-product-step-number">4</b> Default supplier <span>*</span></label>
+            <div class="ft-product-create-field ft-product-sequence-field">
+                <label><b class="ft-product-step-number">4</b> Default supplier <em>Optional</em></label>
                 <x-ui.search-select
                     class="ft-product-create-supplier-select"
                     label="Default supplier"
                     property="newProductSupplierId"
-                    type="suppliers"
-                    context="create-job"
+                    :options="$newProductSupplierOptions"
                     :value="$newProductSupplierId"
                     placeholder="Select supplier"
-                    :clearable="false"
-                    :required="true"
+                    :clearable="true"
+                    :required="false"
                     :hide-label="true"
                     :fixed-menu="true"
                     :menu-width="360"
-                    :disabled="!$productNameReady"
-                    search-placeholder="Search supplier…"
+                    search-placeholder="Search supplier by name or code…"
+                    footer-message="Active suppliers from Supplier Master Data."
                 />
-                @if(!$productNameReady)
-                    <small class="ft-product-step-hint">Complete step 3 first. Supplier selection unlocks after the product name is entered.</small>
-                @else
-                    <small class="ft-product-step-hint">This supplier is saved on the Product and will be filled automatically when the Product is added to an Order.</small>
-                @endif
+                <small class="ft-product-step-hint">Optional. Choose any active supplier from Supplier Master Data, or leave this empty and assign one later.</small>
                 @error('newProductSupplierId')<div class="validation-error">{{ $message }}</div>@enderror
             </div>
 
-            <div class="ft-product-create-field ft-product-create-image-field ft-product-sequence-field {{ !$productSupplierReady ? 'is-step-locked' : '' }}">
+            <div class="ft-product-create-field ft-product-create-image-field ft-product-sequence-field {{ !$productNameReady ? 'is-step-locked' : '' }}">
                 <label><b class="ft-product-step-number">5</b> Product image <em>Optional</em></label>
                 <div class="ft-product-create-image-row">
                     <div
-                        class="ft-product-drop-zone {{ !$productSupplierReady ? 'is-step-disabled' : '' }}"
-                        @if($productSupplierReady)
+                        class="ft-product-drop-zone {{ !$productNameReady ? 'is-step-disabled' : '' }}"
+                        @if($productNameReady)
                             :class="dragging ? 'is-dragging' : ''"
                             x-on:dragover.prevent="dragging = true"
                             x-on:dragleave.prevent="dragging = false"
@@ -231,18 +226,18 @@
                             aria-disabled="true"
                         @endif
                     >
-                        @if($productSupplierReady)
+                        @if($productNameReady)
                             <input x-ref="orderProductFile" type="file" wire:model="newProductImage" accept="image/png,image/jpeg,image/webp" tabindex="-1">
                         @endif
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 5h16v14H4z"/><path d="m7 16 3.5-4 3 3 2-2 2.5 3"/><circle cx="15.5" cy="9" r="1.4"/></svg>
                         <div>
-                            @if($productSupplierReady)
+                            @if($productNameReady)
                                 <strong wire:loading.remove wire:target="newProductImage">Drop an image here or <span>browse</span></strong>
                                 <strong wire:loading wire:target="newProductImage">Preparing image...</strong>
                                 <small>PNG, JPG or WEBP&nbsp;&nbsp;&bull;&nbsp;&nbsp;Max 5 MB</small>
                             @else
-                                <strong>Complete supplier selection first</strong>
-                                <small>Image upload unlocks after steps 1–4 are complete.</small>
+                                <strong>Complete the product name first</strong>
+                                <small>Image upload unlocks after the required product details are complete.</small>
                             @endif
                         </div>
                     </div>
@@ -254,8 +249,8 @@
                         @endif
                     </div>
                 </div>
-                @if(!$productSupplierReady)
-                    <small class="ft-product-step-hint">Complete step 4 to enable the optional product image.</small>
+                @if(!$productNameReady)
+                    <small class="ft-product-step-hint">Complete step 3 to enable the optional product image.</small>
                 @endif
                 @error('newProductImage')<div class="validation-error">{{ $message }}</div>@enderror
             </div>
@@ -293,7 +288,7 @@
                     wire:click="createAndAddOrderProduct"
                     wire:loading.attr="disabled"
                     wire:target="createAndAddOrderProduct,newProductImage"
-                    @disabled(!$productSupplierReady || $hasDuplicateCode)
+                    @disabled(!$productNameReady || $hasDuplicateCode)
                 >Create &amp; add product</button>
             </div>
         </div>

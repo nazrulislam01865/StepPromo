@@ -44,16 +44,35 @@ trait ManagesInquiryCreateProducts
     {
         $this->authorizeCreateInquiryProducts();
         abort_if(count($this->createProductRows) >= 25, 422, 'An Inquiry can contain up to 25 product rows.');
-        $this->createProductRows[] = ['category' => '', 'product' => '', 'quantity' => 1, 'unit_price' => ''];
+        $this->createProductRows[] = ['row_key' => (string) \Illuminate\Support\Str::uuid(), 'category' => '', 'product' => '', 'quantity' => 1, 'unit' => 'units', 'unit_price' => ''];
+        $this->createProductRfqRows[] = $this->newCreateProductRfqState();
     }
 
     public function removeCreateProductRow(int $index): void
     {
         $this->authorizeCreateInquiryProducts();
         abort_unless(array_key_exists($index, $this->createProductRows), 422);
-        unset($this->createProductRows[$index]);
+        unset($this->createProductRows[$index], $this->createProductRfqRows[$index]);
         $this->createProductRows = array_values($this->createProductRows);
-        $this->resetValidation('createProductRows');
+        $this->createProductRfqRows = array_values($this->createProductRfqRows);
+        $this->syncLegacyCreateRfqState();
+        $this->resetValidation(['createProductRows', 'createProductRfqRows']);
+    }
+
+    public function duplicateCreateProductRow(int $index): void
+    {
+        $this->authorizeCreateInquiryProducts();
+        abort_unless(array_key_exists($index, $this->createProductRows), 422);
+        abort_if(count($this->createProductRows) >= 25, 422, 'An Inquiry can contain up to 25 products.');
+
+        $row = $this->createProductRows[$index];
+        $row['row_key'] = (string) \Illuminate\Support\Str::uuid();
+        $this->createProductRows[] = $row;
+        $this->createProductRfqRows[] = $this->normaliseCreateProductRfqState(
+            $this->createProductRfqRows[$index] ?? []
+        );
+        $this->syncLegacyCreateRfqState();
+        $this->resetValidation(['createProductRows', 'createProductRfqRows']);
     }
 
     public function updatedCreateProductSearch(): void
@@ -104,15 +123,27 @@ trait ManagesInquiryCreateProducts
             $basePrice = $product->productPriceForQuantity($defaultQuantity);
 
             $this->createProductRows[] = [
+                'row_key' => (string) \Illuminate\Support\Str::uuid(),
                 'product_id' => (int) $product->id,
                 'category' => $productCategory,
                 'product' => (string) $product->name,
                 'quantity' => $defaultQuantity,
+                'unit' => 'units',
                 'unit_price' => $basePrice !== null ? number_format($basePrice, 2, '.', '') : '',
                 'notes' => '',
             ];
+
+            // Each product owns its RFQ state. The Product Master default Supplier
+            // is seeded into that product only, matching the prototype while the
+            // final invitation plan is still de-duplicated by supplier on save.
+            $this->createProductRfqRows[] = $this->newCreateProductRfqState($product);
+            $this->syncLegacyCreateRfqState();
         }
 
+        // Keep the product search permanently available for the next product.
+        // Clear only its query after a selection so the selector returns to a
+        // neutral state without hiding or muting the control.
+        $this->createProductSearch = '';
         $this->createProductShowAllResults = false;
         $this->resetValidation('createProductRows');
         $this->dispatch('create-order-product-selected');

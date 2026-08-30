@@ -58,8 +58,9 @@
     $componentId = 'ft-search-select-'.substr(md5($property.'|'.$type.'|'.$context.'|'.$label), 0, 12);
 @endphp
 <div
-    {{ $attributes->class(['ft-jl-control', 'ft-remote-filter', 'ft-search-select', 'is-disabled' => $disabled]) }}
+    {{ $attributes->class(['ft-jl-control', 'ft-remote-filter', 'ft-search-select']) }}
     data-ft-ui-component="search-select"
+    x-bind:class="{ 'is-disabled': disabled }"
     @if($remote)
         x-data="window.FlowTrack.ui.searchSelect({
             property: @js($property),
@@ -75,7 +76,7 @@
             menuWidth: @js((int) $menuWidth),
             fixedMenu: @js((bool) $fixedMenu),
         })"
-        x-effect="syncSelection(@js(['value' => (string) $value, 'label' => $resolvedLabel]), @js($params), @js($items->all()))"
+        x-effect="syncSelection(@js(['value' => (string) $value, 'label' => $resolvedLabel]), @js($params), @js($items->all())); syncDisabled(@js((bool) $disabled))"
     @else
         x-data="window.FlowTrack.ui.localFilter({
             property: @js($property),
@@ -106,7 +107,7 @@
         @unless($hideLabel) aria-labelledby="{{ $componentId }}-label" @else aria-label="{{ $label }}" @endunless
         x-on:click.stop="toggle()"
         :aria-expanded="open.toString()"
-        @disabled($disabled)
+        x-bind:disabled="disabled"
     >
         @if($showAvatar)
             <span class="ft-search-select__selected-user">
@@ -131,9 +132,13 @@
         <span class="ft-filter-chevron" aria-hidden="true">⌄</span>
     </button>
 
+    @if($fixedMenu)
+        <template x-teleport="body">
+    @endif
     <div
         x-ref="menu"
-        class="ft-remote-filter-menu ft-search-select__menu"
+        class="ft-remote-filter-menu ft-search-select__menu{{ $showAvatar ? ' ft-search-select__menu--people' : '' }}"
+        data-ft-search-select-context="{{ $context }}"
         x-cloak
         x-bind:style="open ? menuStyle + ';display:flex!important;' : 'display:none!important;'"
         x-on:click.outside="close()"
@@ -208,4 +213,7 @@
         <div class="ft-remote-filter-message" x-text="message"></div>
         @if($footerMessage)<div class="ft-remote-filter-message">{{ $footerMessage }}</div>@endif
     </div>
+    @if($fixedMenu)
+        </template>
+    @endif
 </div>

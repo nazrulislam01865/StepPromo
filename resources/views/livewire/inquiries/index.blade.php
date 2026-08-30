@@ -44,11 +44,17 @@
         'date_from' => filled($dateFrom) ? $dateFrom : null,
         'date_to' => filled($dateTo) ? $dateTo : null,
     ], static fn ($value) => $value !== null && $value !== '');
+    // RFQ delivery failures are represented in the product workspace itself.
+    // Keep the generic page banner for genuine form/validation errors only.
+    $pageError = collect($errors->getBag('default')->messages())
+        ->except(['rfqDelivery'])
+        ->flatten()
+        ->first();
 @endphp
 
 <div class="ft-inquiry-prototype">
     @if(session('success'))<div class="flash-inline">{{ session('success') }}</div>@endif
-    @if($mode !== 'create' && $errors->any())<div class="error-inline">{{ $errors->first() }}</div>@endif
+    @if($mode !== 'create' && filled($pageError))<div class="error-inline">{{ $pageError }}</div>@endif
 
     @if($mode === 'list')
         @include('livewire.inquiries.sections.list')

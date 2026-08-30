@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Jobs\Concerns;
 
-use App\DTOs\Orders\OrderCreateData;
 use App\Queries\Inquiries\InquiryDetailQuery;
 use App\Queries\Orders\OrderListQuery;
 use App\Queries\Orders\VisibleOrderQuery;
@@ -140,8 +139,26 @@ trait BuildsOrderPageData
         $newProductSelectedCategory = null;
         $newProductHasExactCategory = false;
         $newProductImagePreview = null;
+        $newProductSupplierOptions = collect();
 
         if ($canUseOrderProductSelector && $this->showCreateOrderProductModal) {
+            // This optional picker is intentionally local inside the modal. Loading
+            // the canonical active Supplier Master Data rows up front avoids a
+            // second remote-dropdown lifecycle fighting Livewire modal morphs, and
+            // guarantees that clicking the field always opens the real supplier list.
+            $newProductSupplierOptions = MasterRecord::query()
+                ->forWorkspace($workspaceId)
+                ->ofType('supplier')
+                ->active()
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'name', 'code'])
+                ->map(fn (MasterRecord $supplier) => [
+                    'id' => (string) $supplier->id,
+                    'label' => (string) $supplier->name,
+                    'meta' => trim((string) $supplier->code),
+                ])
+                ->values();
             $code = trim($this->newProductCode);
             if ($code !== '') {
                 $duplicateProduct = MasterRecord::withTrashed()
@@ -224,15 +241,6 @@ trait BuildsOrderPageData
             }
         }
 
-        $orderTitlePreview = '';
-        $hasPreviewProduct = collect($this->jobItems)->contains(
-            fn (array $item): bool => filled(trim((string) ($item['product'] ?? '')))
-        );
-
-        if (filled(trim($this->referenceNumber)) && $hasPreviewProduct) {
-            $orderTitlePreview = OrderCreateData::generateTitle($this->referenceNumber, $this->jobItems);
-        }
-
         return [
             'selectedJob' => null,
             'selectedTask' => null,
@@ -288,8 +296,8 @@ trait BuildsOrderPageData
             'newProductSelectedCategory' => $newProductSelectedCategory,
             'newProductHasExactCategory' => $newProductHasExactCategory,
             'newProductImagePreview' => $newProductImagePreview,
+            'newProductSupplierOptions' => $newProductSupplierOptions,
             'mentionUsers' => app(\App\Services\MentionService::class)->optionsForCreate($user),
-            'orderTitlePreview' => $orderTitlePreview,
         ];
     }
 

@@ -99,6 +99,11 @@ class Index extends Component
     public array $createRfqSupplierIds = [];
     public string $createRfqDueDate = '';
     public string $createRfqMessage = 'Please quote your best unit price, lead time, shipping and sample options.';
+
+    // Product-scoped RFQ composer state used by Create Inquiry. It intentionally
+    // lives beside the product rows so every selected product owns its suppliers,
+    // due date, message and send/draft choice without introducing N+1 queries.
+    public array $createProductRfqRows = [];
     public array $createProductRows = [];
     public array $createProductCategoryOptions = [];
     public string $createProductSearch = '';

@@ -112,15 +112,19 @@ class InquiryPrototypeImplementationTest extends TestCase
         $this->assertStringContainsString("The separate Taskflow tab was removed", $component);
         $this->assertStringContainsString("in_array(\$tab, ['overview', 'workflow'], true)", $component);
         $this->assertStringContainsString('<button class="tab active" type="button">Overview</button>', $view);
-        $this->assertStringContainsString('<x-catalog.detail-products-card', $view);
+        $this->assertStringContainsString('<x-inquiries.product-rfq-overview', $view);
         $this->assertStringNotContainsString("setDetailTab('products')", $view);
         $this->assertStringNotContainsString("setDetailTab('finance')", $view);
         $this->assertStringNotContainsString("setDetailTab('documents')", $view);
         $this->assertStringNotContainsString("setDetailTab('activity')", $view);
         $this->assertStringContainsString("@include('livewire.inquiries._attachments')", $view);
         $this->assertStringContainsString("@include('livewire.inquiries._activity')", $view);
+        $this->assertStringContainsString('progressive-section-loader section="activity"', $view);
+        $this->assertStringContainsString('ft-inquiry-overview-activity-card', file_get_contents(resource_path('views/livewire/inquiries/_activity.blade.php')));
+        $this->assertStringContainsString("if (in_array(\$tab, ['workflow', 'activity'], true)) \$tab = 'overview';", $component);
+        $this->assertStringContainsString("in_array(\$tab, ['overview', 'rfq', 'comparison'], true)", $component);
         $this->assertStringContainsString("\$this->detailTab === 'overview' && \$user->canModule('documents', 'view') ? \$detailQuery->documents", $component);
-        $this->assertStringContainsString("\$this->detailTab === 'overview' ? \$detailQuery->activity", $component);
+        $this->assertStringContainsString("\$this->detailTab === 'overview' && \$detailSectionsReady['activity'] ? \$detailQuery->activity", $component);
         $this->assertStringContainsString('#[Renderless]', $component);
     }
 

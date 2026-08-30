@@ -49,7 +49,7 @@ unset($__defined_vars, $__key, $__value); ?>
 ?>
 <span <?php echo e($attributes->class(['ft-client-logo-mark', $shapeClass, 'is-archived' => $archived])->merge(['style' => "--ft-client-logo-size:{$size}px"])); ?> aria-hidden="true">
     <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($imageUrl): ?>
-        <img src="<?php echo e($imageUrl); ?>" alt="" loading="lazy" decoding="async" onerror="this.hidden=true;this.nextElementSibling.hidden=false">
+        <img src="<?php echo e($imageUrl); ?>" alt="" loading="lazy" decoding="async" data-ft-image-fallback="icon">
         <span class="ft-client-logo-fallback" hidden><?php echo e($initials); ?></span>
     <?php else: ?>
         <span class="ft-client-logo-fallback"><?php echo e($initials); ?></span>

@@ -7,7 +7,7 @@ use Tests\Support\OrderPhase5Source;
 
 class ProductCreationSequenceTest extends TestCase
 {
-    public function test_order_and_inquiry_product_creation_require_code_before_category(): void
+    public function test_order_quick_create_allows_generated_code_and_optional_supplier_while_inquiry_keeps_its_sequence(): void
     {
         $orderView = OrderPhase5Source::createProductsView();
         $inquiryView = file_get_contents(resource_path('views/components/inquiries/create-products.blade.php'));

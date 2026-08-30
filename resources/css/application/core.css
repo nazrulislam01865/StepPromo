@@ -20,3 +20,6 @@
 @import '../modules/application/19-board-load-more.css';
 @import '../modules/application/20-inquiry-rfq.css';
 @import '../modules/application/21-inquiry-create-rfq.css';
+@import '../modules/application/22-inquiry-product-rfq-prototype.css';
+@import '../modules/application/23-inquiry-product-rfq-overview.css';
+@import '../modules/application/24-inquiry-rfq-product-workspace.css';

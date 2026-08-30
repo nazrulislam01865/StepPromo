@@ -1066,3 +1066,1375 @@
         max-height: 528px;
     }
 }
+
+/* Inquiry Details > RFQ management workspace --------------------------------------
+ * Prototype-matched management table. Kept under dedicated class names so the
+ * comparison statement, supplier portal and email preview remain unaffected.
+ */
+.ft-rfq-management-pane {
+    gap: 0;
+    padding-top: 12px;
+}
+
+.ft-rfq-workspace-card {
+    overflow: hidden;
+    border: 1px solid var(--ft-border-default);
+    border-radius: 10px;
+    background: var(--ft-bg-surface);
+    box-shadow: var(--ft-shadow-xs);
+}
+
+.ft-rfq-workspace-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 16px 16px 10px;
+}
+
+.ft-rfq-workspace-heading {
+    min-width: 0;
+}
+
+.ft-rfq-workspace-heading h2 {
+    margin: 0;
+    color: var(--ft-text-primary);
+    font-size: var(--ft-font-size-lg);
+    font-weight: var(--ft-font-weight-bold);
+    line-height: var(--ft-line-height-tight);
+}
+
+.ft-rfq-workspace-heading p {
+    margin: 4px 0 0;
+    color: var(--ft-text-secondary);
+    font-size: .6875rem;
+    line-height: 1.45;
+}
+
+.ft-rfq-add-supplier-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 108px;
+    min-height: 36px;
+    padding: 0 15px;
+    border: 1px solid var(--ft-color-brand-primary);
+    border-radius: 6px;
+    background: var(--ft-color-brand-primary);
+    color: var(--ft-text-inverse);
+    font: inherit;
+    font-size: .6875rem;
+    font-weight: var(--ft-font-weight-bold);
+    cursor: pointer;
+    transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+
+.ft-rfq-add-supplier-btn:hover {
+    border-color: var(--ft-color-brand-primary-hover);
+    background: var(--ft-color-brand-primary-hover);
+}
+
+.ft-rfq-add-supplier-btn:focus-visible,
+.ft-rfq-email-settings-btn:focus-visible,
+.ft-rfq-row-action:focus-visible,
+.ft-rfq-send-selected-btn:focus-visible,
+.ft-rfq-clear-selection-btn:focus-visible,
+.ft-rfq-pagination button:focus-visible,
+.ft-rfq-master-checkbox:focus-visible {
+    outline: 0;
+    box-shadow: var(--ft-focus-ring);
+}
+
+.ft-rfq-add-supplier-btn:disabled,
+.ft-rfq-send-selected-btn:disabled,
+.ft-rfq-row-action:disabled {
+    cursor: wait;
+    opacity: var(--ft-disabled-opacity);
+}
+
+.ft-rfq-workspace-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px 12px;
+}
+
+.ft-rfq-workspace-search,
+.ft-rfq-workspace-filter {
+    position: relative;
+    display: block;
+}
+
+.ft-rfq-workspace-search {
+    flex: 0 1 282px;
+    min-width: 220px;
+}
+
+.ft-rfq-workspace-filter {
+    flex: 0 0 214px;
+}
+
+.ft-rfq-workspace-search > svg {
+    position: absolute;
+    top: 50%;
+    left: 12px;
+    width: 17px;
+    height: 17px;
+    transform: translateY(-50%);
+    stroke: var(--ft-text-secondary);
+    stroke-width: 1.8;
+    pointer-events: none;
+}
+
+.ft-rfq-workspace-filter > svg {
+    position: absolute;
+    top: 50%;
+    right: 12px;
+    width: 16px;
+    height: 16px;
+    transform: translateY(-50%);
+    stroke: var(--ft-text-secondary);
+    stroke-width: 1.8;
+    pointer-events: none;
+}
+
+.ft-rfq-workspace-search input,
+.ft-rfq-workspace-filter select,
+.ft-rfq-email-settings-btn {
+    width: 100%;
+    height: 40px;
+    border: 1px solid var(--ft-border-strong);
+    border-radius: 6px;
+    background: var(--ft-bg-surface);
+    color: var(--ft-text-primary);
+    font: inherit;
+    font-size: .6875rem;
+}
+
+.ft-rfq-workspace-search input {
+    padding: 0 12px 0 38px;
+}
+
+.ft-rfq-workspace-search input::placeholder {
+    color: var(--ft-text-tertiary, var(--ft-text-secondary));
+}
+
+.ft-rfq-workspace-filter select {
+    padding: 0 36px 0 13px;
+    appearance: none;
+    cursor: pointer;
+}
+
+.ft-rfq-workspace-search input:focus,
+.ft-rfq-workspace-filter select:focus {
+    border-color: var(--ft-focus-border);
+    outline: 0;
+    box-shadow: var(--ft-focus-ring);
+}
+
+.ft-rfq-email-settings-btn {
+    display: inline-flex;
+    width: auto;
+    min-width: 150px;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 13px;
+    font-weight: var(--ft-font-weight-semibold);
+    line-height: 1;
+    cursor: pointer;
+}
+
+.ft-rfq-email-settings-btn:hover {
+    background: var(--ft-bg-surface-hover);
+}
+
+.ft-rfq-email-settings-btn svg {
+    display: block;
+    width: 17px;
+    height: 17px;
+    flex: 0 0 17px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.ft-rfq-email-settings-btn > span {
+    display: block;
+    line-height: 1.2;
+}
+
+.ft-rfq-selection-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 44px;
+    margin: 0 16px 10px;
+    padding: 7px 12px;
+    border: 1px solid #ccebe4;
+    border-radius: 6px;
+    background: #effbf8;
+}
+
+.ft-rfq-selection-copy,
+.ft-rfq-selection-actions {
+    display: flex;
+    align-items: center;
+}
+
+.ft-rfq-selection-copy {
+    gap: 9px;
+    min-width: 0;
+    color: var(--ft-text-primary);
+    font-size: .6875rem;
+}
+
+.ft-rfq-selection-copy strong {
+    font-weight: var(--ft-font-weight-semibold);
+}
+
+.ft-rfq-selection-check {
+    display: inline-grid;
+    width: 18px;
+    height: 18px;
+    place-items: center;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: var(--ft-color-brand-primary);
+}
+
+.ft-rfq-selection-check svg {
+    width: 12px;
+    height: 12px;
+    stroke: var(--ft-text-inverse);
+    stroke-width: 2.2;
+}
+
+.ft-rfq-selection-actions {
+    gap: 14px;
+    flex: 0 0 auto;
+}
+
+.ft-rfq-send-selected-btn {
+    min-height: 32px;
+    padding: 0 16px;
+    border: 1px solid var(--ft-color-brand-primary);
+    border-radius: 5px;
+    background: var(--ft-color-brand-primary);
+    color: var(--ft-text-inverse);
+    font: inherit;
+    font-size: .6875rem;
+    font-weight: var(--ft-font-weight-bold);
+    cursor: pointer;
+}
+
+.ft-rfq-send-selected-btn:hover {
+    border-color: var(--ft-color-brand-primary-hover);
+    background: var(--ft-color-brand-primary-hover);
+}
+
+.ft-rfq-clear-selection-btn {
+    padding: 4px 0;
+    border: 0;
+    background: transparent;
+    color: var(--ft-color-brand-primary);
+    font: inherit;
+    font-size: .6875rem;
+    font-weight: var(--ft-font-weight-semibold);
+    cursor: pointer;
+}
+
+.ft-rfq-clear-selection-btn:hover {
+    text-decoration: underline;
+}
+
+.ft-rfq-workspace-alert {
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 9px;
+    min-height: 44px;
+    margin: 0 16px 10px;
+    padding: 8px 12px;
+    border: 1px solid var(--ft-border-danger);
+    border-radius: 6px;
+    background: var(--ft-bg-danger);
+    color: var(--ft-text-danger);
+    font-size: .6875rem;
+    font-weight: var(--ft-font-weight-medium);
+}
+
+.ft-rfq-workspace-alert-icon {
+    display: inline-grid;
+    width: 17px;
+    height: 17px;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--ft-text-danger);
+    color: #fff;
+    font-size: .625rem;
+    font-weight: 800;
+}
+
+.ft-rfq-workspace-alert > button {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--ft-text-secondary);
+    font: inherit;
+    font-size: 1.125rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.ft-rfq-management-table-shell {
+    overflow: hidden;
+    margin: 0 16px 16px;
+    border: 1px solid var(--ft-border-default);
+    border-radius: 7px;
+    background: var(--ft-bg-surface);
+}
+
+.ft-rfq-management-scroll {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.ft-rfq-management-table {
+    width: 100%;
+    min-width: 920px;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.ft-rfq-management-table th,
+.ft-rfq-management-table td {
+    border-bottom: 1px solid var(--ft-border-subtle);
+    text-align: left;
+    vertical-align: middle;
+}
+
+.ft-rfq-management-table th {
+    height: 34px;
+    padding: 7px 10px;
+    background: var(--ft-bg-surface-subtle);
+    color: var(--ft-text-secondary);
+    font-size: .5625rem;
+    font-weight: var(--ft-font-weight-bold);
+    letter-spacing: .045em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.ft-rfq-management-table td {
+    min-height: 54px;
+    padding: 9px 10px;
+    color: var(--ft-text-primary);
+    font-size: .6875rem;
+}
+
+.ft-rfq-management-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.ft-rfq-management-table tbody tr:hover td {
+    background: var(--ft-bg-surface-hover);
+}
+
+.ft-rfq-management-table th:nth-child(1),
+.ft-rfq-management-table td:nth-child(1) { width: 42px; }
+.ft-rfq-management-table th:nth-child(2),
+.ft-rfq-management-table td:nth-child(2) { width: 18%; }
+.ft-rfq-management-table th:nth-child(3),
+.ft-rfq-management-table td:nth-child(3) { width: 21%; }
+.ft-rfq-management-table th:nth-child(4),
+.ft-rfq-management-table td:nth-child(4) { width: 18%; }
+.ft-rfq-management-table th:nth-child(5),
+.ft-rfq-management-table td:nth-child(5) { width: 13%; }
+.ft-rfq-management-table th:nth-child(6),
+.ft-rfq-management-table td:nth-child(6) { width: 17%; }
+.ft-rfq-management-table th:nth-child(7),
+.ft-rfq-management-table td:nth-child(7) { width: 125px; }
+
+.ft-rfq-management-table .ft-rfq-checkbox-col {
+    text-align: center;
+}
+
+.ft-rfq-row-checkbox {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: var(--ft-color-brand-primary);
+    cursor: pointer;
+}
+
+.ft-rfq-row-checkbox:disabled {
+    cursor: not-allowed;
+    opacity: .38;
+}
+
+.ft-rfq-master-checkbox {
+    display: inline-grid;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    place-items: center;
+    border: 1px solid var(--ft-border-strong);
+    border-radius: 3px;
+    background: var(--ft-bg-surface);
+    cursor: pointer;
+}
+
+.ft-rfq-master-checkbox.is-checked {
+    border-color: var(--ft-color-brand-primary);
+    background: var(--ft-color-brand-primary);
+}
+
+.ft-rfq-master-checkbox:disabled {
+    cursor: not-allowed;
+    opacity: .38;
+}
+
+.ft-rfq-master-checkbox svg {
+    width: 12px;
+    height: 12px;
+    stroke: #fff;
+    stroke-width: 2.2;
+}
+
+.ft-rfq-management-supplier {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+}
+
+.ft-rfq-management-avatar {
+    display: inline-grid;
+    width: 31px;
+    height: 31px;
+    place-items: center;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: var(--ft-color-brand-primary);
+    color: var(--ft-text-inverse);
+    font-size: .625rem;
+    font-weight: var(--ft-font-weight-extrabold);
+    letter-spacing: .01em;
+}
+
+.ft-rfq-management-supplier strong,
+.ft-rfq-management-email,
+.ft-rfq-management-rfq-status,
+.ft-rfq-management-last-activity {
+    overflow: hidden;
+    display: block;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ft-rfq-management-supplier strong {
+    font-size: .6875rem;
+    font-weight: var(--ft-font-weight-bold);
+}
+
+.ft-rfq-management-email {
+    color: var(--ft-text-secondary);
+}
+
+.ft-rfq-management-email.is-missing {
+    color: var(--ft-text-secondary);
+    font-style: italic;
+}
+
+.ft-rfq-management-status-stack {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+}
+
+.ft-rfq-management-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 24px;
+    max-width: 100%;
+    padding: 3px 8px;
+    border-radius: var(--ft-radius-pill);
+    font-size: .625rem;
+    font-weight: var(--ft-font-weight-semibold);
+    white-space: nowrap;
+}
+
+.ft-rfq-management-status svg {
+    display: block;
+    width: 14px;
+    height: 14px;
+    flex: 0 0 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.ft-rfq-management-status.is-success {
+    background: var(--ft-bg-success);
+    color: var(--ft-text-success);
+}
+.ft-rfq-management-status.is-danger {
+    background: var(--ft-bg-danger);
+    color: var(--ft-text-danger);
+}
+.ft-rfq-management-status.is-warning {
+    background: #fff7df;
+    color: #b56a00;
+}
+.ft-rfq-management-status.is-neutral {
+    background: var(--ft-color-neutral-100);
+    color: var(--ft-color-neutral-600);
+}
+
+.ft-rfq-management-status-stack small {
+    max-width: 100%;
+    overflow: hidden;
+    font-size: .5625rem;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ft-rfq-management-status-stack small.is-danger {
+    color: var(--ft-text-danger);
+}
+
+.ft-rfq-management-rfq-status,
+.ft-rfq-management-last-activity {
+    color: var(--ft-text-secondary);
+    font-size: .625rem;
+}
+
+.ft-rfq-management-table .ft-rfq-email-status-col {
+    text-align: left;
+}
+
+.ft-rfq-email-status-col .ft-rfq-management-status-stack {
+    width: 100%;
+    align-items: flex-start;
+}
+
+.ft-rfq-email-status-col .ft-rfq-management-status {
+    width: max-content;
+    max-width: 100%;
+    margin: 0;
+    justify-content: flex-start;
+    line-height: 1;
+}
+
+.ft-rfq-email-status-col .ft-rfq-management-status > span {
+    display: block;
+    line-height: 1.25;
+}
+
+.ft-rfq-management-table .ft-rfq-actions-col {
+    text-align: right;
+}
+
+.ft-rfq-row-action {
+    display: inline-flex;
+    min-width: 96px;
+    min-height: 32px;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 0 11px;
+    border: 1px solid var(--ft-border-strong);
+    border-radius: 5px;
+    background: var(--ft-bg-surface);
+    color: var(--ft-text-primary);
+    font: inherit;
+    font-size: .625rem;
+    font-weight: var(--ft-font-weight-semibold);
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.ft-rfq-row-action:hover {
+    background: var(--ft-bg-surface-hover);
+    text-decoration: none;
+}
+
+.ft-rfq-row-action.is-success {
+    border-color: var(--ft-color-brand-primary);
+    color: var(--ft-color-brand-primary);
+}
+
+.ft-rfq-row-action.is-danger {
+    border-color: var(--ft-border-danger);
+    color: var(--ft-text-danger);
+}
+
+.ft-rfq-row-action.is-warning {
+    border-color: #e6b966;
+    color: #b56a00;
+}
+
+.ft-rfq-row-action.is-neutral {
+    border-color: var(--ft-border-default);
+    background: var(--ft-bg-surface-subtle);
+    color: var(--ft-text-secondary);
+}
+
+.ft-rfq-row-action-content {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.ft-rfq-row-action svg {
+    width: 15px;
+    height: 15px;
+    flex: 0 0 auto;
+    stroke: currentColor;
+    stroke-width: 1.7;
+}
+
+.ft-rfq-inline-spinner {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 auto;
+    border: 1.5px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: ft-rfq-spin .75s linear infinite;
+}
+
+@keyframes ft-rfq-spin {
+    to { transform: rotate(360deg); }
+}
+
+.ft-rfq-management-empty {
+    display: flex;
+    min-height: 112px;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 4px;
+    color: var(--ft-text-secondary);
+    text-align: center;
+}
+
+.ft-rfq-management-empty strong {
+    color: var(--ft-text-primary);
+    font-size: .75rem;
+}
+
+.ft-rfq-management-empty span {
+    font-size: .6875rem;
+}
+
+.ft-rfq-management-footer {
+    display: flex;
+    min-height: 48px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 8px 12px;
+    border-top: 1px solid var(--ft-border-subtle);
+}
+
+.ft-rfq-management-footer p {
+    margin: 0;
+    color: var(--ft-text-secondary);
+    font-size: .625rem;
+}
+
+.ft-rfq-pagination {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+}
+
+.ft-rfq-pagination > span {
+    margin-right: 2px;
+    color: var(--ft-text-secondary);
+    font-size: .625rem;
+    white-space: nowrap;
+}
+
+.ft-rfq-pagination button {
+    display: inline-grid;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    place-items: center;
+    border: 1px solid var(--ft-border-default);
+    border-radius: 5px;
+    background: var(--ft-bg-surface);
+    color: var(--ft-text-primary);
+    cursor: pointer;
+}
+
+.ft-rfq-pagination button:hover:not(:disabled) {
+    border-color: var(--ft-border-strong);
+    background: var(--ft-bg-surface-hover);
+}
+
+.ft-rfq-pagination button:disabled {
+    color: var(--ft-text-secondary);
+    cursor: not-allowed;
+    opacity: .35;
+}
+
+.ft-rfq-pagination button svg {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
+    stroke-width: 1.8;
+}
+
+/* Add supplier modal. It is deliberately loaded only on demand. */
+.ft-rfq-add-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    display: grid;
+    padding: 24px;
+    place-items: center;
+    background: rgba(15, 23, 42, .34);
+}
+
+.ft-rfq-add-modal {
+    overflow: hidden;
+    width: min(620px, 100%);
+    max-height: min(76vh, 690px);
+    border: 1px solid var(--ft-border-default);
+    border-radius: 10px;
+    background: var(--ft-bg-surface);
+    box-shadow: var(--ft-shadow-xl, 0 18px 55px rgba(15, 23, 42, .18));
+}
+
+.ft-rfq-add-modal-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 16px;
+    border-bottom: 1px solid var(--ft-border-default);
+}
+
+.ft-rfq-add-modal-head h2 {
+    margin: 0;
+    color: var(--ft-text-primary);
+    font-size: var(--ft-font-size-lg);
+    font-weight: var(--ft-font-weight-bold);
+}
+
+.ft-rfq-add-modal-head p {
+    margin: 4px 0 0;
+    color: var(--ft-text-secondary);
+    font-size: .6875rem;
+}
+
+.ft-rfq-add-modal-head > button {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--ft-text-secondary);
+    font: inherit;
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.ft-rfq-add-modal-body {
+    padding: 14px 16px 16px;
+}
+
+.ft-rfq-add-modal-search {
+    position: relative;
+    display: block;
+}
+
+.ft-rfq-add-modal-search svg {
+    position: absolute;
+    top: 50%;
+    left: 12px;
+    width: 17px;
+    height: 17px;
+    transform: translateY(-50%);
+    stroke: var(--ft-text-secondary);
+    stroke-width: 1.8;
+    pointer-events: none;
+}
+
+.ft-rfq-add-modal-search input {
+    width: 100%;
+    height: 42px;
+    padding: 0 12px 0 38px;
+    border: 1px solid var(--ft-border-strong);
+    border-radius: 6px;
+    background: var(--ft-bg-surface);
+    color: var(--ft-text-primary);
+    font: inherit;
+    font-size: .75rem;
+}
+
+.ft-rfq-add-modal-search input:focus {
+    border-color: var(--ft-focus-border);
+    outline: 0;
+    box-shadow: var(--ft-focus-ring);
+}
+
+.ft-rfq-add-modal-error {
+    margin: 7px 0 0;
+    color: var(--ft-text-danger);
+    font-size: .6875rem;
+    font-weight: var(--ft-font-weight-semibold);
+}
+
+.ft-rfq-add-modal-list {
+    overflow-y: auto;
+    max-height: 470px;
+    margin-top: 12px;
+    border: 1px solid var(--ft-border-default);
+    border-radius: 7px;
+}
+
+.ft-rfq-add-modal-row {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    min-height: 58px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--ft-border-subtle);
+}
+
+.ft-rfq-add-modal-row:last-child {
+    border-bottom: 0;
+}
+
+.ft-rfq-add-modal-row:hover {
+    background: var(--ft-bg-surface-hover);
+}
+
+.ft-rfq-add-modal-copy {
+    min-width: 0;
+}
+
+.ft-rfq-add-modal-copy strong,
+.ft-rfq-add-modal-copy span {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ft-rfq-add-modal-copy strong {
+    color: var(--ft-text-primary);
+    font-size: .6875rem;
+    font-weight: var(--ft-font-weight-bold);
+}
+
+.ft-rfq-add-modal-copy span {
+    margin-top: 2px;
+    color: var(--ft-text-secondary);
+    font-size: .625rem;
+}
+
+.ft-rfq-add-modal-row > button {
+    min-width: 72px;
+    min-height: 32px;
+    padding: 0 11px;
+    border: 1px solid var(--ft-color-brand-primary);
+    border-radius: 5px;
+    background: var(--ft-bg-surface);
+    color: var(--ft-color-brand-primary);
+    font: inherit;
+    font-size: .625rem;
+    font-weight: var(--ft-font-weight-bold);
+    cursor: pointer;
+}
+
+.ft-rfq-add-modal-row > button:hover {
+    background: var(--ft-color-brand-primary-soft);
+}
+
+.ft-rfq-add-modal-unavailable {
+    display: inline-flex;
+    min-height: 26px;
+    align-items: center;
+    padding: 0 8px;
+    border-radius: var(--ft-radius-pill);
+    background: var(--ft-color-neutral-100);
+    color: var(--ft-color-neutral-600);
+    font-size: .625rem;
+    font-weight: var(--ft-font-weight-semibold);
+}
+
+.ft-rfq-add-modal-empty {
+    padding: 28px 16px;
+    color: var(--ft-text-secondary);
+    font-size: .6875rem;
+    text-align: center;
+}
+
+@media (max-width: 900px) {
+    .ft-rfq-workspace-toolbar {
+        flex-wrap: wrap;
+    }
+    .ft-rfq-workspace-search {
+        flex: 1 1 100%;
+    }
+    .ft-rfq-workspace-filter,
+    .ft-rfq-email-settings-btn {
+        flex: 1 1 calc(50% - 6px);
+        width: auto;
+    }
+}
+
+@media (max-width: 640px) {
+    .ft-rfq-workspace-head {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 12px;
+        padding: 14px 12px 8px;
+    }
+    .ft-rfq-add-supplier-btn {
+        width: 100%;
+    }
+    .ft-rfq-workspace-toolbar {
+        gap: 8px;
+        padding: 8px 12px 10px;
+    }
+    .ft-rfq-workspace-filter,
+    .ft-rfq-email-settings-btn {
+        flex: 1 1 100%;
+    }
+    .ft-rfq-selection-bar {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 9px;
+        margin: 0 12px 10px;
+    }
+    .ft-rfq-selection-actions {
+        justify-content: space-between;
+    }
+    .ft-rfq-send-selected-btn {
+        flex: 1 1 auto;
+    }
+    .ft-rfq-workspace-alert,
+    .ft-rfq-management-table-shell {
+        margin-right: 12px;
+        margin-left: 12px;
+    }
+    .ft-rfq-management-footer {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+    .ft-rfq-pagination {
+        width: 100%;
+        justify-content: flex-end;
+    }
+    .ft-rfq-add-modal-backdrop {
+        padding: 10px;
+    }
+    .ft-rfq-add-modal {
+        width: 100%;
+        max-height: 90vh;
+    }
+    .ft-rfq-add-modal-row {
+        grid-template-columns: 32px minmax(0, 1fr);
+    }
+    .ft-rfq-add-modal-row > button,
+    .ft-rfq-add-modal-unavailable {
+        grid-column: 1 / -1;
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+.ft-rfq-workspace-card .sr-only,
+.ft-rfq-add-modal .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Inquiry Details > RFQ responsive stability ---------------------------------------
+ * Keeps the prototype proportions on wide screens and prevents the management table
+ * from stretching into unreadable columns. These overrides are intentionally scoped
+ * to the RFQ workspace so other inquiry/detail tables remain unchanged.
+ */
+.ft-rfq-workspace-card,
+.ft-rfq-workspace-card *,
+.ft-rfq-workspace-card *::before,
+.ft-rfq-workspace-card *::after {
+    box-sizing: border-box;
+}
+
+.ft-rfq-management-pane {
+    width: 100%;
+    min-width: 0;
+}
+
+.ft-rfq-workspace-card {
+    width: min(100%, 1480px);
+    margin-inline: auto;
+}
+
+.ft-rfq-workspace-head,
+.ft-rfq-workspace-toolbar,
+.ft-rfq-selection-bar,
+.ft-rfq-workspace-alert,
+.ft-rfq-management-table-shell {
+    min-width: 0;
+}
+
+.ft-rfq-workspace-heading,
+.ft-rfq-workspace-search,
+.ft-rfq-workspace-filter,
+.ft-rfq-management-supplier,
+.ft-rfq-management-status-stack {
+    min-width: 0;
+}
+
+.ft-rfq-workspace-toolbar {
+    display: grid;
+    grid-template-columns: minmax(240px, 290px) 210px 154px;
+    justify-content: start;
+    align-items: center;
+}
+
+.ft-rfq-workspace-search,
+.ft-rfq-workspace-filter,
+.ft-rfq-email-settings-btn {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+}
+
+.ft-rfq-email-settings-btn {
+    min-width: 0;
+}
+
+.ft-rfq-management-table {
+    min-width: 1040px;
+}
+
+.ft-rfq-management-table th:nth-child(1),
+.ft-rfq-management-table td:nth-child(1) { width: 44px; }
+.ft-rfq-management-table th:nth-child(2),
+.ft-rfq-management-table td:nth-child(2) { width: 220px; }
+.ft-rfq-management-table th:nth-child(3),
+.ft-rfq-management-table td:nth-child(3) { width: 270px; }
+.ft-rfq-management-table th:nth-child(4),
+.ft-rfq-management-table td:nth-child(4) { width: 190px; }
+.ft-rfq-management-table th:nth-child(5),
+.ft-rfq-management-table td:nth-child(5) { width: 135px; }
+.ft-rfq-management-table th:nth-child(6),
+.ft-rfq-management-table td:nth-child(6) { width: 190px; }
+.ft-rfq-management-table th:nth-child(7),
+.ft-rfq-management-table td:nth-child(7) { width: 132px; }
+
+.ft-rfq-management-table td {
+    height: 56px;
+}
+
+.ft-rfq-management-email,
+.ft-rfq-management-last-activity,
+.ft-rfq-management-rfq-status,
+.ft-rfq-management-supplier strong {
+    max-width: 100%;
+}
+
+.ft-rfq-row-checkbox {
+    appearance: none;
+    -webkit-appearance: none;
+    display: inline-grid;
+    place-content: center;
+    width: 17px;
+    height: 17px;
+    border: 1px solid var(--ft-border-strong);
+    border-radius: 3px;
+    background: var(--ft-bg-surface);
+    vertical-align: middle;
+    transition: border-color .12s ease, background-color .12s ease, box-shadow .12s ease;
+}
+
+.ft-rfq-row-checkbox::before {
+    content: '';
+    width: 5px;
+    height: 9px;
+    border-right: 2px solid #fff;
+    border-bottom: 2px solid #fff;
+    transform: rotate(45deg) scale(0);
+    transform-origin: center;
+    transition: transform .1s ease;
+}
+
+.ft-rfq-row-checkbox:checked {
+    border-color: var(--ft-color-brand-primary);
+    background: var(--ft-color-brand-primary);
+}
+
+.ft-rfq-row-checkbox:checked::before {
+    transform: rotate(45deg) scale(1);
+}
+
+.ft-rfq-row-checkbox:focus-visible {
+    outline: 0;
+    box-shadow: var(--ft-focus-ring);
+}
+
+.ft-rfq-row-checkbox:disabled {
+    background: var(--ft-bg-surface-subtle);
+}
+
+.ft-rfq-management-table tbody tr {
+    transition: background-color .12s ease;
+}
+
+.ft-rfq-management-footer {
+    background: var(--ft-bg-surface);
+}
+
+@media (max-width: 1200px) {
+    .ft-rfq-workspace-toolbar {
+        grid-template-columns: minmax(240px, 1fr) 210px 154px;
+    }
+}
+
+@media (max-width: 900px) {
+    .ft-rfq-workspace-card {
+        width: 100%;
+    }
+
+    .ft-rfq-workspace-toolbar {
+        grid-template-columns: minmax(0, 1fr) minmax(180px, .7fr);
+    }
+
+    .ft-rfq-workspace-search {
+        grid-column: 1 / -1;
+    }
+
+    .ft-rfq-workspace-filter,
+    .ft-rfq-email-settings-btn {
+        width: 100%;
+    }
+}
+
+/* Card-style rows on narrow screens: no cropped columns or horizontal page overflow. */
+@media (max-width: 760px) {
+    .ft-rfq-management-pane {
+        padding-top: 10px;
+    }
+
+    .ft-rfq-workspace-card {
+        overflow: visible;
+        border-radius: 9px;
+    }
+
+    .ft-rfq-workspace-head {
+        padding: 14px 12px 10px;
+    }
+
+    .ft-rfq-workspace-heading h2 {
+        font-size: .9375rem;
+    }
+
+    .ft-rfq-workspace-toolbar {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+        padding: 6px 12px 12px;
+    }
+
+    .ft-rfq-workspace-search,
+    .ft-rfq-workspace-filter,
+    .ft-rfq-email-settings-btn {
+        grid-column: 1;
+        width: 100%;
+    }
+
+    .ft-rfq-selection-bar,
+    .ft-rfq-workspace-alert,
+    .ft-rfq-management-table-shell {
+        margin-right: 12px;
+        margin-left: 12px;
+    }
+
+    .ft-rfq-management-table-shell {
+        overflow: visible;
+        border: 0;
+        background: transparent;
+    }
+
+    .ft-rfq-management-scroll {
+        overflow: visible;
+    }
+
+    .ft-rfq-management-table,
+    .ft-rfq-management-table tbody {
+        display: block;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .ft-rfq-management-table thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        padding: 0;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    .ft-rfq-management-table tbody {
+        display: grid;
+        gap: 10px;
+    }
+
+    .ft-rfq-management-table tbody tr {
+        display: block;
+        overflow: hidden;
+        border: 1px solid var(--ft-border-default);
+        border-radius: 8px;
+        background: var(--ft-bg-surface);
+        box-shadow: var(--ft-shadow-xs);
+    }
+
+    .ft-rfq-management-table tbody tr:hover td {
+        background: transparent;
+    }
+
+    .ft-rfq-management-table td,
+    .ft-rfq-management-table td:nth-child(n) {
+        display: grid;
+        grid-template-columns: 106px minmax(0, 1fr);
+        width: 100%;
+        height: auto;
+        min-height: 0;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px;
+        border: 0;
+        border-bottom: 1px solid var(--ft-border-subtle);
+        text-align: left;
+    }
+
+    .ft-rfq-management-table td::before {
+        content: attr(data-label);
+        color: var(--ft-text-secondary);
+        font-size: .5625rem;
+        font-weight: var(--ft-font-weight-bold);
+        letter-spacing: .04em;
+        text-transform: uppercase;
+    }
+
+    .ft-rfq-management-table td:last-child {
+        border-bottom: 0;
+    }
+
+    .ft-rfq-management-table .ft-rfq-checkbox-col {
+        display: flex;
+        justify-content: flex-end;
+        min-height: 38px;
+        padding: 9px 12px 4px;
+        border-bottom: 0;
+    }
+
+    .ft-rfq-management-table .ft-rfq-checkbox-col::before {
+        margin-right: auto;
+        content: 'Select';
+    }
+
+    .ft-rfq-management-table .ft-rfq-email-status-col {
+        text-align: left;
+    }
+
+    .ft-rfq-email-status-col .ft-rfq-management-status-stack {
+        align-items: flex-start;
+    }
+
+    .ft-rfq-email-status-col .ft-rfq-management-status {
+        margin-inline: 0;
+    }
+
+    .ft-rfq-management-table .ft-rfq-actions-col {
+        text-align: left;
+    }
+
+    .ft-rfq-management-table .ft-rfq-actions-col .ft-rfq-row-action {
+        width: 100%;
+        max-width: 180px;
+    }
+
+    .ft-rfq-management-supplier strong,
+    .ft-rfq-management-email,
+    .ft-rfq-management-rfq-status,
+    .ft-rfq-management-last-activity,
+    .ft-rfq-management-status-stack small {
+        overflow: visible;
+        text-overflow: clip;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
+    .ft-rfq-management-footer {
+        margin-top: 10px;
+        padding: 10px 0 0;
+        border-top: 1px solid var(--ft-border-subtle);
+    }
+}
+
+@media (max-width: 480px) {
+    .ft-rfq-workspace-head {
+        gap: 10px;
+    }
+
+    .ft-rfq-add-supplier-btn {
+        min-height: 38px;
+    }
+
+    .ft-rfq-selection-actions {
+        width: 100%;
+        gap: 10px;
+    }
+
+    .ft-rfq-clear-selection-btn {
+        padding-inline: 4px;
+    }
+
+    .ft-rfq-management-table td,
+    .ft-rfq-management-table td:nth-child(n) {
+        grid-template-columns: 88px minmax(0, 1fr);
+    }
+}
+
+.ft-rfq-add-supplier-btn,
+.ft-rfq-email-settings-btn,
+.ft-rfq-send-selected-btn {
+    white-space: nowrap;
+}

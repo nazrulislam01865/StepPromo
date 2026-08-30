@@ -1760,3 +1760,339 @@ body>.ft-mention-menu {
 .ft-inquiry-prototype .inquiry-list-v2 .inquiry-list-body>.row.ft-client-row-nep:hover {
     background: #e4f0ff !important
 }
+
+/* 2026-08-29: Inquiry detail responsive polish.
+ * Keeps the full detail page usable beside the desktop sidebar and on compact
+ * devices without changing the existing navigation or information hierarchy.
+ */
+@media (max-width: 1280px) {
+    .ft-inquiry-prototype .inquiry-detail-view {
+        min-width: 0;
+        overflow-x: clip;
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view .ft-inquiry-header-meta {
+        gap: 7px 10px;
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view .ft-inquiry-header-meta-separator {
+        display: none;
+    }
+}
+
+@media (max-width: 900px) {
+    .ft-inquiry-prototype .inquiry-detail-view .ft-inquiry-exact-header {
+        margin-bottom: 10px;
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view .ft-editable-task-title {
+        max-width: 100%;
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view .ft-inquiry-detail-tabs {
+        width: 100%;
+        max-width: 100%;
+        padding-bottom: 2px;
+        overscroll-behavior-inline: contain;
+        scroll-snap-type: inline proximity;
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view .ft-inquiry-detail-tabs .tab {
+        flex: 0 0 auto;
+        scroll-snap-align: start;
+    }
+}
+
+@media (max-width: 620px) {
+    .ft-inquiry-prototype .app {
+        grid-template-columns: 58px minmax(0, 1fr);
+    }
+
+    .ft-inquiry-prototype .sidebar {
+        padding-inline: 5px;
+    }
+
+    .ft-inquiry-prototype .content {
+        padding: 10px 9px 20px;
+    }
+
+    .ft-inquiry-prototype .topbar {
+        height: 58px;
+        padding-inline: 10px;
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view .ft-inquiry-exact-header {
+        margin-bottom: 8px;
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view .ft-detail-breadcrumb {
+        max-width: 100%;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view .ft-detail-breadcrumb::-webkit-scrollbar {
+        display: none;
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view .ft-inquiry-header-meta {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 6px;
+        margin-top: 10px;
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view .ft-inquiry-header-meta-item {
+        width: 100%;
+        white-space: normal;
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view .ft-inquiry-header-meta-item > span:last-child {
+        overflow: visible;
+        text-overflow: clip;
+        overflow-wrap: anywhere;
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view .ft-inquiry-detail-tabs {
+        gap: 4px;
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view .ft-inquiry-detail-tabs .tab {
+        min-height: 38px;
+    }
+}
+
+/* 2026-08-29: Inquiry Taskflow compact status/resource cluster.
+ * Status, +file and +link belong to the same task action context. Keep the
+ * desktop table columns unchanged, but group these controls as one responsive
+ * cluster when the Taskflow panel becomes narrow. This prevents the resource
+ * buttons from drifting to the far side of tablet/mobile task cards. */
+.ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-status-resources {
+    display: contents;
+}
+
+@container inquiry-taskflow (max-width: 1240px) {
+    .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-status-resources {
+        display: flex !important;
+        grid-column: 2 / 5 !important;
+        grid-row: 2 !important;
+        min-width: 0;
+        width: 100%;
+        align-items: center;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+        gap: var(--ft-space-2, 8px);
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-status-resources > .task-status-cell {
+        flex: 0 1 220px;
+        width: min(220px, 100%) !important;
+        max-width: 220px !important;
+        min-width: 150px !important;
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-status-resources > .ft-inquiry-task-files {
+        display: flex !important;
+        flex: 0 1 auto;
+        width: auto !important;
+        max-width: 100%;
+        min-width: 0 !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        flex-wrap: wrap !important;
+        gap: var(--ft-space-1, 6px) !important;
+        white-space: normal !important;
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-status-resources .ft-inquiry-task-add-actions {
+        display: inline-flex !important;
+        flex: 0 0 auto !important;
+        align-items: center;
+        gap: 5px;
+    }
+}
+
+@container inquiry-taskflow (min-width: 1181px) and (max-width: 1240px) {
+    .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-grid-head {
+        display: none !important;
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-row {
+        display: grid !important;
+        grid-template-columns: 34px minmax(0, 1.45fr) minmax(150px, .75fr) minmax(125px, .62fr) minmax(120px, .58fr) !important;
+        grid-template-rows: auto auto !important;
+        column-gap: 12px !important;
+        row-gap: 9px !important;
+        align-items: center !important;
+        padding: 13px 15px 12px 13px !important;
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-step {
+        grid-column: 1 !important;
+        grid-row: 1 / 3 !important;
+        align-self: start !important;
+        padding-top: 2px !important;
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-copy {
+        grid-column: 2 !important;
+        grid-row: 1 !important;
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-assignee-inline {
+        grid-column: 3 !important;
+        grid-row: 1 !important;
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-date {
+        grid-column: 4 !important;
+        grid-row: 1 !important;
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-action {
+        grid-column: 5 !important;
+        grid-row: 1 !important;
+        width: auto !important;
+        max-width: 150px !important;
+        justify-self: end !important;
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-action .ft-inquiry-action-button {
+        width: auto !important;
+        min-width: 104px !important;
+        max-width: 150px !important;
+        min-height: 32px !important;
+        padding: 0 12px !important;
+    }
+}
+
+@container inquiry-taskflow (min-width: 641px) and (max-width: 860px) {
+    .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-status-resources {
+        grid-column: 2 / 4 !important;
+        grid-row: 3 !important;
+    }
+}
+
+@container inquiry-taskflow (max-width: 640px) {
+    .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-row {
+        grid-template-rows: auto auto auto auto auto !important;
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-step {
+        grid-row: 1 / 6 !important;
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-status-resources {
+        grid-column: 2 !important;
+        grid-row: 4 !important;
+        width: 100%;
+        max-width: 100%;
+        flex-wrap: wrap;
+        column-gap: var(--ft-space-2, 8px);
+        row-gap: var(--ft-space-1, 6px);
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-status-resources > .task-status-cell {
+        flex: 1 1 170px;
+        width: auto !important;
+        max-width: 210px !important;
+        min-width: 150px !important;
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-status-resources > .ft-inquiry-task-files {
+        flex: 0 1 auto;
+        width: auto !important;
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-action {
+        grid-column: 2 !important;
+        grid-row: 5 !important;
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-add-icon {
+        width: 34px;
+        height: 32px;
+        border-radius: 8px;
+    }
+}
+
+@container inquiry-taskflow (max-width: 420px) {
+    .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-status-resources {
+        display: grid !important;
+        grid-template-columns: minmax(145px, 1fr) auto;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-status-resources > .task-status-cell {
+        width: 100% !important;
+        max-width: none !important;
+        min-width: 0 !important;
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-status-resources > .ft-inquiry-task-files {
+        width: auto !important;
+        min-width: 0 !important;
+        flex-wrap: nowrap !important;
+        gap: 5px !important;
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-status-resources .ft-inquiry-task-resource-count {
+        grid-column: 1 / -1;
+        font-size: var(--ft-font-size-xs, .6875rem);
+        white-space: nowrap !important;
+    }
+}
+
+/* Viewport fallback for browsers without container queries. */
+@supports not (container-type: inline-size) {
+    @media (max-width: 900px) {
+        .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-status-resources {
+            display: flex !important;
+            grid-column: 2 / 4 !important;
+            grid-row: 3 !important;
+            min-width: 0;
+            align-items: center;
+            justify-content: flex-start;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-status-resources > .task-status-cell {
+            flex: 0 1 210px;
+            width: min(210px, 100%) !important;
+            max-width: 210px !important;
+        }
+
+        .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-status-resources > .ft-inquiry-task-files {
+            flex: 0 1 auto;
+            width: auto !important;
+            justify-content: flex-start !important;
+        }
+    }
+}
+
+@container inquiry-taskflow (max-width: 360px) {
+    .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-status-resources {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-status-resources > .ft-inquiry-task-files {
+        justify-self: start;
+    }
+}
+
+@supports not (container-type: inline-size) {
+    @media (max-width: 640px) {
+        .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-status-resources {
+            grid-column: 2 !important;
+            grid-row: 4 !important;
+            width: 100%;
+        }
+
+        .ft-inquiry-prototype .inquiry-detail-view #tab-workflow .ft-inquiry-task-action {
+            grid-column: 2 !important;
+            grid-row: 5 !important;
+        }
+    }
+}

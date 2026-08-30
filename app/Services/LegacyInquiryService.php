@@ -1836,8 +1836,9 @@ class LegacyInquiryService
         if ($task) {
             abort_unless((int) $task->inquiry_id === (int) $inquiry->id, 422);
             abort_if($task->inquiry?->result, 422, 'Tasks on a closed Inquiry cannot receive documents.');
-            // Attachments are evidence, not workflow state. They may be added to
-            // a completed task without reopening or changing completed_at.
+            // Documents added to an already-completed task remain evidence only.
+            // An open task that explicitly requires a submission is completed
+            // after its upload succeeds, below.
         }
 
         $stored = app(SecureDocumentStorage::class)->store($file, 'flowtrack/inquiries/'.$inquiry->id);
@@ -1861,6 +1862,15 @@ class LegacyInquiryService
             $document->name.' uploaded'.($task ? ' to '.$task->title : ' directly to the Inquiry').'.',
             ['inquiry_task_id' => $task?->id, 'inquiry_document_id' => $document->id],
         );
+
+        if ($task
+            && (bool) $task->requires_submission
+            && ! $task->completed_at) {
+            // The document record now satisfies the service-level completion
+            // guard. Complete through the normal task transition so timestamps,
+            // activity, metrics inputs and the parent Inquiry status stay aligned.
+            $this->completeTask($task->fresh(), $actor);
+        }
 
         return $document;
     }

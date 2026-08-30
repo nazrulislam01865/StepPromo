@@ -1,4 +1,4 @@
-<section class="ft-detail-card ft-task-activity-card ft-friendly-activity">
+<section class="ft-detail-card ft-task-activity-card ft-friendly-activity ft-inquiry-overview-activity-card">
     <div class="ft-activity-head">
         <div><h2>Activity</h2><p>Comments and Inquiry changes, with who changed what and when.</p></div>
         <div class="ft-activity-tabs">

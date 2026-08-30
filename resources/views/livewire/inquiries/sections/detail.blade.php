@@ -111,9 +111,8 @@
 
             <div class="tabs ft-inquiry-detail-tabs" role="tablist" aria-label="Inquiry detail sections">
                 <button class="tab {{ $detailTab === 'overview' ? 'active' : '' }}" type="button" wire:click="setDetailTab('overview')">Overview</button>
-                <button class="tab {{ $detailTab === 'rfq' ? 'active' : '' }}" type="button" wire:click="setDetailTab('rfq')">RFQ @if(($inquiryRfqSummary['invited'] ?? 0) > 0)<span class="ft-inquiry-tab-count">{{ $inquiryRfqSummary['invited'] }} invited</span>@endif</button>
+                <button class="tab {{ $detailTab === 'rfq' ? 'active' : '' }}" type="button" wire:click="setDetailTab('rfq')">RFQ @if(($inquiryRfqSummary['invited'] ?? 0) > 0)<span class="ft-inquiry-tab-count">{{ $inquiryRfqSummary['invited'] }} invitations</span>@endif</button>
                 <button class="tab {{ $detailTab === 'comparison' ? 'active' : '' }}" type="button" wire:click="setDetailTab('comparison')">Comparison statement @if(($inquiryRfqSummary['submitted'] ?? 0) > 0)<span class="ft-inquiry-tab-count is-green">{{ $inquiryRfqSummary['submitted'] }}</span>@endif</button>
-                <button class="tab {{ $detailTab === 'activity' ? 'active' : '' }}" type="button" wire:click="setDetailTab('activity')">Activity</button>
             </div>
 
             @if($detailTab === 'overview')
@@ -249,150 +248,71 @@
                     @if($canViewInquiryProducts)
                     @if((bool) ($inquiryDetailSectionsReady['products'] ?? false))
                     @php
-                        // Only persisted products belong in the details table. The shared
-                        // Add Product panel owns the temporary selection state, exactly as
-                        // it does on Order Details, so unfinished legacy draft rows stay out.
-                        $inquiryItemRows = collect($inquiry->items ?? collect())
-                            ->filter(fn ($item) => filled($item->item_name))
-                            ->values();
-                        $inquiryItemCount = $inquiryItemRows->count();
-                        $inquiryItemUnits = (float) $inquiryItemRows->sum('quantity');
+                        $inquiryProductOverview = $inquiryProductRfqOverview ?? [
+                            'stats' => ['products' => 0, 'supplier_assignments' => 0, 'invitations_sent' => 0, 'quotations_received' => 0],
+                            'rows' => collect(),
+                            'product_count' => 0,
+                            'total_units' => 0,
+                        ];
+                        $inquiryOverviewRows = collect($inquiryProductOverview['rows'] ?? []);
                     @endphp
-                    <x-catalog.detail-products-card
+                    <x-inquiries.product-rfq-overview
                         id="inquiry-products-card"
-                        variant="inquiry"
-                        :count="$inquiryItemCount"
-                        :total-units="$inquiryItemUnits"
+                        :overview="$inquiryProductOverview"
+                        :can-add="$canCreateInquiryProducts"
+                        :show-add-form="$showAddInquiryProductForm"
                     >
-                        @if($inquiryItemRows->isEmpty())
-                            <tr class="ft-order-product-empty-row"><td colspan="8">No products have been added to this Inquiry yet.</td></tr>
-                        @else
-                            @foreach($inquiryItemRows as $item)
-                                @php
-                                    $isDraftInquiryItem = blank($item->item_name);
-                                    $categoryNeedsSelection = filled($item->id) && blank($item->category);
-                                    $productNeedsSelection = filled($item->id) && filled($item->category) && blank($item->item_name);
-                                    $categoryLabel = $item->category ?: 'Select category';
-                                    $productLabel = $item->item_name ?: (blank($item->category) ? 'Select category first' : 'Select product');
-                                    $productPickerKey = 'inquiry-item-'.$item->id.'-product-'.md5((string) ($item->category ?? '').'|'.(string) ($item->item_name ?? ''));
-                                    $productMaster = $inquiryProductMasters->get(mb_strtolower(trim((string) ($item->item_name ?? ''))));
-                                    $productImageUrl = $productMaster?->productImageUrl();
-                                    $productCode = $productMaster?->productDisplayCode();
-                                    $productReference = $productMaster?->productReferenceCode();
-                                    $productSupplier = $productMaster ? $inquiryProductSuppliers->get((int) $productMaster->id) : null;
-                                    $supplierLeadDays = (int) (data_get($productMaster?->metadata, 'lead_time_days') ?: data_get($productMaster?->metadata, 'supplier_lead_time_days') ?: 0);
-                                    $supplierPreferred = (bool) (data_get($productMaster?->metadata, 'supplier_preferred') ?: data_get($productMaster?->metadata, 'preferred_supplier'));
-                                    $supplierMeta = collect([
-                                        $productSupplier ? 'Default supplier' : null,
-                                        $supplierLeadDays > 0 ? number_format($supplierLeadDays).'-day lead time' : null,
-                                        $supplierPreferred ? 'Preferred' : null,
-                                    ])->filter()->implode(' · ');
-                                    $classificationParts = collect([
-                                        $productMaster?->productMainCategory(),
-                                        ...array_filter(array_map('trim', preg_split('/\s*>\s*/', (string) ($productMaster?->productClassificationPath() ?? '')) ?: [])),
-                                    ])->filter()->unique()->values();
-                                    if ($classificationParts->isEmpty() && filled($item->category)) $classificationParts = collect([$item->category]);
-                                    $categoryDisplay = $classificationParts->implode(' › ') ?: $categoryLabel;
-                                    $unitPrice = $item->unit_price !== null ? (float) $item->unit_price : null;
-                                    $unitPriceValue = $unitPrice !== null ? number_format($unitPrice, 2, '.', '') : '';
-                                    $unitPriceDisplay = $unitPrice !== null ? $inquiryCurrencySymbol.number_format($unitPrice, 2) : '—';
-                                    $updatedBy = $inquiry->owner?->name ?: $inquiry->creator?->name ?: 'FlowTrack';
-                                    $updatedRelative = $item->updated_at
-                                        ? (\App\Support\UserLocalTime::localize($item->updated_at)?->diffForHumans() ?: '—')
-                                        : '—';
-                                @endphp
-                                <tr
-                                    wire:key="inquiry-product-detail-{{ $item->id }}"
-                                    x-data="{ actionOpen: false }"
-                                    @class(['ft-order-product-draft-row' => $isDraftInquiryItem, 'is-editing' => (int) $editInquiryProductItemId === (int) $item->id])
-                                >
-                                    <td data-label="Product">
-                                        <x-catalog.detail-product-identity
-                                            :image-url="$productImageUrl"
-                                            :alt="$item->item_name ?? ''"
-                                            :code="$productCode"
-                                            :reference="$productReference"
-                                            fallback-meta="Inquiry product"
-                                        >
-                                            <span class="ft-order-product-name">{{ $productLabel }}</span>
-                                        </x-catalog.detail-product-identity>
-                                    </td>
-                                    <td data-label="Category">
-                                        <span class="ft-order-product-category-path">{{ $categoryDisplay }}</span>
-                                    </td>
-                                    <td data-label="Supplier">
-                                        <x-catalog.detail-product-supplier
-                                            :supplier="$productSupplier"
-                                            :meta="$supplierMeta"
-                                            fallback="No default supplier"
-                                        />
-                                    </td>
-                                    <td class="ft-order-product-quantity" data-label="Quantity">
-                                        <strong class="ft-order-product-static-value">{{ number_format((int) max(1, (int) $item->quantity)) }} units</strong>
-                                    </td>
-                                    <td class="ft-order-product-price" data-label="Unit price">
-                                        <strong class="ft-order-product-static-value">{{ $unitPriceDisplay }}</strong>
-                                    </td>
-                                    <td class="ft-order-product-notes" data-label="Notes">
-                                        <span class="ft-order-product-note-value {{ filled($item->notes) ? '' : 'is-empty' }}">{{ $item->notes ?: 'Add notes' }}</span>
-                                    </td>
-                                    <x-catalog.detail-product-updated
-                                        :primary="$updatedBy"
-                                        :secondary="$updatedRelative"
-                                    />
-                                    <td class="ft-order-product-actions-cell" data-label="Actions">
-                                        <x-catalog.detail-product-actions
-                                            :item-id="$item->id"
-                                            :can-edit="$canEditInquiryProducts"
-                                            edit-method="openEditInquiryProduct"
-                                            :can-delete="$canDeleteInquiryProducts"
-                                            remove-method="removeInquiryItem"
-                                            confirm-text="Remove this product from the Inquiry?"
+                        @forelse($inquiryOverviewRows as $overviewRow)
+                            <x-inquiries.product-rfq-overview-row
+                                :row="$overviewRow"
+                                :can-edit="$canEditInquiryProducts"
+                                :can-delete="$canDeleteInquiryProducts"
+                            />
+
+                            @if($canEditInquiryProducts && (int) $editInquiryProductItemId === (int) ($overviewRow['item_id'] ?? 0))
+                                <tr class="ft-detail-product-editor-row ft-inquiry-prq-editor-row" wire:key="inquiry-product-inline-editor-{{ (int) ($overviewRow['item_id'] ?? 0) }}">
+                                    <td colspan="7">
+                                        <x-catalog.detail-product-edit
+                                            :wire-key="'inquiry-product-edit-'.(int) ($overviewRow['item_id'] ?? 0)"
+                                            variant="inquiry"
+                                            record-label="Inquiry"
+                                            search-model="editInquiryProductSearch"
+                                            :search-value="$editInquiryProductSearch"
+                                            :search-results="$editInquiryProductSearchResults"
+                                            :search-suppliers="$editInquiryProductSearchSuppliers"
+                                            :result-total="$editInquiryProductResultTotal"
+                                            :show-all-results="$editInquiryProductShowAllResults"
+                                            show-all-method="showAllEditInquiryProductResults"
+                                            select-method="selectEditInquiryProduct"
+                                            :selected-product="$editInquiryProductSelectedProduct"
+                                            :selected-supplier="$editInquiryProductSelectedSupplier"
+                                            :category-value="$editInquiryProductCategory"
+                                            quantity-model="editInquiryProductQuantity"
+                                            :quantity-value="$editInquiryProductQuantity"
+                                            :unit-price-value="$editInquiryProductUnitPrice"
+                                            notes-model="editInquiryProductNotes"
+                                            :notes-value="$editInquiryProductNotes"
+                                            :supplier-editable="false"
+                                            :currency-symbol="$inquiryCurrencySymbol"
+                                            close-method="closeEditInquiryProduct"
+                                            save-method="saveEditInquiryProduct"
+                                            selected-error-key="editInquiryProductSelectedId"
+                                            quantity-error-key="editInquiryProductQuantity"
+                                            unit-price-error-key="editInquiryProductUnitPrice"
+                                            notes-error-key="editInquiryProductNotes"
                                         />
                                     </td>
                                 </tr>
-
-                                @if($canEditInquiryProducts && (int) $editInquiryProductItemId === (int) $item->id)
-                                    <tr class="ft-detail-product-editor-row" wire:key="inquiry-product-inline-editor-{{ $item->id }}">
-                                        <td colspan="8">
-                                            <x-catalog.detail-product-edit
-                                                :wire-key="'inquiry-product-edit-'.$item->id"
-                                                variant="inquiry"
-                                                record-label="Inquiry"
-                                                search-model="editInquiryProductSearch"
-                                                :search-value="$editInquiryProductSearch"
-                                                :search-results="$editInquiryProductSearchResults"
-                                                :search-suppliers="$editInquiryProductSearchSuppliers"
-                                                :result-total="$editInquiryProductResultTotal"
-                                                :show-all-results="$editInquiryProductShowAllResults"
-                                                show-all-method="showAllEditInquiryProductResults"
-                                                select-method="selectEditInquiryProduct"
-                                                :selected-product="$editInquiryProductSelectedProduct"
-                                                :selected-supplier="$editInquiryProductSelectedSupplier"
-                                                :category-value="$editInquiryProductCategory"
-                                                quantity-model="editInquiryProductQuantity"
-                                                :quantity-value="$editInquiryProductQuantity"
-                                                :unit-price-value="$editInquiryProductUnitPrice"
-                                                notes-model="editInquiryProductNotes"
-                                                :notes-value="$editInquiryProductNotes"
-                                                :supplier-editable="false"
-                                                :currency-symbol="$inquiryCurrencySymbol"
-                                                close-method="closeEditInquiryProduct"
-                                                save-method="saveEditInquiryProduct"
-                                                selected-error-key="editInquiryProductSelectedId"
-                                                quantity-error-key="editInquiryProductQuantity"
-                                                unit-price-error-key="editInquiryProductUnitPrice"
-                                                notes-error-key="editInquiryProductNotes"
-                                            />
-                                        </td>
-                                    </tr>
-                                @endif
-                            @endforeach
-                        @endif
+                            @endif
+                        @empty
+                            <tr class="ft-inquiry-prq-empty-row">
+                                <td colspan="7">No products have been added to this Inquiry yet.</td>
+                            </tr>
+                        @endforelse
 
                         <x-slot:afterTable>
                             @if($showAddInquiryProductForm && $canCreateInquiryProducts)
-                                <div class="ft-detail-products-inline-add" wire:key="inquiry-add-product-inline-{{ $inquiry->id }}" x-data x-on:keydown.escape.window="$wire.closeAddInquiryProductForm()">
+                                <div class="ft-detail-products-inline-add ft-inquiry-prq-inline-add" wire:key="inquiry-add-product-inline-{{ $inquiry->id }}" x-data x-on:keydown.escape.window="$wire.closeAddInquiryProductForm()">
                                     <x-catalog.detail-add-product
                                         :wire-key="'inquiry-detail-add-product-'.$inquiry->id"
                                         search-model="inquiryProductSearch"
@@ -421,14 +341,7 @@
                                 </div>
                             @endif
                         </x-slot:afterTable>
-
-                        <x-slot:footer>
-                            <span>Product, quantity, price and supplier changes are recorded in inquiry activity.</span>
-                            @if($canCreateInquiryProducts && !$showAddInquiryProductForm)
-                                <button type="button" class="ft-outline-btn ft-order-product-add-another" wire:click="openAddInquiryProductForm" wire:loading.attr="disabled" wire:target="openAddInquiryProductForm">＋ Add another product</button>
-                            @endif
-                        </x-slot:footer>
-                    </x-catalog.detail-products-card>
+                    </x-inquiries.product-rfq-overview>
                     @else
                         <x-ui.progressive-section-loader
                             section="products"
@@ -472,15 +385,17 @@
                         @endif
                     @endif
 
+                    @if((bool) ($inquiryDetailSectionsReady['activity'] ?? false))
+                        @include('livewire.inquiries._activity')
+                    @else
+                        <x-ui.progressive-section-loader section="activity" method="loadDetailSection" key-prefix="inquiry-detail" context-type="inquiry" :context-id="$inquiry->id" :rows="4" message="Loading Inquiry activity when needed…" root-margin="300px 0px" />
+                    @endif
+
                 </div>
             @elseif($detailTab === 'rfq')
                 @include('livewire.inquiries.sections.rfq')
             @elseif($detailTab === 'comparison')
                 @include('livewire.inquiries.sections.comparison')
-            @elseif($detailTab === 'activity')
-                <div class="ft-rfq-pane ft-rfq-activity-pane" wire:key="inquiry-detail-activity-{{ $inquiry->id }}">
-                    @include('livewire.inquiries._activity')
-                </div>
             @endif
 
             @if($showRfqEmailPreview)
@@ -489,7 +404,17 @@
 
             @if($showTaskDocumentModal && $taskDocumentModalTask)
                 @php
-                    $completeAfterTaskDocument = (int) ($pendingCompletionTaskId ?? 0) === (int) $taskDocumentModalTask->id;
+                    $completeAfterTaskDocument = (bool) $taskDocumentModalTask->requires_submission
+                        && ! $taskDocumentModalTask->completed_at;
+                    $taskDocumentUploadName = $taskDocumentUpload?->getClientOriginalName();
+                    $taskDocumentUploadType = $taskDocumentUploadName
+                        ? (strtoupper((string) pathinfo($taskDocumentUploadName, PATHINFO_EXTENSION)) ?: 'FILE')
+                        : null;
+                    $taskDocumentUploadSize = $taskDocumentUpload
+                        ? ($taskDocumentUpload->getSize() >= 1048576
+                            ? number_format($taskDocumentUpload->getSize() / 1048576, 1).' MB'
+                            : number_format(max(1, (int) ceil($taskDocumentUpload->getSize() / 1024))).' KB')
+                        : null;
                 @endphp
                 <div class="ft-inquiry-task-document-modal-backdrop" wire:key="inquiry-task-document-modal" wire:click.self="closeTaskDocumentModal">
                     <section class="ft-inquiry-task-document-modal" data-ft-feedback-scope="form" role="dialog" aria-modal="true" aria-labelledby="task-document-modal-title">
@@ -530,18 +455,32 @@
                                     x-on:livewire-upload-error="uploading = false; progress = 0"
                                     x-on:livewire-upload-cancel="uploading = false; progress = 0"
                                 >
-                                    <label class="ft-inquiry-task-document-dropzone">
-                                        <input type="file" wire:model="taskDocumentUpload" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.zip,.txt,.csv,.ai,.eps,.esp">
-                                        <span class="ft-inquiry-task-document-upload-icon">⇧</span>
+                                    @if($taskDocumentUpload)
+                                        <div class="ft-inquiry-attachment-selected-count">1 file selected</div>
+                                        <div class="ft-inquiry-attachment-selected-file">
+                                            <span class="ft-inquiry-attachment-selected-check" aria-hidden="true">✓</span>
+                                            <span class="ft-inquiry-attachment-selected-copy">
+                                                <strong title="{{ $taskDocumentUploadName }}">{{ $taskDocumentUploadName }}</strong>
+                                                <small>{{ $taskDocumentUploadType }} · {{ $taskDocumentUploadSize }} · Ready to upload</small>
+                                            </span>
+                                            <button type="button" wire:click="$set('taskDocumentUpload', null)" wire:loading.attr="disabled" wire:target="taskDocumentUpload">Remove</button>
+                                        </div>
+                                    @else
+                                        <div class="ft-inquiry-attachment-field-label">File attachment</div>
+                                    @endif
+
+                                    <label class="ft-inquiry-task-document-dropzone ft-inquiry-attachment-dropzone {{ $taskDocumentUpload ? 'is-compact' : '' }}">
+                                        <input type="file" wire:model="taskDocumentUpload" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.zip,.txt,.csv,.ai,.eps,.esp" aria-label="{{ $taskDocumentUpload ? 'Add another file' : 'Choose a file to upload' }}">
+                                        <svg class="ft-inquiry-attachment-upload-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 16l-4-4-4 4M12 12v9M20.4 17.5A5 5 0 0 0 18 8.2 7 7 0 0 0 4.3 10.8 4.5 4.5 0 0 0 5.5 19H7"/></svg>
                                         @if($taskDocumentUpload)
-                                            <strong>{{ $taskDocumentUpload->getClientOriginalName() }}</strong>
-                                            <b>File selected — choose another file</b>
-                                            <small>{{ number_format(max(1, (int) ceil($taskDocumentUpload->getSize() / 1024))) }} KB · ready to add</small>
+                                            <strong>Add another file</strong>
+                                            <b>Drag &amp; drop or <span>browse</span></b>
                                         @else
-                                            <strong>Drop a file here</strong>
-                                            <b>or browse files</b>
-                                            <small>PDF, Office files, JPG, PNG, ZIP, AI, EPS or ESP · Max 20 MB</small>
+                                            <strong>Drag &amp; drop a file here</strong>
+                                            <b>or choose from your computer</b>
+                                            <span class="ft-inquiry-attachment-browse">Browse files</span>
                                         @endif
+                                        <small>PDF, Office files, JPG, PNG, ZIP, AI, EPS or ESP · Max 20 MB</small>
                                     </label>
 
                                     <div class="ft-inquiry-task-document-upload-progress" x-cloak x-show="uploading" x-transition.opacity.duration.120ms>
@@ -577,7 +516,7 @@
                             <button type="button" class="secondary" wire:click="closeTaskDocumentModal">Cancel</button>
                             <button type="button" class="primary" wire:click="saveTaskDocument" wire:loading.attr="disabled" wire:target="saveTaskDocument,taskDocumentUpload"
                                 @disabled(!$taskDocumentUpload)>
-                                <span wire:loading.remove wire:target="saveTaskDocument">{{ $completeAfterTaskDocument ? 'Add file & complete' : 'Add document' }}</span>
+                                <span wire:loading.remove wire:target="saveTaskDocument">{{ $taskDocumentUpload ? 'Add 1 document' : 'Add document' }}</span>
                                 <span wire:loading wire:target="saveTaskDocument">{{ $completeAfterTaskDocument ? 'Adding & completing...' : 'Adding...' }}</span>
                             </button>
                         </footer>

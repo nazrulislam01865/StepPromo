@@ -1,5 +1,6 @@
 @props([
     'suppliers' => collect(),
+    'selectedSuppliers' => collect(),
     'selectedSupplierIds' => [],
     'supplierSearch' => '',
     'productCount' => 0,
@@ -8,6 +9,9 @@
 @php
     $selectedIds = collect($selectedSupplierIds)->map(fn ($id) => (int) $id)->filter()->unique()->values();
     $selectedCount = $selectedIds->count();
+    $selectedSupplierRows = collect($selectedSuppliers)
+        ->filter(fn ($supplier) => $selectedIds->contains((int) data_get($supplier, 'id')))
+        ->values();
 @endphp
 
 <section {{ $attributes->class(['ft-create-rfq-layout']) }} aria-labelledby="create-rfq-title">
@@ -83,3 +87,25 @@
         </div>
     </aside>
 </section>
+
+@if($selectedSupplierRows->isNotEmpty())
+    <section class="ft-create-rfq-selected-section" aria-labelledby="create-rfq-selected-title">
+        <div class="ft-create-rfq-selected-head">
+            <div>
+                <h3 id="create-rfq-selected-title">Selected suppliers</h3>
+                <p>These suppliers will be added to this Inquiry RFQ when you create the Inquiry.</p>
+            </div>
+            <span>{{ number_format($selectedSupplierRows->count()) }} {{ \Illuminate\Support\Str::plural('supplier', $selectedSupplierRows->count()) }}</span>
+        </div>
+
+        <div class="ft-create-rfq-selected-list">
+            @foreach($selectedSupplierRows as $supplier)
+                <x-inquiries.rfq-selected-supplier-card
+                    :supplier="$supplier"
+                    wire:key="create-rfq-selected-supplier-{{ (int) data_get($supplier, 'id') }}"
+                />
+            @endforeach
+        </div>
+    </section>
+@endif
+

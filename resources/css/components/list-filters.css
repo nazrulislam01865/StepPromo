@@ -831,3 +831,73 @@
   background:#fff;
   box-shadow:0 0 0 2px color-mix(in srgb, var(--ft-theme-primary) 7%, transparent);
 }
+
+/* CHANGE 2026-08-29: teleported people-picker row stability.
+   Fixed search-select menus are teleported to <body>, so page-scoped Order-list
+   selectors no longer wrap the menu. Keep avatar/user rows self-contained and
+   tall enough for both the name and metadata line without overlaps. */
+.ft-search-select__menu--people .ft-search-select__option {
+  height: auto !important;
+  min-height: 48px !important;
+  padding: 6px 9px !important;
+  align-items: center !important;
+  line-height: 1.2 !important;
+  overflow: hidden;
+}
+
+.ft-search-select__menu--people .ft-search-select__user-option {
+  display: flex !important;
+  align-items: center !important;
+  gap: 9px !important;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  white-space: normal !important;
+}
+
+.ft-search-select__menu--people .ft-search-select__avatar {
+  width: 30px !important;
+  height: 30px !important;
+  flex: 0 0 30px !important;
+}
+
+.ft-search-select__menu--people .ft-search-select__user-copy {
+  display: flex !important;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px !important;
+  overflow: hidden;
+  line-height: 1.2 !important;
+}
+
+.ft-search-select__menu--people .ft-search-select__user-copy strong,
+.ft-search-select__menu--people .ft-search-select__user-copy small {
+  display: block;
+  min-width: 0;
+  margin: 0;
+  line-height: 1.2 !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ft-search-select__menu--people .ft-search-select__user-copy strong {
+  font-size: .75rem;
+  font-weight: 780;
+}
+
+.ft-search-select__menu--people .ft-search-select__user-copy small {
+  font-size: .625rem;
+  font-weight: 620;
+}
+
+.ft-search-select__menu--people .ft-search-select__selected-mark {
+  flex: 0 0 auto;
+  max-width: 72px;
+  font-size: .59375rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+

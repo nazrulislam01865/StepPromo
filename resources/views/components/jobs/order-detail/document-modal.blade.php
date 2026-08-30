@@ -39,9 +39,18 @@
             'button' => 'Add document',
         ],
     };
+    $selectedUploadName = $upload?->getClientOriginalName();
+    $selectedUploadType = $selectedUploadName
+        ? (strtoupper((string) pathinfo($selectedUploadName, PATHINFO_EXTENSION)) ?: 'FILE')
+        : null;
+    $selectedUploadSize = $upload
+        ? ($upload->getSize() >= 1048576
+            ? number_format($upload->getSize() / 1048576, 1).' MB'
+            : number_format(max(1, (int) ceil($upload->getSize() / 1024))).' KB')
+        : null;
 @endphp
 <div class="ft-order-task-document-modal-backdrop" wire:key="order-task-document-modal-{{ $task->id }}" wire:click.self="closeOverviewTaskDocumentModal">
-    <section class="ft-order-task-document-modal {{ $prototypeUpload ? 'ft-order-prototype-upload-modal' : '' }}" data-ft-feedback-scope="form" role="dialog" aria-modal="true" aria-labelledby="order-task-document-modal-title">
+    <section class="ft-order-task-document-modal ft-order-attachment-upload-modal {{ $prototypeUpload ? 'ft-order-prototype-upload-modal' : '' }}" data-ft-feedback-scope="form" role="dialog" aria-modal="true" aria-labelledby="order-task-document-modal-title">
         <header class="ft-order-task-document-modal-head">
             <div>
                 <h2 id="order-task-document-modal-title">{{ $prototypeConfig['title'] }}</h2>
@@ -72,49 +81,32 @@
                     x-on:livewire-upload-error="uploading = false; progress = 0"
                     x-on:livewire-upload-cancel="uploading = false; progress = 0"
                 >
-                    <div class="ft-prototype-upload-label">
-                        {{ $prototypeConfig['label'] }}
-                    </div>
+                    @if($upload)
+                        <div class="ft-order-attachment-selected-count">1 file selected</div>
+                        <div class="ft-order-attachment-selected-file">
+                            <span class="ft-order-attachment-selected-check" aria-hidden="true">✓</span>
+                            <span class="ft-order-attachment-selected-copy">
+                                <strong class="{{ $prototypeUpload ? 'ft-prototype-selected-file-name' : '' }}" title="{{ $selectedUploadName }}">{{ $selectedUploadName }}</strong>
+                                <small>{{ $selectedUploadType }} · {{ $selectedUploadSize }} · Ready to upload</small>
+                            </span>
+                            <button type="button" wire:click="$set('overviewTaskDocumentUpload', null)" wire:loading.attr="disabled" wire:target="overviewTaskDocumentUpload">Remove</button>
+                        </div>
+                    @else
+                        <div class="{{ $prototypeUpload ? 'ft-prototype-upload-label' : 'ft-order-attachment-field-label' }}">{{ $prototypeUpload ? $prototypeConfig['label'] : 'File attachment' }}</div>
+                    @endif
 
-                    <label class="ft-order-task-document-dropzone ft-prototype-file-drop">
-                        <input
-                            type="file"
-                            wire:model="overviewTaskDocumentUpload"
-                            accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.zip,.txt,.csv,.ai,.eps,.esp"
-                            aria-label="Choose a file to upload"
-                            title="Choose file"
-                        >
-
-                        <span class="ft-prototype-upload-icon">⇧</span>
-
+                    <label class="ft-order-task-document-dropzone ft-order-attachment-dropzone {{ $upload ? 'is-compact' : '' }}">
+                        <input type="file" wire:model="overviewTaskDocumentUpload" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.zip,.txt,.csv,.ai,.eps,.esp" aria-label="{{ $upload ? 'Add another file' : 'Choose a file to upload' }}" title="Choose file">
+                        <svg class="ft-order-attachment-upload-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 16l-4-4-4 4M12 12v9M20.4 17.5A5 5 0 0 0 18 8.2 7 7 0 0 0 4.3 10.8 4.5 4.5 0 0 0 5.5 19H7"/></svg>
                         @if($upload)
-                            <strong
-                                class="ft-prototype-selected-file-name"
-                                title="{{ $upload->getClientOriginalName() }}"
-                            >
-                                {{ $upload->getClientOriginalName() }}
-                            </strong>
-
-                            <b>File selected</b>
-
-                            <small>
-                                {{
-                                    number_format(
-                                        max(
-                                            1,
-                                            (int) ceil(
-                                                $upload->getSize() / 1024
-                                            )
-                                        )
-                                    )
-                                }}
-                                KB
-                            </small>
+                            <strong>Add another file</strong>
+                            <b>Drag &amp; drop or <span>browse</span></b>
                         @else
-                            <strong>Drop a file here</strong>
-                            <b>or browse files</b>
-                            <small>{{ $prototypeConfig['hint'] }}</small>
+                            <strong>Drag &amp; drop a file here</strong>
+                            <b>or choose from your computer</b>
+                            <span class="ft-order-attachment-browse">Browse files</span>
                         @endif
+                        <small>{{ $prototypeConfig['hint'] }}</small>
                     </label>
 
                     {{-- CHANGED: shown only while Livewire is transferring the selected file. --}}
@@ -178,7 +170,7 @@
                     {{
                         $prototypeUpload
                             ? $prototypeConfig['button']
-                            : 'Add document'
+                            : ($upload ? 'Add 1 document' : 'Add document')
                     }}
                 </span>
 

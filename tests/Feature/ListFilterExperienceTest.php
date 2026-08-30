@@ -40,6 +40,10 @@ class ListFilterExperienceTest extends TestCase
         $this->assertStringContainsString('knownLabels: initialLabels', $runtime);
         $this->assertStringContainsString('const knownLabel = this.knownLabels.get(next);', $runtime);
         $this->assertStringContainsString('syncSelection(selection, params = {}, serverItems = [])', $runtime);
+        $this->assertStringContainsString('disabled: config.disabled === true', $runtime);
+        $this->assertStringContainsString('syncDisabled(disabled = false)', $runtime);
+        $this->assertStringContainsString('if (this.disabled) return;', $runtime);
+        $this->assertStringContainsString('syncDisabled(@js((bool) $disabled))', file_get_contents(resource_path('views/components/ui/search-select.blade.php')));
         $this->assertStringContainsString('if (this.pendingAt)', $runtime);
         $this->assertStringContainsString('if ((Date.now() - this.pendingAt) < 15000) return;', $runtime);
         $this->assertStringNotContainsString('currentLabel || suppliedLabel', $runtime);

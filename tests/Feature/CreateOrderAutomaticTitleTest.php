@@ -17,8 +17,8 @@ class CreateOrderAutomaticTitleTest extends TestCase
 
         $this->assertStringContainsString('Client Reference Number *', $view);
         $this->assertStringContainsString('wire:model.live.debounce.300ms="referenceNumber" required', $view);
-        $this->assertStringContainsString('<b>Order Title</b>', $view);
-        $this->assertStringContainsString('value="{{ $orderTitlePreview }}" readonly', $view);
+        $this->assertStringNotContainsString('<b>Order Title</b>', $view);
+        $this->assertStringNotContainsString('value="{{ $orderTitlePreview }}" readonly', $view);
         $this->assertStringNotContainsString('wire:model="jobTitle"', $view);
         $this->assertStringContainsString("'referenceNumber' => ['required','string','max:255']", $creation);
         $this->assertStringContainsString("'referenceNumber.required' => 'Client Reference Number is required.'", $creation);

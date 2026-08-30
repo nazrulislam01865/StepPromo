@@ -427,9 +427,12 @@ trait ManagesCreateOrderProducts
         $code = strtoupper(trim($this->newProductCode));
         $this->newProductCode = $code;
 
+        // SKU is optional in the Create Order quick-create flow. When it is
+        // omitted, MasterDataService generates the canonical Product code at
+        // save time. A manually entered SKU still has to be valid and unique.
         if ($code === '') {
-            $this->addError('newProductCode', 'Enter the SKU / product code first.');
-            return false;
+            $this->resetValidation('newProductCode');
+            return true;
         }
 
         if (mb_strlen($code) > 40 || preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]*$/', $code) !== 1) {
@@ -492,11 +495,11 @@ trait ManagesCreateOrderProducts
         $this->newProductName = trim($this->newProductName);
 
         $data = $this->validate([
-            'newProductCode' => ['required', 'string', 'max:40', 'regex:/^[A-Za-z0-9][A-Za-z0-9._-]*$/'],
+            'newProductCode' => ['nullable', 'string', 'max:40', 'regex:/^[A-Za-z0-9][A-Za-z0-9._-]*$/'],
             'newProductCategoryId' => ['required', 'integer'],
             'newProductName' => ['required', 'string', 'max:255'],
             'newProductSupplierId' => [
-                'required',
+                'nullable',
                 'integer',
                 Rule::exists('master_records', 'id')->where(fn ($query) => $query
                     ->where('workspace_id', app(MasterDataService::class)->workspaceId())
@@ -509,10 +512,15 @@ trait ManagesCreateOrderProducts
 
         $service = app(MasterDataService::class);
         $workspaceId = $service->workspaceId();
+        $productCode = strtoupper(trim((string) ($data['newProductCode'] ?? '')));
+        if ($productCode === '') {
+            $productCode = $service->nextCode('product');
+        }
+
         $duplicate = MasterRecord::withTrashed()
             ->forWorkspace($workspaceId)
             ->ofType('product')
-            ->whereRaw('LOWER(code) = ?', [mb_strtolower($data['newProductCode'])])
+            ->whereRaw('LOWER(code) = ?', [mb_strtolower($productCode)])
             ->first();
 
         if ($duplicate) {
@@ -534,13 +542,15 @@ trait ManagesCreateOrderProducts
 
         try {
             $product = $service->save('product', [
-                'code' => $data['newProductCode'],
+                'code' => $productCode,
                 'name' => $data['newProductName'],
                 'description' => null,
                 'parent_id' => $category->id,
                 'status' => 'active',
                 'sort_order' => ((int) MasterRecord::query()->forWorkspace($workspaceId)->ofType('product')->max('sort_order')) + 1,
-                'metadata' => ['supplier_id' => (int) $data['newProductSupplierId']],
+                'metadata' => filled($data['newProductSupplierId'] ?? null)
+                    ? ['supplier_id' => (int) $data['newProductSupplierId']]
+                    : [],
             ]);
         } catch (\Illuminate\Validation\ValidationException $exception) {
             $message = collect($exception->errors())->flatten()->first() ?: 'The product could not be created.';
@@ -562,7 +572,17 @@ trait ManagesCreateOrderProducts
             }
         }
 
-        $this->selectCreateProduct((int) $product->id);
+        $supplierId = filled($data['newProductSupplierId'] ?? null) ? (int) $data['newProductSupplierId'] : null;
+        if ($supplierId === null && !in_array((int) $product->id, $this->createOrderSupplierSkipProductIds, true)) {
+            // The Product can intentionally have no default supplier. Mark this
+            // Order row as an explicit supplier skip so quick-create does not
+            // immediately open the missing-supplier confirmation modal.
+            $this->createOrderSupplierSkipProductIds[] = (int) $product->id;
+        }
+        $this->appendCreateOrderProduct($product, $supplierId);
+        $this->createProductShowAllResults = false;
+        $this->resetValidation('jobItems');
+        $this->dispatch('create-order-product-selected');
         $this->showCreateOrderProductModal = false;
         $this->resetCreateOrderProductModal();
         if (!$imageStored) {

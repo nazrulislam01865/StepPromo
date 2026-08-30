@@ -108,9 +108,10 @@ unset($__defined_vars, $__key, $__value); ?>
     $componentId = 'ft-search-select-'.substr(md5($property.'|'.$type.'|'.$context.'|'.$label), 0, 12);
 ?>
 <div
-    <?php echo e($attributes->class(['ft-jl-control', 'ft-remote-filter', 'ft-search-select', 'is-disabled' => $disabled])); ?>
+    <?php echo e($attributes->class(['ft-jl-control', 'ft-remote-filter', 'ft-search-select'])); ?>
 
     data-ft-ui-component="search-select"
+    x-bind:class="{ 'is-disabled': disabled }"
     <?php if($remote): ?>
         x-data="window.FlowTrack.ui.searchSelect({
             property: <?php echo \Illuminate\Support\Js::from($property)->toHtml() ?>,
@@ -126,7 +127,7 @@ unset($__defined_vars, $__key, $__value); ?>
             menuWidth: <?php echo \Illuminate\Support\Js::from((int) $menuWidth)->toHtml() ?>,
             fixedMenu: <?php echo \Illuminate\Support\Js::from((bool) $fixedMenu)->toHtml() ?>,
         })"
-        x-effect="syncSelection(<?php echo \Illuminate\Support\Js::from(['value' => (string) $value, 'label' => $resolvedLabel])->toHtml() ?>, <?php echo \Illuminate\Support\Js::from($params)->toHtml() ?>, <?php echo \Illuminate\Support\Js::from($items->all())->toHtml() ?>)"
+        x-effect="syncSelection(<?php echo \Illuminate\Support\Js::from(['value' => (string) $value, 'label' => $resolvedLabel])->toHtml() ?>, <?php echo \Illuminate\Support\Js::from($params)->toHtml() ?>, <?php echo \Illuminate\Support\Js::from($items->all())->toHtml() ?>); syncDisabled(<?php echo \Illuminate\Support\Js::from((bool) $disabled)->toHtml() ?>)"
     <?php else: ?>
         x-data="window.FlowTrack.ui.localFilter({
             property: <?php echo \Illuminate\Support\Js::from($property)->toHtml() ?>,
@@ -157,7 +158,7 @@ unset($__defined_vars, $__key, $__value); ?>
         <?php if (! ($hideLabel)): ?> aria-labelledby="<?php echo e($componentId); ?>-label" <?php else: ?> aria-label="<?php echo e($label); ?>" <?php endif; ?>
         x-on:click.stop="toggle()"
         :aria-expanded="open.toString()"
-        <?php if($disabled): echo 'disabled'; endif; ?>
+        x-bind:disabled="disabled"
     >
         <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($showAvatar): ?>
             <span class="ft-search-select__selected-user">
@@ -182,9 +183,13 @@ unset($__defined_vars, $__key, $__value); ?>
         <span class="ft-filter-chevron" aria-hidden="true">⌄</span>
     </button>
 
+    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($fixedMenu): ?>
+        <template x-teleport="body">
+    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
     <div
         x-ref="menu"
-        class="ft-remote-filter-menu ft-search-select__menu"
+        class="ft-remote-filter-menu ft-search-select__menu<?php echo e($showAvatar ? ' ft-search-select__menu--people' : ''); ?>"
+        data-ft-search-select-context="<?php echo e($context); ?>"
         x-cloak
         x-bind:style="open ? menuStyle + ';display:flex!important;' : 'display:none!important;'"
         x-on:click.outside="close()"
@@ -259,5 +264,8 @@ unset($__defined_vars, $__key, $__value); ?>
         <div class="ft-remote-filter-message" x-text="message"></div>
         <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($footerMessage): ?><div class="ft-remote-filter-message"><?php echo e($footerMessage); ?></div><?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
     </div>
+    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($fixedMenu): ?>
+        </template>
+    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
 </div>
 <?php /**PATH /Applications/XAMPP/xamppfiles/htdocs/laravel/flowtrack/resources/views/components/ui/search-select.blade.php ENDPATH**/ ?>

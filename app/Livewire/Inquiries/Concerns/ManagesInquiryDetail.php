@@ -115,14 +115,12 @@ trait ManagesInquiryDetail
 
     public function setDetailTab(string $tab): void
     {
-        // Legacy workflow links still land on Overview. RFQ, comparison and
-        // activity are lightweight Inquiry-detail tabs with independent data.
-        if ($tab === 'workflow') $tab = 'overview';
-        abort_unless(in_array($tab, ['overview', 'rfq', 'comparison', 'activity'], true), 422);
+        // Workflow and Activity now live inside Overview. Keep stale links safe.
+        if (in_array($tab, ['workflow', 'activity'], true)) $tab = 'overview';
+        abort_unless(in_array($tab, ['overview', 'rfq', 'comparison'], true), 422);
         $this->detailTab = $tab;
         $this->selectedTaskId = null;
         $this->showRfqEmailPreview = false;
-        if ($tab === 'activity') $this->inquiryDetailSectionsReady['activity'] = true;
         $this->resetPage('inquiryDocumentsPage');
         $this->resetPage('inquiryActivityPage');
     }

@@ -11,13 +11,21 @@ class InquiryCreateRfqModuleTest extends TestCase
         $create = file_get_contents(resource_path('views/livewire/inquiries/sections/create.blade.php'));
         $component = file_get_contents(resource_path('views/components/inquiries/create-rfq.blade.php'));
         $choice = file_get_contents(resource_path('views/components/inquiries/rfq-supplier-choice.blade.php'));
+        $selectedCard = file_get_contents(resource_path('views/components/inquiries/rfq-selected-supplier-card.blade.php'));
         $pageData = file_get_contents(app_path('Livewire/Inquiries/Concerns/BuildsInquiryPageData.php'));
+        $createRfq = file_get_contents(app_path('Livewire/Inquiries/Concerns/ManagesInquiryCreateRfq.php'));
         $rfq = file_get_contents(app_path('Services/Inquiries/InquiryRfqService.php'));
 
         $this->assertStringContainsString('<x-inquiries.create-rfq', $create);
         $this->assertStringContainsString('Invite suppliers to the RFQ', $component);
         $this->assertStringContainsString('<x-inquiries.rfq-supplier-choice', $component);
         $this->assertStringContainsString('wire:model.live="{{ $model }}"', $choice);
+        $this->assertStringContainsString('Selected suppliers', $component);
+        $this->assertStringContainsString('<x-inquiries.rfq-selected-supplier-card', $component);
+        $this->assertStringContainsString('wire:click="removeCreateRfqSupplier(', $selectedCard);
+        $this->assertStringContainsString('createRfqSelectedSuppliers', $pageData);
+        $this->assertStringContainsString('selectableSuppliersByIds', $pageData);
+        $this->assertStringContainsString('public function removeCreateRfqSupplier', $createRfq);
         $this->assertStringContainsString('wire:model="createRfqDueDate"', $component);
         $this->assertStringContainsString('wire:model="createRfqMessage"', $component);
         $this->assertStringNotContainsString('Suppliers remain RFQ participants only.', $component);
@@ -27,6 +35,19 @@ class InquiryCreateRfqModuleTest extends TestCase
         $this->assertStringContainsString("'invitable' => \$invitable", $rfq);
         $this->assertStringContainsString('@disabled(! $invitable)', $choice);
         $this->assertStringContainsString('public function invitableSuppliersByIds', $rfq);
+    }
+
+    public function test_adding_a_product_auto_selects_its_default_supplier_for_the_create_rfq(): void
+    {
+        $products = file_get_contents(app_path('Livewire/Inquiries/Concerns/ManagesInquiryCreateProducts.php'));
+        $createRfq = file_get_contents(app_path('Livewire/Inquiries/Concerns/ManagesInquiryCreateRfq.php'));
+
+        $this->assertStringContainsString('$this->autoSelectCreateRfqDefaultSupplier($product);', $products);
+        $this->assertStringContainsString('private function autoSelectCreateRfqDefaultSupplier(MasterRecord $product): void', $createRfq);
+        $this->assertStringContainsString('$supplierId = $product->productSupplierId();', $createRfq);
+        $this->assertStringContainsString('selectableSuppliersByIds($workspaceId, [$supplierId])', $createRfq);
+        $this->assertStringContainsString('$selectedIds->push($supplierId);', $createRfq);
+        $this->assertStringContainsString('$this->createRfqSupplierIds = $selectedIds->values()->all();', $createRfq);
     }
 
     public function test_create_inquiry_sends_selected_rfq_invitations_only_after_creation(): void
@@ -57,5 +78,7 @@ class InquiryCreateRfqModuleTest extends TestCase
         $this->assertStringContainsString('.ft-create-rfq-layout', $css);
         $this->assertStringContainsString('.ft-create-rfq-card--settings', $css);
         $this->assertStringContainsString('.ft-create-rfq-supplier.is-selected', $css);
+        $this->assertStringContainsString('.ft-create-rfq-selected-section', $css);
+        $this->assertStringContainsString('.ft-create-rfq-selected-card', $css);
     }
 }

@@ -26,6 +26,11 @@ final class InquiryRfqService
         private readonly ModuleEmailControlService $emailControl,
     ) {}
 
+    public function emailEnabled(): bool
+    {
+        return $this->emailControl->inquiryEnabled();
+    }
+
     /** @return array{invited:int,responses:int,submitted:int,awarded:int} */
     public function summary(Inquiry $inquiry): array
     {
@@ -167,6 +172,44 @@ final class InquiryRfqService
                 ];
             })
             ->values();
+    }
+
+    /** @return array<int,int> */
+    private function assignedSupplierIdsForInquiry(Inquiry $inquiry): array
+    {
+        $inquiry->loadMissing('items:id,inquiry_id,item_name,category,sort_order');
+        $names = $inquiry->items
+            ->pluck('item_name')
+            ->map(fn ($name) => trim((string) $name))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($names->isEmpty()) return [];
+
+        $products = MasterRecord::query()
+            ->forWorkspace((int) $inquiry->workspace_id)
+            ->ofType('product')
+            ->active()
+            ->whereIn('name', $names->all())
+            ->get(['id','metadata']);
+
+        $supplierIds = $products
+            ->flatMap(fn (MasterRecord $product) => $product->productSupplierIds())
+            ->map(fn ($id) => (int) $id)
+            ->filter();
+
+        if (Schema::hasTable('product_supplier_links') && $products->isNotEmpty()) {
+            $supplierIds = $supplierIds->concat(
+                DB::table('product_supplier_links')
+                    ->where('workspace_id', (int) $inquiry->workspace_id)
+                    ->whereIn('product_id', $products->pluck('id')->all())
+                    ->pluck('supplier_id')
+                    ->map(fn ($id) => (int) $id)
+            );
+        }
+
+        return $supplierIds->unique()->values()->all();
     }
 
     /**
@@ -392,6 +435,52 @@ final class InquiryRfqService
             ->values();
     }
 
+    /**
+     * Lightweight invitation source for the RFQ management table. The table only
+     * needs supplier identity plus invitation status timestamps; quote items are
+     * intentionally not hydrated here. The comparison tab continues to use the
+     * full invitations() graph below.
+     *
+     * @return Collection<int,InquiryRfqInvitation>
+     */
+    public function managementInvitations(Inquiry $inquiry): Collection
+    {
+        if (! Schema::hasTable('inquiry_rfq_invitations')) return collect();
+
+        return InquiryRfqInvitation::query()
+            ->where('inquiry_id', $inquiry->id)
+            ->with('supplier:id,name,code,metadata,status')
+            ->orderBy('invited_at')
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
+     * Lightweight product-overview invitation graph.
+     *
+     * Inquiry Overview needs delivery state plus quote-to-item links to render
+     * product-level RFQ progress, but it does not need the full comparison data.
+     *
+     * @return Collection<int,InquiryRfqInvitation>
+     */
+    public function overviewInvitations(Inquiry $inquiry): Collection
+    {
+        if (! Schema::hasTable('inquiry_rfq_invitations')) return collect();
+
+        return InquiryRfqInvitation::query()
+            ->where('inquiry_id', $inquiry->id)
+            ->with([
+                'supplier:id,name,code,metadata,status',
+                'quote:id,invitation_id,updated_at',
+                'quote.items:id,quote_id,inquiry_item_id',
+            ])
+            ->orderBy('id')
+            ->get([
+                'id', 'inquiry_id', 'supplier_id', 'email_status', 'quote_status',
+                'invited_at', 'quote_submitted_at', 'awarded_at', 'rejected_at', 'updated_at',
+            ]);
+    }
+
     /** @return Collection<int,InquiryRfqInvitation> */
     public function invitations(Inquiry $inquiry): Collection
     {
@@ -409,7 +498,7 @@ final class InquiryRfqService
             ->get();
     }
 
-    public function invite(Inquiry $inquiry, int $supplierId, User $actor, ?Carbon $dueAt = null, ?string $requestMessage = null): InquiryRfqInvitation
+    public function invite(Inquiry $inquiry, int $supplierId, User $actor, ?Carbon $dueAt = null, ?string $requestMessage = null, bool $sendEmail = true): InquiryRfqInvitation
     {
         $workspaceId = (int) $inquiry->workspace_id;
         $supplier = MasterRecord::query()
@@ -447,13 +536,23 @@ final class InquiryRfqService
             'invited_by' => $actor->id,
             'token_hash' => hash('sha256', $token),
             'token_cipher' => Crypt::encryptString($token),
-            'invited_at' => now(),
+            'invited_at' => $sendEmail ? now() : null,
             'due_at' => $dueAt ?: ($sharedDueAt ? Carbon::parse($sharedDueAt) : $this->defaultDueAt($inquiry)),
             'request_message' => filled($requestMessage) ? trim((string) $requestMessage) : ($sharedRequestMessage ?: null),
-            'email_status' => $emailReady ? 'Sending' : 'No email',
+            'email_status' => ! $sendEmail ? 'Draft' : ($emailReady ? 'Sending' : 'No email'),
         ]);
         $invitation->setRelation('supplier', $supplier);
         $inquiry->loadMissing('items:id,inquiry_id,item_name,category,quantity,unit,unit_price,notes,sort_order');
+        $invitation->setRelation('inquiry', $inquiry);
+
+        if (! $sendEmail) {
+            $this->activity($inquiry, $actor, 'rfq.draft', $supplier->name.' was added to the RFQ as a draft invitation.', [
+                'supplier_id' => (int) $supplier->id,
+                'invitation_id' => (int) $invitation->id,
+            ]);
+            app(\App\Services\WorkspaceRefreshService::class)->touch('InquiryRFQ:draft');
+            return $invitation->fresh(['supplier','quote']);
+        }
 
         if (! $emailEnabled && $emailReady) {
             $invitation->update(['email_status' => 'Email disabled']);
@@ -502,18 +601,79 @@ final class InquiryRfqService
      */
     public function sendExistingInvitation(Inquiry $inquiry, int $invitationId, User $actor): InquiryRfqInvitation
     {
-        $invitation = InquiryRfqInvitation::query()
+        $invitation = $this->existingInvitation($inquiry, $invitationId);
+        abort_if($invitation->email_status === 'Delivered', 422, 'This RFQ invitation has already been sent.');
+
+        return $this->deliverExistingInvitation($inquiry, $invitation, $actor, false);
+    }
+
+    /**
+     * Send or resend the supplier's RFQ invitation from the management table.
+     * Default suppliers do not have an invitation row yet, so they are created
+     * lazily. Existing delivered invitations reuse the same secure token when
+     * the user explicitly chooses Resend.
+     */
+    public function sendSupplierInvitation(Inquiry $inquiry, int $supplierId, User $actor): InquiryRfqInvitation
+    {
+        $existing = InquiryRfqInvitation::query()
+            ->where('inquiry_id', $inquiry->id)
+            ->where('supplier_id', $supplierId)
+            ->with(['supplier','inquiry.items','quote'])
+            ->first();
+
+        if ($existing) {
+            abort_if(
+                $existing->awarded_at || $existing->rejected_at,
+                422,
+                'This supplier RFQ is already closed and does not need another invitation.'
+            );
+        }
+
+        if (! $existing) {
+            $assignedSupplierIds = $this->assignedSupplierIdsForInquiry($inquiry);
+            abort_unless(
+                in_array($supplierId, $assignedSupplierIds, true),
+                422,
+                'Assign this supplier to an Inquiry product before sending an invitation.'
+            );
+
+            // Create the participant first, then deliver it through the same
+            // retry-safe path as existing rows. If delivery fails the Failed
+            // state remains visible in the management table instead of the
+            // supplier silently falling back to a fresh default row.
+            $existing = $this->invite($inquiry, $supplierId, $actor, null, null, false);
+            $existing->setRelation('inquiry', $inquiry);
+        }
+
+        return $this->deliverExistingInvitation($inquiry, $existing, $actor, true);
+    }
+
+    private function existingInvitation(Inquiry $inquiry, int $invitationId): InquiryRfqInvitation
+    {
+        return InquiryRfqInvitation::query()
             ->where('inquiry_id', $inquiry->id)
             ->whereKey($invitationId)
             ->with(['supplier','inquiry.items','quote'])
             ->firstOrFail();
+    }
 
-        abort_if($invitation->email_status === 'Delivered', 422, 'This RFQ invitation has already been sent.');
+    private function deliverExistingInvitation(
+        Inquiry $inquiry,
+        InquiryRfqInvitation $invitation,
+        User $actor,
+        bool $allowResend,
+    ): InquiryRfqInvitation {
+        abort_if(
+            ! $allowResend && $invitation->email_status === 'Delivered',
+            422,
+            'This RFQ invitation has already been sent.'
+        );
         abort_unless($this->emailControl->inquiryEnabled(), 422, 'Inquiry email service is currently disabled by an administrator.');
 
         $recipient = $invitation->supplierEmail();
         abort_unless(filter_var($recipient, FILTER_VALIDATE_EMAIL), 422, 'Add a valid email address to this supplier before sending the RFQ invitation.');
 
+        $wasDelivered = $invitation->email_status === 'Delivered';
         $token = Crypt::decryptString((string) $invitation->token_cipher);
         $invitation->update(['email_status' => 'Sending']);
 
@@ -530,11 +690,12 @@ final class InquiryRfqService
             'email_tracking_id' => $trackingId,
         ]);
 
-        $this->activity($inquiry, $actor, 'rfq.invited', 'RFQ invitation sent to '.$invitation->supplier?->name.'.', [
+        $verb = $wasDelivered ? 'resent' : 'sent';
+        $this->activity($inquiry, $actor, $wasDelivered ? 'rfq.resent' : 'rfq.invited', 'RFQ invitation '.$verb.' to '.$invitation->supplier?->name.'.', [
             'supplier_id' => (int) $invitation->supplier_id,
             'invitation_id' => (int) $invitation->id,
         ]);
-        app(\App\Services\WorkspaceRefreshService::class)->touch('InquiryRFQ:invited');
+        app(\App\Services\WorkspaceRefreshService::class)->touch($wasDelivered ? 'InquiryRFQ:resent' : 'InquiryRFQ:invited');
 
         return $invitation->fresh(['supplier','quote']);
     }
