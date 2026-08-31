@@ -4,11 +4,13 @@
 @endphp
 <form method="post" action="{{ route('rfq.public.respond', ['token' => $token]) }}" id="rfq-pricing-form" class="ft-rfq-portal-stack">
     @csrf
+    <x-rfq.public.product-to-quote :invitation="$invitation" :token="$token" :products="$products" />
+
     <section class="ft-rfq-portal-card ft-rfq-portal-section-card">
         <div class="ft-rfq-portal-card__header ft-rfq-card-header-with-select">
             <div>
-                <h2>Product pricing</h2>
-                <p>Enter unit pricing and minimum order quantity for each requested product.</p>
+                <h2>Pricing</h2>
+                <p>Enter pricing for the requested quantity. You may add volume price breaks.</p>
             </div>
             <label class="ft-rfq-inline-select">
                 <span>Currency</span>

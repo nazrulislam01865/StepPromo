@@ -100,6 +100,7 @@
                         :ready-to-submit="$readyToSubmit"
                         :locked="$locked"
                         :submitted="$submitted"
+                        :can-revise="$canRevise"
                     />
                     @break
                 @default
@@ -135,6 +136,7 @@
                 :ready-to-submit="$readyToSubmit"
                 :locked="$locked"
                 :submitted="$submitted"
+                :can-revise="$canRevise"
             />
         </aside>
     </main>
@@ -193,6 +195,17 @@
             pricing.addEventListener('change', recalculate);
             recalculate();
         }
+
+        document.querySelectorAll('[data-rfq-toggle-requirements]').forEach(link => {
+            link.addEventListener('click', event => {
+                const panel = link.closest('.ft-rfq-buyer-requirements');
+                if (!panel) return;
+
+                event.preventDefault();
+                const expanded = panel.classList.toggle('is-expanded');
+                link.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+            });
+        });
 
         document.querySelectorAll('[data-rfq-decline]').forEach(button => button.addEventListener('click', event => {
             if (!window.confirm('Decline this request for quotation?')) event.preventDefault();

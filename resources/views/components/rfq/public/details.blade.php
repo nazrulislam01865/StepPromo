@@ -1,7 +1,6 @@
 @props(['invitation', 'token', 'quote', 'products', 'contact', 'rfqReference', 'locked' => false])
 @php
     $inquiry = $invitation->inquiry;
-    $firstProduct = collect($products)->first();
 @endphp
 <form method="post" action="{{ route('rfq.public.respond', ['token' => $token]) }}" id="rfq-details-form" class="ft-rfq-portal-stack">
     @csrf
@@ -35,29 +34,7 @@
         </div>
     </section>
 
-    <section class="ft-rfq-portal-card ft-rfq-portal-section-card">
-        <div class="ft-rfq-portal-card__header">
-            <div>
-                <h2>Requested product</h2>
-                <p>Review the product and requested quantity before entering pricing.</p>
-            </div>
-        </div>
-        <div class="ft-rfq-product-list">
-            @foreach($products as $product)
-                <article class="ft-rfq-product-line">
-                    <x-rfq.public.product-thumb :product="$product" size="lg" />
-                    <div class="ft-rfq-product-line__copy">
-                        <strong>{{ $product['name'] }}</strong>
-                        <span>{{ $product['code'] ?: 'Product' }} @if($product['category']) · {{ $product['category'] }} @endif</span>
-                    </div>
-                    <div class="ft-rfq-product-line__quantity">
-                        <small>Requested quantity</small>
-                        <strong>{{ number_format((float) $product['quantity'], fmod((float) $product['quantity'], 1.0) === 0.0 ? 0 : 2) }} {{ $product['unit'] }}</strong>
-                    </div>
-                </article>
-            @endforeach
-        </div>
-    </section>
+    <x-rfq.public.product-to-quote :invitation="$invitation" :token="$token" :products="$products" />
 
     @unless($locked)
         <div class="ft-rfq-portal-bottom-actions">

@@ -54,3 +54,13 @@ The archive did not contain `vendor/` or `node_modules/`, so the source CSS modu
 ## 2026-08-31 active-step hotfix
 
 Fixed the public RFQ step-state builder so the current `$step` is captured safely when computing the stepper's `active` state. The builder now uses an arrow function, which automatically captures the surrounding completion-state variables and the active step and prevents the `Undefined variable $step` runtime error seen on the public RFQ GET route.
+
+## 2026-08-31 typography, Product to quote, and revision update
+
+The supplier portal now consumes the same centralized FlowTrack typography tokens used by the rest of the application instead of relying on small one-off font sizes. Page titles, section headings, form labels, controls, values, buttons, review content, and the quotation summary use the project theme variables from `resources/theme/flowtrack/settings.css`. The remaining 9px portal text overrides were removed, and key values/controls were raised to the normal project form sizes.
+
+The pricing flow now uses the reusable `resources/views/components/rfq/public/product-to-quote.blade.php` component for section 2. It follows the supplied prototype structure: numbered section heading, product thumbnail/name/code/category, requested-quantity callout, buyer-requirements panel, specification action, and the quotation-scope information strip. Buyer requirements are taken from the supplier-facing RFQ request message and fall back to the inquiry requirement notes. General internal inquiry attachments are intentionally not exposed through the public supplier token; reference-file links render only when supplier-safe reference documents are explicitly provided to this component.
+
+A submitted quotation can now be reopened with **Revise quotation** while the RFQ is still active and the existing public-link window has not expired. Starting a revision changes the invitation from `submitted` back to `draft`, preserves the existing quote fields, item prices/MOQs, and uploaded documents, records an `rfq.quote_revision_started` activity, and sends the supplier back into the editable quotation flow. Awarded, rejected, declined, or expired requests remain locked. Re-submitting uses the existing final-submission workflow and refreshes the submitted timestamp.
+
+This update does not add a database migration. After deploying these files, clear Laravel caches. The prebuilt CSS asset in this archive is refreshed as well so the typography/layout change is visible even before the next normal frontend build.

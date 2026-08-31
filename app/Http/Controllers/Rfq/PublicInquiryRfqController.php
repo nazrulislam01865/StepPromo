@@ -48,6 +48,13 @@ final class PublicInquiryRfqController extends Controller
                 ->with('success', 'Thank you. Your response has been recorded.');
         }
 
+        if ($action === 'revise') {
+            $rfq->beginQuoteRevision($invitation);
+
+            return redirect()->route('rfq.public.show', ['token' => $token, 'step' => 'details'])
+                ->with('success', 'Quotation reopened for revision. Your previous values and documents are preserved.');
+        }
+
         if (in_array($action, ['save_details', 'continue_pricing'], true)) {
             $portal->saveDetails($invitation, $request->validate([
                 'supplier_contact_name' => ['required', 'string', 'max:160'],

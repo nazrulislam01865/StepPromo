@@ -1,6 +1,6 @@
 @props([
     'invitation', 'token', 'quote', 'products', 'documents', 'documentTypes', 'contact', 'rfqReference', 'currency',
-    'productSubtotal', 'sampleCost', 'otherCosts', 'totalQuotedValue', 'clientName', 'readyToSubmit', 'locked' => false, 'submitted' => false,
+    'productSubtotal', 'sampleCost', 'otherCosts', 'totalQuotedValue', 'clientName', 'readyToSubmit', 'locked' => false, 'submitted' => false, 'canRevise' => false,
 ])
 @php
     $quoteItems = collect($quote?->items ?? [])->keyBy('inquiry_item_id');
@@ -14,7 +14,7 @@
         <h2>Review your quotation</h2>
         <p>Check all information before submitting. You can return to any section to make changes.</p>
         @unless($submitted)
-            <div class="ft-rfq-warning-strip"><x-rfq.public.icon name="info" /> Submitting will send this quotation to {{ $clientName }}. You will not be able to edit it unless the buyer reopens the request.</div>
+            <div class="ft-rfq-warning-strip"><x-rfq.public.icon name="info" /> Submitting will send this quotation to {{ $clientName }}. You can revise it later from this secure link until the RFQ is closed.</div>
         @endunless
     </section>
 
@@ -115,7 +115,23 @@
             </div>
             <p class="ft-rfq-confirmation-note"><x-rfq.public.icon name="lock" /> A confirmation email will be sent after submission.</p>
         @elseif($submitted)
-            <div class="ft-rfq-submitted-banner">✓ Quotation submitted successfully. This quotation is now locked.</div>
+            <div class="ft-rfq-submitted-banner">
+                <span>✓ Quotation submitted successfully.</span>
+                @if($canRevise)
+                    <button type="submit" class="ft-rfq-btn is-secondary" form="rfq-revise-form">
+                        <x-rfq.public.icon name="pencil" /> Revise quotation
+                    </button>
+                @else
+                    <small>This quotation is locked because the RFQ is closed or the revision window has ended.</small>
+                @endif
+            </div>
         @endif
     </form>
+
+    @if($submitted && $canRevise)
+        <form method="post" action="{{ route('rfq.public.respond', ['token' => $token]) }}" id="rfq-revise-form" class="ft-rfq-hidden-form">
+            @csrf
+            <input type="hidden" name="action" value="revise">
+        </form>
+    @endif
 </div>

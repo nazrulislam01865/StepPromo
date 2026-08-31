@@ -80,7 +80,14 @@ final class PublicRfqPortalService
             ->count();
         $documentsComplete = $requiredDocumentCount === count(self::REQUIRED_DOCUMENT_TYPES);
         $readyToSubmit = $detailsComplete && $pricingComplete && $documentsComplete;
-        $locked = $invitation->quote_status === 'submitted'
+        $submitted = $invitation->quote_status === 'submitted' && (bool) $quote;
+        $revisionWindowOpen = ! $invitation->due_at || now()->lessThanOrEqualTo($invitation->due_at->copy()->addDays(30));
+        $canRevise = $submitted
+            && ! $invitation->awarded_at
+            && ! $invitation->rejected_at
+            && $invitation->interest_status !== 'declined'
+            && $revisionWindowOpen;
+        $locked = $submitted
             || (bool) $invitation->awarded_at
             || (bool) $invitation->rejected_at
             || $invitation->interest_status === 'declined';
@@ -116,7 +123,8 @@ final class PublicRfqPortalService
                 'active' => $key === $step,
             ])->values(),
             'locked' => $locked,
-            'submitted' => $invitation->quote_status === 'submitted' && (bool) $quote,
+            'submitted' => $submitted,
+            'canRevise' => $canRevise,
             'quote' => $quote,
             'products' => $products,
             'firstProduct' => $firstProduct,
@@ -406,6 +414,9 @@ final class PublicRfqPortalService
                 'image_url' => $hasSecureImage
                     ? route('rfq.public.product-image', ['token' => $token, 'item' => $item->id], false)
                     : null,
+                // Reference-document access is intentionally opt-in. General Inquiry attachments
+                // are not exposed through a supplier token because they can contain internal material.
+                'reference_documents' => [],
             ];
         })->values();
     }

@@ -1,7 +1,7 @@
 @props([
     'invitation', 'token', 'step', 'quote', 'firstProduct', 'currency', 'totalQuantity', 'productSubtotal',
     'sampleCost', 'otherCosts', 'totalQuotedValue', 'detailsComplete', 'pricingComplete', 'documents',
-    'documentsComplete' => false, 'readyToSubmit', 'locked' => false, 'submitted' => false,
+    'documentsComplete' => false, 'readyToSubmit', 'locked' => false, 'submitted' => false, 'canRevise' => false,
 ])
 @php
     $formId = match($step) {
@@ -66,5 +66,13 @@
         @if($step === 'review')<div class="ft-rfq-secure-submission"><x-rfq.public.icon name="lock" /> Secure submission</div>@endif
     @elseif($submitted)
         <div class="ft-rfq-summary-submitted">✓ Submitted</div>
+        @if($canRevise)
+            <div class="ft-rfq-summary-actions is-submitted-actions">
+                <form method="post" action="{{ route('rfq.public.respond', ['token' => $token]) }}">
+                    @csrf
+                    <button type="submit" name="action" value="revise" class="ft-rfq-btn is-secondary is-full"><x-rfq.public.icon name="pencil" /> Revise quotation</button>
+                </form>
+            </div>
+        @endif
     @endif
 </section>

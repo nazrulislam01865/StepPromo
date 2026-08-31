@@ -708,7 +708,7 @@ final class InquiryRfqService
             ->with([
                 'supplier:id,name,code,metadata,status',
                 'inviter:id,name,email',
-                'inquiry:id,workspace_id,inquiry_number,client_id,subject,currency,required_delivery_date,result',
+                'inquiry:id,workspace_id,inquiry_number,client_id,subject,requirement_notes,currency,required_delivery_date,result',
                 'inquiry.client:id,name',
                 'inquiry.items:id,inquiry_id,item_name,category,quantity,unit,unit_price,notes,sort_order',
                 'quote:id,invitation_id,supplier_contact_name,supplier_contact_email,supplier_contact_phone,currency,freight,tooling_cost,sample_cost,discount,tax_status,lead_time_days,sample_lead_time_days,incoterm,shipping_port,estimated_delivery_date,validity_days,specification_compliance,notes,supporting_information,document_notes,submitted_by_name,submitted_by_email,submitted_total,created_at,updated_at',
@@ -735,6 +735,37 @@ final class InquiryRfqService
             'invitation_id' => (int) $invitation->id,
         ]);
         app(\App\Services\WorkspaceRefreshService::class)->touch('InquiryRFQ:declined');
+    }
+
+    public function beginQuoteRevision(InquiryRfqInvitation $invitation): InquiryRfqQuote
+    {
+        $invitation->loadMissing(['quote', 'supplier', 'inquiry']);
+        abort_if($invitation->awarded_at || $invitation->rejected_at, 422, 'This RFQ is already closed.');
+        abort_if($invitation->interest_status === 'declined', 422, 'This quotation request has been declined.');
+        abort_unless($invitation->quote_status === 'submitted' && $invitation->quote, 422, 'Only a submitted quotation can be revised.');
+        abort_if($invitation->due_at && now()->greaterThan($invitation->due_at->copy()->addDays(30)), 422, 'This quotation link has expired.');
+
+        $previousSubmittedAt = $invitation->quote_submitted_at;
+        $quote = DB::transaction(function () use ($invitation, $previousSubmittedAt): InquiryRfqQuote {
+            $invitation->update([
+                'quote_status' => 'draft',
+                'interest_status' => 'interested',
+                'interest_at' => $invitation->interest_at ?: now(),
+            ]);
+
+            $this->activity($invitation->inquiry, null, 'rfq.quote_revision_started', $invitation->supplier?->name.' reopened its quotation for revision.', [
+                'supplier_id' => (int) $invitation->supplier_id,
+                'invitation_id' => (int) $invitation->id,
+                'quote_id' => (int) $invitation->quote->id,
+                'previous_submitted_at' => $previousSubmittedAt?->toIso8601String(),
+            ]);
+
+            return $invitation->quote->fresh(['items', 'documents']);
+        });
+
+        app(\App\Services\WorkspaceRefreshService::class)->touch('InquiryRFQ:quote-revision-started');
+
+        return $quote;
     }
 
     /** @param array<int,array{inquiry_item_id:int,unit_price:float|int|string,moq?:float|int|string|null}> $items */

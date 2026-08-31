@@ -46,6 +46,16 @@
         @case('check')
             <path d="m6.5 12.5 3.5 3.5 7.5-8"></path>
             @break
+        @case('external')
+            <path d="M14 5h5v5"></path>
+            <path d="m19 5-8 8"></path>
+            <path d="M18 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path>
+            @break
+        @case('download')
+            <path d="M12 4v11"></path>
+            <path d="m8 11 4 4 4-4"></path>
+            <path d="M5 20h14"></path>
+            @break
         @case('alert')
             <path d="M12 8v5"></path>
             <path d="M12 16h.01"></path>

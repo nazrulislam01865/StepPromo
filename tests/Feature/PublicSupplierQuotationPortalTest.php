@@ -65,6 +65,45 @@ class PublicSupplierQuotationPortalTest extends TestCase
         $this->assertStringContainsString('documentForInvitation', $portal);
     }
 
+    public function test_product_to_quote_section_matches_the_pricing_prototype_and_uses_project_typography(): void
+    {
+        $details = file_get_contents(resource_path('views/components/rfq/public/details.blade.php'));
+        $pricing = file_get_contents(resource_path('views/components/rfq/public/pricing.blade.php'));
+        $productSection = file_get_contents(resource_path('views/components/rfq/public/product-to-quote.blade.php'));
+        $css = file_get_contents(resource_path('css/modules/application/25-public-rfq-quotation-prototype.css'));
+
+        $this->assertStringContainsString('<x-rfq.public.product-to-quote', $details);
+        $this->assertStringContainsString('<x-rfq.public.product-to-quote', $pricing);
+        $this->assertStringContainsString('Product to quote', $productSection);
+        $this->assertStringContainsString('Requested quantity', $productSection);
+        $this->assertStringContainsString('Buyer requirements', $productSection);
+        $this->assertStringContainsString('View specifications', $productSection);
+        $this->assertStringContainsString('data-rfq-toggle-requirements', $productSection);
+
+        $this->assertStringContainsString('font-family: var(--ft-theme-font-family)', $css);
+        $this->assertStringContainsString('font-size: var(--ft-theme-form-page-title-size)', $css);
+        $this->assertStringContainsString('font-size: var(--ft-theme-form-section-title-size)', $css);
+        $this->assertStringContainsString('font-size: var(--ft-theme-form-control-size)', $css);
+        $this->assertStringNotContainsString('font-size: 9px', $css);
+    }
+
+    public function test_submitted_quotation_can_be_reopened_for_revision_while_the_rfq_is_active(): void
+    {
+        $controller = file_get_contents(app_path('Http/Controllers/Rfq/PublicInquiryRfqController.php'));
+        $rfq = file_get_contents(app_path('Services/Inquiries/InquiryRfqService.php'));
+        $portal = file_get_contents(app_path('Services/Inquiries/PublicRfqPortalService.php'));
+        $review = file_get_contents(resource_path('views/components/rfq/public/review.blade.php'));
+        $summary = file_get_contents(resource_path('views/components/rfq/public/summary.blade.php'));
+
+        $this->assertStringContainsString("\$action === 'revise'", $controller);
+        $this->assertStringContainsString('beginQuoteRevision', $rfq);
+        $this->assertStringContainsString("'quote_status' => 'draft'", $rfq);
+        $this->assertStringContainsString('rfq.quote_revision_started', $rfq);
+        $this->assertStringContainsString("'canRevise' => \$canRevise", $portal);
+        $this->assertStringContainsString('Revise quotation', $review);
+        $this->assertStringContainsString('Revise quotation', $summary);
+    }
+
     public function test_portal_step_builder_captures_the_active_step_without_manual_closure_use(): void
     {
         $service = file_get_contents(app_path('Services/Inquiries/PublicRfqPortalService.php'));
