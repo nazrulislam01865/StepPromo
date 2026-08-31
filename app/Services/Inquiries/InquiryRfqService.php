@@ -706,11 +706,14 @@ final class InquiryRfqService
         $invitation = InquiryRfqInvitation::query()
             ->where('token_hash', hash('sha256', $token))
             ->with([
-                'supplier:id,name,metadata,status',
-                'inquiry:id,workspace_id,inquiry_number,subject,currency,required_delivery_date,result',
+                'supplier:id,name,code,metadata,status',
+                'inviter:id,name,email',
+                'inquiry:id,workspace_id,inquiry_number,client_id,subject,currency,required_delivery_date,result',
+                'inquiry.client:id,name',
                 'inquiry.items:id,inquiry_id,item_name,category,quantity,unit,unit_price,notes,sort_order',
-                'quote:id,invitation_id,currency,freight,lead_time_days,validity_days,notes,submitted_total',
-                'quote.items:id,quote_id,inquiry_item_id,product_name,quantity,unit_price,sort_order',
+                'quote:id,invitation_id,supplier_contact_name,supplier_contact_email,supplier_contact_phone,currency,freight,tooling_cost,sample_cost,discount,tax_status,lead_time_days,sample_lead_time_days,incoterm,shipping_port,estimated_delivery_date,validity_days,specification_compliance,notes,supporting_information,document_notes,submitted_by_name,submitted_by_email,submitted_total,created_at,updated_at',
+                'quote.items:id,quote_id,inquiry_item_id,product_name,quantity,unit_price,moq,sort_order',
+                'quote.documents:id,quote_id,document_type,name,path,mime_type,size,sort_order,created_at,updated_at',
             ])
             ->firstOrFail();
 
@@ -734,10 +737,11 @@ final class InquiryRfqService
         app(\App\Services\WorkspaceRefreshService::class)->touch('InquiryRFQ:declined');
     }
 
-    /** @param array<int,array{inquiry_item_id:int,unit_price:float|int|string}> $items */
+    /** @param array<int,array{inquiry_item_id:int,unit_price:float|int|string,moq?:float|int|string|null}> $items */
     public function submitQuote(InquiryRfqInvitation $invitation, array $items, array $data): InquiryRfqQuote
     {
         abort_if($invitation->awarded_at || $invitation->rejected_at, 422, 'This RFQ is already closed.');
+        abort_if($invitation->quote_status === 'submitted', 422, 'This quotation has already been submitted and can no longer be edited.');
         abort_if($invitation->due_at && now()->greaterThan($invitation->due_at->copy()->addDays(30)), 422, 'This quotation link has expired.');
 
         $inquiry = $invitation->inquiry()->with('items:id,inquiry_id,item_name,quantity,sort_order')->firstOrFail();
@@ -756,6 +760,7 @@ final class InquiryRfqService
                 'product_name' => (string) $source->item_name,
                 'quantity' => (float) $source->quantity,
                 'unit_price' => $unitPrice,
+                'moq' => filled($row['moq'] ?? null) ? max(0, (float) $row['moq']) : null,
                 'sort_order' => (int) $source->sort_order,
             ];
         })->keyBy('inquiry_item_id');
@@ -765,18 +770,37 @@ final class InquiryRfqService
         }
 
         $freight = max(0, round((float) ($data['freight'] ?? 0), 2));
+        $toolingCost = max(0, round((float) ($data['tooling_cost'] ?? 0), 2));
+        $sampleCost = max(0, round((float) ($data['sample_cost'] ?? 0), 2));
+        $discount = max(0, round((float) ($data['discount'] ?? 0), 2));
         $subtotal = $normalized->sum(fn (array $row) => ((float) $row['quantity']) * ((float) $row['unit_price']));
-        $submittedTotal = round($subtotal + $freight, 2);
+        $submittedTotal = round($subtotal + $freight + $toolingCost + $sampleCost - $discount, 2);
 
-        $quote = DB::transaction(function () use ($invitation, $normalized, $data, $freight, $submittedTotal): InquiryRfqQuote {
+        $quote = DB::transaction(function () use ($invitation, $normalized, $data, $freight, $toolingCost, $sampleCost, $discount, $submittedTotal): InquiryRfqQuote {
             $quote = InquiryRfqQuote::query()->updateOrCreate(
                 ['invitation_id' => $invitation->id],
                 [
+                    'supplier_contact_name' => trim((string) ($data['supplier_contact_name'] ?? '')) ?: null,
+                    'supplier_contact_email' => trim((string) ($data['supplier_contact_email'] ?? '')) ?: null,
+                    'supplier_contact_phone' => trim((string) ($data['supplier_contact_phone'] ?? '')) ?: null,
                     'currency' => strtoupper(trim((string) ($data['currency'] ?? 'USD'))) ?: 'USD',
                     'freight' => $freight,
+                    'tooling_cost' => $toolingCost,
+                    'sample_cost' => $sampleCost,
+                    'discount' => $discount,
+                    'tax_status' => trim((string) ($data['tax_status'] ?? 'excluded')) ?: 'excluded',
                     'lead_time_days' => filled($data['lead_time_days'] ?? null) ? max(0, (int) $data['lead_time_days']) : null,
+                    'sample_lead_time_days' => filled($data['sample_lead_time_days'] ?? null) ? max(0, (int) $data['sample_lead_time_days']) : null,
+                    'incoterm' => trim((string) ($data['incoterm'] ?? '')) ?: null,
+                    'shipping_port' => trim((string) ($data['shipping_port'] ?? '')) ?: null,
+                    'estimated_delivery_date' => filled($data['estimated_delivery_date'] ?? null) ? $data['estimated_delivery_date'] : null,
                     'validity_days' => filled($data['validity_days'] ?? null) ? max(0, (int) $data['validity_days']) : null,
+                    'specification_compliance' => trim((string) ($data['specification_compliance'] ?? '')) ?: null,
                     'notes' => trim((string) ($data['notes'] ?? '')) ?: null,
+                    'supporting_information' => $data['supporting_information'] ?? null,
+                    'document_notes' => trim((string) ($data['document_notes'] ?? '')) ?: null,
+                    'submitted_by_name' => trim((string) ($data['submitted_by_name'] ?? $data['supplier_contact_name'] ?? '')) ?: null,
+                    'submitted_by_email' => trim((string) ($data['submitted_by_email'] ?? $data['supplier_contact_email'] ?? '')) ?: null,
                     'submitted_total' => $submittedTotal,
                 ],
             );
@@ -819,6 +843,50 @@ final class InquiryRfqService
         }
 
         return $quote->fresh('items');
+    }
+
+    public function submitSavedDraft(InquiryRfqInvitation $invitation): InquiryRfqQuote
+    {
+        $invitation->loadMissing(['quote.items', 'quote.documents', 'supplier', 'inquiry.items']);
+        $quote = $invitation->quote;
+        abort_unless($quote, 422, 'Complete the quotation before submitting.');
+
+        $requiredDocumentTypes = ['formal_quotation', 'price_breakdown'];
+        $documentTypes = collect($quote->documents ?? [])->pluck('document_type');
+        abort_unless(collect($requiredDocumentTypes)->every(fn (string $type): bool => $documentTypes->contains($type)), 422, 'Upload the required quotation documents before submitting.');
+        abort_unless(filled($quote->supplier_contact_name) && filled($quote->supplier_contact_email), 422, 'Complete the supplier contact details before submitting.');
+
+        $items = collect($quote->items)->map(fn ($item): array => [
+            'inquiry_item_id' => (int) $item->inquiry_item_id,
+            'unit_price' => $item->unit_price,
+            'moq' => $item->moq,
+        ])->all();
+
+        $data = [
+            'supplier_contact_name' => $quote->supplier_contact_name,
+            'supplier_contact_email' => $quote->supplier_contact_email,
+            'supplier_contact_phone' => $quote->supplier_contact_phone,
+            'currency' => $quote->currency,
+            'freight' => $quote->freight,
+            'tooling_cost' => $quote->tooling_cost,
+            'sample_cost' => $quote->sample_cost,
+            'discount' => $quote->discount,
+            'tax_status' => $quote->tax_status,
+            'lead_time_days' => $quote->lead_time_days,
+            'sample_lead_time_days' => $quote->sample_lead_time_days,
+            'incoterm' => $quote->incoterm,
+            'shipping_port' => $quote->shipping_port,
+            'estimated_delivery_date' => $quote->estimated_delivery_date?->format('Y-m-d'),
+            'validity_days' => $quote->validity_days,
+            'specification_compliance' => $quote->specification_compliance,
+            'notes' => $quote->notes,
+            'supporting_information' => $quote->supporting_information,
+            'document_notes' => $quote->document_notes,
+            'submitted_by_name' => $quote->supplier_contact_name,
+            'submitted_by_email' => $quote->supplier_contact_email,
+        ];
+
+        return $this->submitQuote($invitation, $items, $data);
     }
 
     /** @return array{winner:InquiryRfqInvitation,email_failures:int,email_service_disabled:bool} */
