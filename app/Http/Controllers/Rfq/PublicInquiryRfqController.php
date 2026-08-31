@@ -68,6 +68,9 @@ final class PublicInquiryRfqController extends Controller
         if (in_array($action, ['save_pricing', 'continue_documents'], true)) {
             $itemIds = $invitation->inquiry->items->pluck('id')->map(fn ($id) => (int) $id)->all();
             $data = $request->validate([
+                'supplier_contact_name' => ['required', 'string', 'max:160'],
+                'supplier_contact_email' => ['required', 'email', 'max:255'],
+                'supplier_contact_phone' => ['nullable', 'string', 'max:80'],
                 'currency' => ['required', 'in:USD,EUR,GBP,CNY'],
                 'prices' => ['required', 'array'],
                 'prices.*' => ['required', 'numeric', 'min:0', 'max:999999999.9999'],
@@ -86,11 +89,18 @@ final class PublicInquiryRfqController extends Controller
                 'validity_days' => ['nullable', 'integer', 'min:0', 'max:3650'],
                 'specification_compliance' => ['nullable', 'in:yes,partial,no'],
                 'notes' => ['nullable', 'string', 'max:5000'],
+                'document_notes' => ['nullable', 'string', 'max:5000'],
+                'documents' => ['nullable', 'array', 'max:10'],
+                'documents.*' => ['file', 'mimes:pdf,xlsx,docx,jpg,jpeg,png', 'max:20480'],
             ]);
 
             $prices = collect($data['prices'] ?? [])->mapWithKeys(fn ($price, $itemId) => [(int) $itemId => $price]);
             abort_unless(collect($itemIds)->every(fn (int $itemId): bool => $prices->has($itemId)), 422, 'Enter a unit price for every product.');
+            $portal->saveDetails($invitation, $data);
             $portal->savePricing($invitation, $data);
+            if (! empty($data['documents'])) {
+                $portal->uploadDocuments($invitation, $data['documents']);
+            }
 
             return $this->redirectToStep($token, $action === 'continue_documents' ? 'documents' : 'pricing', 'Draft saved.');
         }
@@ -154,14 +164,19 @@ final class PublicInquiryRfqController extends Controller
             'supporting_information' => ['nullable', 'array'],
             'supporting_information.*' => ['in:'.implode(',', array_keys(PublicRfqPortalService::SUPPORTING_INFORMATION))],
             'document_notes' => ['nullable', 'string', 'max:5000'],
+            'return_step' => ['nullable', 'in:pricing,documents'],
         ]);
-        $portal->saveDocumentStep($invitation, $data);
+        if ($request->hasAny(['document_types', 'supporting_information', 'document_notes'])) {
+            $portal->saveDocumentStep($invitation, $data);
+        }
         $portal->uploadDocuments($invitation, $data['documents']);
 
-        return $this->redirectToStep($token, 'documents', count($data['documents']).' document(s) uploaded.');
+        $returnStep = ($data['return_step'] ?? null) === 'pricing' ? 'pricing' : 'documents';
+        return $this->redirectToStep($token, $returnStep, count($data['documents']).' document(s) uploaded.');
     }
 
     public function removeDocument(
+        Request $request,
         string $token,
         int $document,
         InquiryRfqService $rfq,
@@ -170,7 +185,8 @@ final class PublicInquiryRfqController extends Controller
         $invitation = $rfq->findPublicInvitation($token);
         $portal->removeDocument($invitation, $document);
 
-        return $this->redirectToStep($token, 'documents', 'Document removed.');
+        $returnStep = $request->input('return_step') === 'pricing' ? 'pricing' : 'documents';
+        return $this->redirectToStep($token, $returnStep, 'Document removed.');
     }
 
     public function previewDocument(

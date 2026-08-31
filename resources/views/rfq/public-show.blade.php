@@ -13,7 +13,7 @@
     ></script>
     @vite(['resources/theme/flowtrack/core.css', 'resources/css/app.css'])
 </head>
-<body class="ft-rfq-portal-page">
+<body class="ft-rfq-portal-page ft-rfq-step-{{ $step }}">
     <x-rfq.public.header :brand="$brand" :supplier="$invitation->supplier" :buyer-email="$buyerEmail" />
 
     <main class="ft-rfq-portal-shell">
@@ -41,9 +41,10 @@
                 <span>This quotation is private and can only be accessed through your invitation link.</span>
             </div>
 
-            @if(session('success'))
+            @php($portalSuccess = session('success'))
+            @if($portalSuccess && $step !== 'pricing' && $portalSuccess !== 'Draft saved.')
                 <div class="ft-rfq-portal-feedback is-success" role="status">
-                    <x-rfq.public.icon name="check" />{{ session('success') }}
+                    <x-rfq.public.icon name="check" />{{ $portalSuccess }}
                 </div>
             @endif
             @if($errors->any())
@@ -62,6 +63,10 @@
                         :quote="$quote"
                         :products="$products"
                         :currency="$currency"
+                        :contact="$contact"
+                        :rfq-reference="$rfqReference"
+                        :client-name="$clientName"
+                        :documents="$documents"
                         :locked="$locked"
                     />
                     @break
@@ -154,27 +159,42 @@
                 }
             });
         }
-        const dropZone = document.querySelector('[data-rfq-dropzone]');
-        if (dropZone && upload) {
-            ['dragenter', 'dragover'].forEach(name => dropZone.addEventListener(name, event => {
+
+        // Every quotation upload surface supports native browse plus drag-and-drop.
+        // The Documents step auto-uploads after a drop; the Pricing step keeps the
+        // dropped files in its form so unsaved commercial fields are not discarded.
+        document.querySelectorAll('[data-rfq-dropzone]').forEach(dropZone => {
+            const fileInput = dropZone.querySelector('input[type="file"]');
+            if (!fileInput || fileInput.disabled) return;
+
+            const stopDragDefaults = event => {
                 event.preventDefault();
+                event.stopPropagation();
+            };
+
+            ['dragenter', 'dragover'].forEach(name => dropZone.addEventListener(name, event => {
+                stopDragDefaults(event);
                 dropZone.classList.add('is-dragging');
             }));
-            ['dragleave', 'drop'].forEach(name => dropZone.addEventListener(name, event => {
-                event.preventDefault();
+
+            ['dragleave', 'dragend'].forEach(name => dropZone.addEventListener(name, event => {
+                stopDragDefaults(event);
                 dropZone.classList.remove('is-dragging');
             }));
+
             dropZone.addEventListener('drop', event => {
-                if (!event.dataTransfer?.files?.length) return;
+                stopDragDefaults(event);
+                dropZone.classList.remove('is-dragging');
+
+                const droppedFiles = Array.from(event.dataTransfer?.files || []);
+                if (!droppedFiles.length) return;
+
                 const transfer = new DataTransfer();
-                Array.from(event.dataTransfer.files).forEach(file => transfer.items.add(file));
-                upload.files = transfer.files;
-                if (upload.form) {
-                    upload.form.action = upload.dataset.uploadUrl || upload.form.action;
-                    upload.form.submit();
-                }
+                droppedFiles.forEach(file => transfer.items.add(file));
+                fileInput.files = transfer.files;
+                fileInput.dispatchEvent(new Event('change', { bubbles: true }));
             });
-        }
+        });
 
         const pricing = document.getElementById('rfq-pricing-form');
         if (pricing) {
@@ -184,16 +204,80 @@
                 let subtotal = 0;
                 pricing.querySelectorAll('[data-rfq-price]').forEach(input => {
                     const row = input.closest('[data-rfq-price-row]');
-                    subtotal += (Number(row?.dataset.quantity || 0) * Number(input.value || 0));
+                    const lineSubtotal = Number(row?.dataset.quantity || 0) * Number(input.value || 0);
+                    subtotal += lineSubtotal;
+                    const lineNode = row?.querySelector('[data-rfq-line-subtotal]');
+                    if (lineNode) {
+                        const code = currency?.value || 'USD';
+                        lineNode.textContent = `${code} ${lineSubtotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                    }
                 });
                 const money = name => Number(pricing.querySelector(`[name="${name}"]`)?.value || 0);
-                const total = subtotal + money('tooling_cost') + money('sample_cost') + money('freight') - money('discount');
+                const sampleCost = money('sample_cost');
+                const otherCosts = money('tooling_cost') + money('freight') - money('discount');
+                const total = subtotal + sampleCost + otherCosts;
                 const code = currency?.value || 'USD';
                 totalNodes.forEach(node => node.textContent = `${code} ${total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`);
+                const productSubtotalNode = document.querySelector('[data-rfq-summary-product-subtotal]');
+                const sampleCostNode = document.querySelector('[data-rfq-summary-sample-cost]');
+                const otherCostsNode = document.querySelector('[data-rfq-summary-other-costs]');
+                if (productSubtotalNode) productSubtotalNode.textContent = `${code} ${subtotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                if (sampleCostNode) sampleCostNode.textContent = `${code} ${sampleCost.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                if (otherCostsNode) otherCostsNode.textContent = `${code} ${otherCosts.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                pricing.querySelectorAll('[data-rfq-currency-label]').forEach(node => { node.textContent = code; });
             };
             pricing.addEventListener('input', recalculate);
             pricing.addEventListener('change', recalculate);
             recalculate();
+
+            const editContact = pricing.querySelector('[data-rfq-edit-contact]');
+            editContact?.addEventListener('click', () => pricing.querySelector('[name="supplier_contact_name"]')?.focus());
+
+            const addPriceBreak = pricing.querySelector('[data-rfq-add-price-break]');
+            addPriceBreak?.addEventListener('click', () => {
+                pricing.querySelector('[name^="moqs["]')?.focus();
+            });
+
+            const pricingFiles = pricing.querySelector('[data-rfq-pricing-file-input]');
+            pricingFiles?.addEventListener('change', () => {
+                const list = pricing.querySelector('.ft-rfq-prototype-uploaded-files');
+                if (!list) return;
+                list.querySelectorAll('[data-rfq-pending-file]').forEach(node => node.remove());
+                const selectedFiles = Array.from(pricingFiles.files || []);
+                const emptyState = list.querySelector('.ft-rfq-prototype-empty-file');
+                if (emptyState) emptyState.hidden = selectedFiles.length > 0;
+                const summaryDocument = document.querySelector('[data-rfq-summary-document]');
+                if (summaryDocument) {
+                    const hasDocument = Number(summaryDocument.dataset.existingDocuments || 0) > 0 || selectedFiles.length > 0;
+                    summaryDocument.classList.toggle('is-complete', hasDocument);
+                    const marker = summaryDocument.querySelector('span');
+                    if (marker) marker.textContent = hasDocument ? '✓' : '○';
+                }
+                selectedFiles.forEach(file => {
+                    const row = document.createElement('div');
+                    row.className = 'ft-rfq-prototype-file-row is-pending-upload';
+                    row.dataset.rfqPendingFile = '1';
+                    const size = file.size >= 1048576
+                        ? `${(file.size / 1048576).toFixed(1)} MB`
+                        : `${Math.max(1, Math.ceil(file.size / 1024))} KB`;
+                    row.innerHTML = `<span class="ft-rfq-file-icon">FILE</span><span class="ft-rfq-prototype-file-name"></span><span class="ft-rfq-prototype-file-size">·&nbsp; ${size}</span><span class="ft-rfq-prototype-file-ready">✓</span><span class="ft-rfq-prototype-pending-label">Ready to save</span>`;
+                    row.querySelector('.ft-rfq-prototype-file-name').textContent = file.name;
+                    list.appendChild(row);
+                });
+            });
+
+            const confirmation = pricing.querySelector('[data-rfq-pricing-confirmation]');
+            const confirmationSummary = document.querySelector('[data-rfq-summary-confirmation]');
+            const syncConfirmation = () => {
+                if (!confirmation || !confirmationSummary) return;
+                confirmationSummary.classList.toggle('is-complete', confirmation.checked);
+                confirmationSummary.classList.toggle('is-pending', !confirmation.checked);
+                const marker = confirmationSummary.querySelector('span');
+                if (marker) marker.textContent = confirmation.checked ? '✓' : '○';
+                confirmationSummary.lastChild.textContent = confirmation.checked ? ' Confirmation completed' : ' Confirmation required';
+            };
+            confirmation?.addEventListener('change', syncConfirmation);
+            syncConfirmation();
         }
 
         document.querySelectorAll('[data-rfq-toggle-requirements]').forEach(link => {

@@ -81,11 +81,12 @@ final class PublicRfqPortalService
         $documentsComplete = $requiredDocumentCount === count(self::REQUIRED_DOCUMENT_TYPES);
         $readyToSubmit = $detailsComplete && $pricingComplete && $documentsComplete;
         $submitted = $invitation->quote_status === 'submitted' && (bool) $quote;
-        $revisionWindowOpen = ! $invitation->due_at || now()->lessThanOrEqualTo($invitation->due_at->copy()->addDays(30));
+        $revisionWindowOpen = ! $this->linkExpired($invitation);
         $canRevise = $submitted
             && ! $invitation->awarded_at
             && ! $invitation->rejected_at
             && $invitation->interest_status !== 'declined'
+            && (bool) ($invitation->allow_revision ?? true)
             && $revisionWindowOpen;
         $locked = $submitted
             || (bool) $invitation->awarded_at
@@ -203,6 +204,9 @@ final class PublicRfqPortalService
                 'validity_days' => filled($data['validity_days'] ?? null) ? max(0, (int) $data['validity_days']) : null,
                 'specification_compliance' => trim((string) ($data['specification_compliance'] ?? '')) ?: null,
                 'notes' => trim((string) ($data['notes'] ?? '')) ?: null,
+                'document_notes' => array_key_exists('document_notes', $data)
+                    ? (trim((string) $data['document_notes']) ?: null)
+                    : $quote->document_notes,
             ]);
 
             $quote->items()->delete();
@@ -374,7 +378,7 @@ final class PublicRfqPortalService
         abort_if($invitation->awarded_at || $invitation->rejected_at, 422, 'This RFQ is already closed.');
         abort_if($invitation->quote_status === 'submitted', 422, 'This quotation has already been submitted and can no longer be edited.');
         abort_if($invitation->interest_status === 'declined', 422, 'This quotation request has been declined.');
-        abort_if($invitation->due_at && now()->greaterThan($invitation->due_at->copy()->addDays(30)), 422, 'This quotation link has expired.');
+        abort_if($this->linkExpired($invitation), 422, 'This quotation link has expired.');
     }
 
     /** @return Collection<int,array<string,mixed>> */
@@ -419,6 +423,15 @@ final class PublicRfqPortalService
                 'reference_documents' => [],
             ];
         })->values();
+    }
+
+    private function linkExpired(InquiryRfqInvitation $invitation): bool
+    {
+        if ($invitation->link_expires_at) {
+            return now()->greaterThan($invitation->link_expires_at);
+        }
+
+        return (bool) ($invitation->due_at && now()->greaterThan($invitation->due_at->copy()->addDays(30)));
     }
 
     /** @param array<int,string> $existingTypes */

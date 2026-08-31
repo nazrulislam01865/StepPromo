@@ -420,3 +420,1067 @@
     .ft-rfq-portal-footer > div, .ft-rfq-portal-footer nav { grid-column: 1; justify-self: center; }
     .ft-rfq-portal-footer nav { gap: 18px; }
 }
+
+/* --------------------------------------------------------------------------
+   Supplier quotation pricing screen — locked to the supplied prototype.
+   Keep these rules isolated to the public RFQ portal so the application theme
+   and the Documents/Review component structure remain reusable.
+   -------------------------------------------------------------------------- */
+@media (min-width: 901px) {
+    .ft-rfq-portal-page {
+        font-size: 12px;
+        line-height: 1.35;
+    }
+
+    .ft-rfq-portal-topbar {
+        height: 46px;
+        padding-inline: 31px;
+    }
+
+    .ft-rfq-portal-brand strong { font-size: 20px; }
+    .ft-rfq-portal-secure-title,
+    .ft-rfq-portal-help,
+    .ft-rfq-portal-supplier-name { font-size: 12px; }
+
+    .ft-rfq-portal-shell {
+        width: min(1360px, calc(100% - 72px));
+        margin-top: 18px;
+        grid-template-columns: minmax(0, 1fr) 282px;
+        gap: 72px;
+    }
+
+    .ft-rfq-portal-title-row {
+        min-height: 75px;
+        padding: 0 8px 6px;
+    }
+    .ft-rfq-portal-backlink { font-size: 10px; }
+    .ft-rfq-portal-title-row h1 {
+        margin-top: 5px;
+        font-size: 25px;
+        line-height: 1.08;
+    }
+    .ft-rfq-portal-title-row p { font-size: 12px; }
+    .ft-rfq-portal-draft-pill,
+    .ft-rfq-portal-save-state small,
+    .ft-rfq-portal-private-note,
+    .ft-rfq-portal-feedback { font-size: 10px; }
+
+    .ft-rfq-portal-private-note {
+        min-height: 30px;
+        margin: 0 4px 8px;
+        padding: 5px 12px;
+    }
+
+    .ft-rfq-portal-stepper {
+        height: 49px;
+        margin: 0 38px 8px;
+    }
+    .ft-rfq-portal-step a { gap: 8px; font-size: 11px; }
+    .ft-rfq-portal-step__circle {
+        width: 27px;
+        height: 27px;
+        flex-basis: 27px;
+        font-size: 11px;
+    }
+    .ft-rfq-portal-step__line { margin-inline: 14px; }
+
+    .ft-rfq-portal-aside { padding-top: 61px; }
+    .ft-rfq-summary-card {
+        padding: 17px 17px 15px;
+        border-radius: 6px;
+    }
+    .ft-rfq-summary-card > h2 {
+        margin-bottom: 12px;
+        font-size: 12px;
+        font-weight: 700;
+    }
+    .ft-rfq-summary-product {
+        grid-template-columns: 61px minmax(0, 1fr);
+        gap: 11px;
+        min-height: 64px;
+    }
+    .ft-rfq-summary-product strong { font-size: 12px; }
+    .ft-rfq-summary-meta dt,
+    .ft-rfq-summary-costs dt,
+    .ft-rfq-summary-progress > div,
+    .ft-rfq-summary-total span,
+    .ft-rfq-decline-link,
+    .ft-rfq-secure-submission { font-size: 10.5px; }
+    .ft-rfq-summary-meta dd,
+    .ft-rfq-summary-costs dd { font-size: 11px; }
+    .ft-rfq-summary-meta > div,
+    .ft-rfq-summary-costs > div { min-height: 28px; }
+    .ft-rfq-summary-total strong { font-size: 19px; }
+    .ft-rfq-summary-progress {
+        gap: 10px;
+        margin-top: 11px;
+        padding: 12px 9px;
+    }
+    .ft-rfq-summary-actions { gap: 9px; margin-top: 16px; }
+    .ft-rfq-summary-actions .ft-rfq-btn {
+        min-height: 38px;
+        font-size: 11px;
+    }
+
+    .ft-rfq-pricing-prototype,
+    .ft-rfq-pricing-prototype__form {
+        display: grid;
+        gap: 2px;
+    }
+
+    .ft-rfq-prototype-card {
+        padding: 8px 12px 9px;
+        border-color: #d9dee7;
+        border-radius: 6px;
+        box-shadow: 0 1px 2px rgb(16 33 61 / .02);
+    }
+
+    .ft-rfq-prototype-section-head {
+        min-height: 22px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 5px;
+    }
+    .ft-rfq-prototype-section-head.is-inline-copy { gap: 9px; }
+    .ft-rfq-prototype-section-head h2 {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.2;
+        font-weight: 700;
+        color: #10213d;
+    }
+    .ft-rfq-prototype-section-head p {
+        margin: 0 0 0 5px;
+        font-size: 10px;
+        line-height: 1.25;
+        color: #647287;
+    }
+    .ft-rfq-prototype-section-number {
+        width: 18px;
+        height: 18px;
+        flex: 0 0 18px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        background: #078d79;
+        color: #fff;
+        font-size: 9px;
+        line-height: 1;
+        font-weight: 700;
+    }
+
+    .ft-rfq-prototype-details { min-height: 154px; }
+    .ft-rfq-prototype-details-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0 24px;
+    }
+    .ft-rfq-prototype-details-grid.is-reference-row {
+        padding-bottom: 7px;
+        border-bottom: 1px solid #eef0f3;
+    }
+    .ft-rfq-prototype-details-grid.is-contact-row { padding-top: 7px; }
+
+    .ft-rfq-prototype-field {
+        min-width: 0;
+        display: block;
+        margin: 0;
+    }
+    .ft-rfq-prototype-field > span:first-child,
+    .ft-rfq-prototype-subtotal > span {
+        display: block;
+        margin-bottom: 4px;
+        color: #26364f;
+        font-size: 9.5px;
+        line-height: 1.1;
+        font-weight: 500;
+        white-space: nowrap;
+    }
+    .ft-rfq-prototype-field > span:first-child b,
+    .ft-rfq-prototype-section-head b { color: #a03c38; font-weight: 600; }
+    .ft-rfq-prototype-field input,
+    .ft-rfq-prototype-field select,
+    .ft-rfq-prototype-field textarea {
+        width: 100%;
+        border: 1px solid #cfd6df;
+        border-radius: 4px;
+        background: #fff;
+        color: #14243d;
+        font-family: inherit;
+        font-size: 11px;
+        font-weight: 400;
+        outline: none;
+    }
+    .ft-rfq-prototype-field input,
+    .ft-rfq-prototype-field select {
+        height: 29px;
+        padding: 0 8px;
+    }
+    .ft-rfq-prototype-field textarea {
+        min-height: 69px;
+        padding: 7px 8px;
+        resize: vertical;
+        line-height: 1.35;
+    }
+    .ft-rfq-prototype-field input:focus,
+    .ft-rfq-prototype-field select:focus,
+    .ft-rfq-prototype-field textarea:focus {
+        border-color: #59a99b;
+        box-shadow: 0 0 0 2px rgb(5 138 118 / .08);
+    }
+    .ft-rfq-prototype-field input[readonly] {
+        background: #fafbfd;
+        color: #2a3a52;
+    }
+    .ft-rfq-prototype-control-with-icon { position: relative; display: block; }
+    .ft-rfq-prototype-control-with-icon input { padding-right: 28px; }
+    .ft-rfq-prototype-control-with-icon .ft-rfq-icon {
+        position: absolute;
+        top: 50%;
+        right: 8px;
+        width: 11px;
+        height: 11px;
+        transform: translateY(-50%);
+        color: #728097;
+    }
+    .ft-rfq-prototype-phone-cell {
+        min-width: 0;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: end;
+        gap: 8px;
+    }
+    .ft-rfq-edit-contact-link {
+        min-height: 29px;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 0 0 1px;
+        border: 0;
+        background: transparent;
+        color: #08796a;
+        font: inherit;
+        font-size: 9.5px;
+        white-space: nowrap;
+        cursor: pointer;
+    }
+    .ft-rfq-edit-contact-link .ft-rfq-icon { width: 12px; height: 12px; }
+
+    .ft-rfq-pricing-prototype .ft-rfq-product-to-quote {
+        min-height: 136px;
+        border-radius: 6px;
+    }
+    .ft-rfq-pricing-prototype .ft-rfq-numbered-section-head {
+        min-height: 29px;
+        gap: 8px;
+        padding: 7px 12px 3px;
+    }
+    .ft-rfq-pricing-prototype .ft-rfq-numbered-section-head__number {
+        width: 18px;
+        height: 18px;
+        flex-basis: 18px;
+        font-size: 9px;
+    }
+    .ft-rfq-pricing-prototype .ft-rfq-numbered-section-head h2 { font-size: 13px; }
+    .ft-rfq-pricing-prototype .ft-rfq-product-quote-grid {
+        grid-template-columns: minmax(0, 1.17fr) minmax(0, .93fr);
+        gap: 14px;
+        padding: 0 12px 6px;
+    }
+    .ft-rfq-pricing-prototype .ft-rfq-product-quote-main {
+        grid-template-columns: 61px minmax(0, 1fr) 108px;
+        gap: 14px;
+    }
+    .ft-rfq-pricing-prototype .ft-rfq-product-thumb.is-lg { width: 61px; height: 61px; }
+    .ft-rfq-pricing-prototype .ft-rfq-product-quote-copy > strong { font-size: 13px; }
+    .ft-rfq-pricing-prototype .ft-rfq-product-quote-meta {
+        gap: 4px 8px;
+        margin-top: 5px;
+        font-size: 9.5px;
+    }
+    .ft-rfq-pricing-prototype .ft-rfq-requested-quantity {
+        min-width: 108px;
+        padding: 7px 8px;
+    }
+    .ft-rfq-pricing-prototype .ft-rfq-requested-quantity small { font-size: 9px; }
+    .ft-rfq-pricing-prototype .ft-rfq-requested-quantity strong { font-size: 15px; }
+    .ft-rfq-pricing-prototype .ft-rfq-buyer-requirements {
+        min-height: 79px;
+        padding: 8px 10px;
+    }
+    .ft-rfq-pricing-prototype .ft-rfq-buyer-requirements > strong,
+    .ft-rfq-pricing-prototype .ft-rfq-buyer-requirements p,
+    .ft-rfq-pricing-prototype .ft-rfq-buyer-requirements__actions a { font-size: 9.5px; }
+    .ft-rfq-pricing-prototype .ft-rfq-buyer-requirements p { margin-top: 3px; }
+    .ft-rfq-pricing-prototype .ft-rfq-buyer-requirements__actions {
+        gap: 10px 20px;
+        margin-top: 6px;
+    }
+    .ft-rfq-pricing-prototype .ft-rfq-product-scope-note {
+        min-height: 27px;
+        margin: 0 10px 8px;
+        padding: 5px 9px;
+        font-size: 9.5px;
+    }
+
+    .ft-rfq-prototype-pricing { min-height: 143px; }
+    .ft-rfq-prototype-price-lines { display: grid; gap: 5px; }
+    .ft-rfq-prototype-price-line {
+        display: grid;
+        grid-template-columns: minmax(130px, 1.25fr) 78px minmax(128px, 1.12fr) minmax(112px, 1fr) minmax(120px, 1.08fr) 145px;
+        align-items: end;
+        gap: 11px;
+    }
+    .ft-rfq-prototype-subtotal {
+        min-width: 0;
+        min-height: 46px;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        padding-bottom: 6px;
+    }
+    .ft-rfq-prototype-subtotal strong {
+        color: #152640;
+        font-size: 11px;
+        font-weight: 700;
+        text-align: center;
+        white-space: nowrap;
+    }
+    .ft-rfq-add-price-break-btn {
+        height: 38px;
+        align-self: end;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        margin-bottom: 0;
+        border: 1px dashed #9bb7c4;
+        border-radius: 4px;
+        background: #fff;
+        color: #08796a;
+        font: inherit;
+        font-size: 10px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .ft-rfq-add-price-break-btn > span { font-size: 18px; line-height: 1; font-weight: 400; }
+    .ft-rfq-prototype-cost-row {
+        display: grid;
+        grid-template-columns: 160px 140px 140px 112px;
+        gap: 26px;
+        margin-top: 7px;
+    }
+
+    .ft-rfq-prototype-production { min-height: 126px; }
+    .ft-rfq-prototype-production-grid {
+        display: grid;
+        grid-template-columns: 164px 164px 125px 155px minmax(190px, 1fr);
+        grid-template-rows: auto auto;
+        gap: 6px 20px;
+        align-items: start;
+    }
+    .ft-rfq-prototype-production-grid .is-deviations {
+        grid-column: 5;
+        grid-row: 1 / span 2;
+    }
+    .ft-rfq-prototype-production-grid .is-specification {
+        grid-column: 3 / span 2;
+        grid-row: 2;
+    }
+    .ft-rfq-prototype-suffix-control { position: relative; display: block; }
+    .ft-rfq-prototype-suffix-control input { padding-right: 42px; }
+    .ft-rfq-prototype-suffix-control em {
+        position: absolute;
+        top: 50%;
+        right: 8px;
+        transform: translateY(-50%);
+        color: #65758a;
+        font-size: 9.5px;
+        font-style: normal;
+        pointer-events: none;
+    }
+
+    .ft-rfq-prototype-supporting { min-height: 124px; }
+    .ft-rfq-prototype-supporting-grid {
+        display: grid;
+        grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr);
+        gap: 23px;
+        align-items: start;
+    }
+    .ft-rfq-prototype-dropzone {
+        min-height: 65px;
+        display: grid;
+        grid-template-columns: 42px minmax(0, 1fr);
+        align-items: center;
+        gap: 10px;
+        padding: 8px 16px 8px 73px;
+        border: 1px dashed #8daab9;
+        border-radius: 4px;
+        background: #fff;
+        color: #26364f;
+        cursor: pointer;
+        position: relative;
+    }
+    .ft-rfq-prototype-dropzone.is-dragging { border-color: #058a76; background: #f3fbf8; }
+    .ft-rfq-prototype-dropzone input { display: none; }
+    .ft-rfq-prototype-upload-icon {
+        width: 33px;
+        height: 33px;
+        display: grid;
+        place-items: center;
+        color: #586b84;
+    }
+    .ft-rfq-prototype-upload-icon .ft-rfq-icon { width: 28px; height: 28px; }
+    .ft-rfq-prototype-dropzone strong,
+    .ft-rfq-prototype-dropzone small { display: block; }
+    .ft-rfq-prototype-dropzone strong { font-size: 10px; font-weight: 500; }
+    .ft-rfq-prototype-dropzone strong b { color: #08796a; font-weight: 600; }
+    .ft-rfq-prototype-dropzone small { margin-top: 2px; color: #647287; font-size: 9px; }
+    .ft-rfq-prototype-supporting-right { min-width: 0; }
+    .ft-rfq-prototype-uploaded-files {
+        max-height: 72px;
+        overflow-y: auto;
+        display: grid;
+        gap: 4px;
+    }
+    .ft-rfq-prototype-file-row {
+        min-height: 32px;
+        display: grid;
+        grid-template-columns: 24px minmax(0, 1fr) auto 18px 64px;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 6px;
+        border: 1px solid #e0e4ea;
+        border-radius: 4px;
+        background: #fbfcfd;
+        font-size: 9.5px;
+    }
+    .ft-rfq-prototype-file-row .ft-rfq-file-icon {
+        width: 19px;
+        height: 22px;
+        font-size: 6px;
+    }
+    .ft-rfq-prototype-file-name {
+        overflow: hidden;
+        color: #25364f;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .ft-rfq-prototype-file-size { color: #65758a; white-space: nowrap; }
+    .ft-rfq-prototype-file-ready {
+        width: 15px;
+        height: 15px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        background: #07927c;
+        color: #fff;
+        font-size: 9px;
+    }
+    .ft-rfq-prototype-remove-file {
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: #a52d28;
+        font: inherit;
+        font-size: 9px;
+        cursor: pointer;
+    }
+    .ft-rfq-prototype-empty-file {
+        min-height: 32px;
+        display: flex;
+        align-items: center;
+        padding: 0 8px;
+        border: 1px solid #e0e4ea;
+        border-radius: 4px;
+        color: #758399;
+        font-size: 9.5px;
+    }
+    .ft-rfq-prototype-supplier-notes { margin-top: 5px; }
+
+    .ft-rfq-prototype-confirmation {
+        min-height: 49px;
+        padding: 5px 10px 4px;
+        border: 1px solid #f0dfb4;
+        border-radius: 4px;
+        background: #fffaf0;
+        color: #283951;
+    }
+    .ft-rfq-prototype-confirmation label {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-size: 9.5px;
+    }
+    .ft-rfq-prototype-confirmation input {
+        width: 18px;
+        height: 18px;
+        margin: 0;
+        accent-color: #058a76;
+    }
+    .ft-rfq-prototype-confirmation label b { color: #a03c38; }
+    .ft-rfq-prototype-confirmation p {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        margin: 1px 0 0 30px;
+        color: #a96a00;
+        font-size: 9px;
+    }
+    .ft-rfq-prototype-confirmation p .ft-rfq-icon { width: 11px; height: 11px; }
+    .ft-rfq-prototype-confirmation small {
+        display: block;
+        margin-top: 1px;
+        color: #59687d;
+        font-size: 8.5px;
+    }
+
+    .ft-rfq-step-pricing .ft-rfq-portal-shell { margin-bottom: 0; }
+    .ft-rfq-pricing-prototype + * { margin-top: 0; }
+    .ft-rfq-portal-footer {
+        min-height: 49px;
+        margin-top: 0;
+        font-size: 10px;
+    }
+    .ft-rfq-portal-footer strong { font-size: 10px; }
+}
+
+@media (max-width: 1180px) and (min-width: 901px) {
+    .ft-rfq-prototype-details-grid { gap-inline: 14px; }
+    .ft-rfq-prototype-phone-cell { grid-template-columns: 1fr; gap: 2px; }
+    .ft-rfq-edit-contact-link { min-height: 20px; }
+    .ft-rfq-prototype-price-line {
+        grid-template-columns: minmax(110px, 1.2fr) 72px minmax(110px, 1fr) minmax(100px, .9fr) minmax(110px, 1fr) 130px;
+        gap: 8px;
+    }
+    .ft-rfq-prototype-production-grid {
+        grid-template-columns: 145px 145px 110px 140px minmax(170px, 1fr);
+        gap-inline: 12px;
+    }
+}
+
+@media (max-width: 900px) {
+    .ft-rfq-pricing-prototype,
+    .ft-rfq-pricing-prototype__form { display: grid; gap: 8px; }
+    .ft-rfq-prototype-card { padding: 12px; }
+    .ft-rfq-prototype-section-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .ft-rfq-prototype-section-number { width: 20px; height: 20px; flex: 0 0 20px; display: grid; place-items: center; border-radius: 50%; background: var(--rfq-green); color: #fff; font-size: 10px; font-weight: 700; }
+    .ft-rfq-prototype-section-head h2 { margin: 0; font-size: 14px; }
+    .ft-rfq-prototype-section-head p { margin: 0; font-size: 11px; color: var(--rfq-muted); }
+    .ft-rfq-prototype-details-grid,
+    .ft-rfq-prototype-price-line,
+    .ft-rfq-prototype-cost-row,
+    .ft-rfq-prototype-production-grid,
+    .ft-rfq-prototype-supporting-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .ft-rfq-prototype-details-grid.is-contact-row { margin-top: 10px; }
+    .ft-rfq-prototype-field > span:first-child,
+    .ft-rfq-prototype-subtotal > span { display: block; margin-bottom: 4px; font-size: 11px; color: #26364f; }
+    .ft-rfq-prototype-field input,
+    .ft-rfq-prototype-field select { width: 100%; height: 36px; padding: 0 9px; border: 1px solid #cfd6df; border-radius: 4px; background: #fff; font: inherit; }
+    .ft-rfq-prototype-field textarea { width: 100%; min-height: 76px; padding: 8px; border: 1px solid #cfd6df; border-radius: 4px; font: inherit; }
+    .ft-rfq-prototype-phone-cell { display: grid; grid-template-columns: 1fr; gap: 4px; }
+    .ft-rfq-edit-contact-link { justify-self: start; border: 0; background: transparent; color: var(--rfq-green-dark); font: inherit; }
+    .ft-rfq-prototype-production-grid .is-deviations,
+    .ft-rfq-prototype-production-grid .is-specification { grid-column: auto; grid-row: auto; }
+    .ft-rfq-prototype-supporting-grid { grid-template-columns: 1fr; }
+    .ft-rfq-prototype-dropzone { min-height: 78px; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 12px; border: 1px dashed #8daab9; border-radius: 4px; }
+    .ft-rfq-prototype-dropzone input { display: none; }
+    .ft-rfq-prototype-file-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto 20px auto; gap: 6px; align-items: center; min-height: 36px; padding: 4px 7px; border: 1px solid #e0e4ea; border-radius: 4px; }
+    .ft-rfq-prototype-confirmation { padding: 10px; border: 1px solid #f0dfb4; border-radius: 4px; background: #fffaf0; }
+}
+
+@media (max-width: 620px) {
+    .ft-rfq-prototype-details-grid,
+    .ft-rfq-prototype-price-line,
+    .ft-rfq-prototype-cost-row,
+    .ft-rfq-prototype-production-grid { grid-template-columns: 1fr; }
+    .ft-rfq-prototype-section-head.is-inline-copy { align-items: flex-start; flex-wrap: wrap; }
+    .ft-rfq-prototype-section-head.is-inline-copy p { flex-basis: 100%; margin-left: 28px; }
+    .ft-rfq-prototype-subtotal { min-height: auto; }
+}
+
+/* --------------------------------------------------------------------------
+   Supplier quotation pricing — FlowTrack form typography + clearer grouping.
+   Scoped to section 3 so the rest of the public RFQ prototype stays unchanged.
+   -------------------------------------------------------------------------- */
+.ft-rfq-prototype-pricing {
+    padding: 14px 14px 15px;
+}
+.ft-rfq-prototype-pricing .ft-rfq-prototype-section-head {
+    min-height: 26px;
+    gap: 9px;
+    margin-bottom: 10px;
+}
+.ft-rfq-prototype-pricing .ft-rfq-prototype-section-number {
+    width: 22px;
+    height: 22px;
+    flex-basis: 22px;
+    font-size: var(--ft-theme-font-size-xs);
+    font-weight: var(--ft-theme-font-weight-bold);
+}
+.ft-rfq-prototype-pricing .ft-rfq-prototype-section-head h2 {
+    font-size: var(--ft-theme-form-section-title-size);
+    font-weight: var(--ft-theme-form-section-title-weight);
+    line-height: var(--ft-theme-line-height-tight);
+}
+.ft-rfq-prototype-pricing .ft-rfq-prototype-section-head p {
+    margin-left: 7px;
+    color: var(--ft-theme-form-page-copy-color);
+    font-size: var(--ft-theme-form-page-copy-size);
+    font-weight: var(--ft-theme-form-page-copy-weight);
+    line-height: var(--ft-theme-line-height-snug);
+}
+.ft-rfq-prototype-pricing .ft-rfq-prototype-price-lines {
+    gap: 8px;
+}
+.ft-rfq-prototype-pricing .ft-rfq-prototype-price-line {
+    padding: 11px 12px;
+    border: 1px solid var(--ft-theme-border-subtle);
+    border-radius: var(--ft-theme-radius-md);
+    background: var(--ft-theme-surface-subtle);
+}
+.ft-rfq-prototype-pricing .ft-rfq-prototype-field > span:first-child,
+.ft-rfq-prototype-pricing .ft-rfq-prototype-subtotal > span {
+    margin-bottom: 6px;
+    color: var(--ft-theme-form-label-color);
+    font-size: var(--ft-theme-form-label-size);
+    font-weight: var(--ft-theme-form-label-weight);
+    line-height: 1.2;
+}
+.ft-rfq-prototype-pricing .ft-rfq-prototype-field input,
+.ft-rfq-prototype-pricing .ft-rfq-prototype-field select {
+    height: 38px;
+    padding: 0 11px;
+    border-color: var(--ft-theme-form-control-border);
+    border-radius: var(--ft-theme-radius-sm);
+    color: var(--ft-theme-form-control-color);
+    font-size: var(--ft-theme-form-control-size);
+    font-weight: var(--ft-theme-form-control-weight);
+}
+.ft-rfq-prototype-pricing .ft-rfq-prototype-field input[readonly] {
+    background: #f4f7fa;
+    color: #40516a;
+}
+.ft-rfq-prototype-pricing .ft-rfq-prototype-field input:focus,
+.ft-rfq-prototype-pricing .ft-rfq-prototype-field select:focus {
+    border-color: var(--ft-theme-focus);
+    box-shadow: 0 0 0 3px var(--ft-theme-focus-ring);
+}
+.ft-rfq-prototype-pricing .ft-rfq-prototype-subtotal {
+    min-height: 62px;
+    justify-content: center;
+    padding: 8px 12px;
+    border: 1px solid #c9e6df;
+    border-radius: var(--ft-theme-radius-sm);
+    background: #f1faf7;
+}
+.ft-rfq-prototype-pricing .ft-rfq-prototype-subtotal > span {
+    color: #52647a;
+}
+.ft-rfq-prototype-pricing .ft-rfq-prototype-subtotal strong {
+    color: #0b725f;
+    font-size: var(--ft-theme-font-size-lg);
+    font-weight: var(--ft-theme-font-weight-bold);
+    line-height: 1.2;
+    text-align: left;
+}
+.ft-rfq-prototype-pricing .ft-rfq-prototype-subtotal small {
+    display: block;
+    margin-top: 3px;
+    color: var(--ft-theme-form-helper-color);
+    font-size: var(--ft-theme-form-helper-size);
+    line-height: 1.2;
+}
+.ft-rfq-prototype-pricing .ft-rfq-add-price-break-btn {
+    min-height: 62px;
+    height: auto;
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 8px 12px;
+    border-color: #91c4bb;
+    border-radius: var(--ft-theme-radius-sm);
+    background: #f8fcfb;
+    color: var(--ft-theme-primary-700);
+    font-size: var(--ft-theme-form-button-size);
+    font-weight: var(--ft-theme-form-button-weight);
+    text-align: left;
+    transition: border-color var(--ft-theme-transition-fast), background var(--ft-theme-transition-fast), box-shadow var(--ft-theme-transition-fast);
+}
+.ft-rfq-prototype-pricing .ft-rfq-add-price-break-btn:hover,
+.ft-rfq-prototype-pricing .ft-rfq-add-price-break-btn:focus-visible {
+    border-color: var(--ft-theme-primary-500);
+    background: var(--ft-theme-primary-soft);
+    box-shadow: 0 0 0 3px var(--ft-theme-focus-ring);
+    outline: 0;
+}
+.ft-rfq-prototype-pricing .ft-rfq-add-price-break-btn > span:first-child {
+    width: 26px;
+    height: 26px;
+    flex: 0 0 26px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--ft-theme-primary-soft);
+    font-size: var(--ft-theme-font-size-xl);
+    font-weight: var(--ft-theme-font-weight-medium);
+    line-height: 1;
+}
+.ft-rfq-add-price-break-copy {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+}
+.ft-rfq-add-price-break-copy strong {
+    font-size: var(--ft-theme-font-size-sm);
+    font-weight: var(--ft-theme-font-weight-semibold);
+    line-height: 1.2;
+}
+.ft-rfq-add-price-break-copy small {
+    color: var(--ft-theme-form-helper-color);
+    font-size: var(--ft-theme-form-helper-size);
+    font-weight: var(--ft-theme-form-helper-weight);
+    line-height: 1.2;
+}
+.ft-rfq-prototype-costs-heading {
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+    margin: 11px 2px 6px;
+}
+.ft-rfq-prototype-costs-heading strong {
+    color: var(--ft-theme-form-label-color);
+    font-size: var(--ft-theme-form-label-size);
+    font-weight: var(--ft-theme-form-label-weight);
+}
+.ft-rfq-prototype-costs-heading span {
+    color: var(--ft-theme-form-helper-color);
+    font-size: var(--ft-theme-form-helper-size);
+    font-weight: var(--ft-theme-form-helper-weight);
+}
+.ft-rfq-prototype-pricing .ft-rfq-prototype-cost-row {
+    margin-top: 0;
+    padding: 10px 12px 11px;
+    border: 1px solid var(--ft-theme-border-soft);
+    border-radius: var(--ft-theme-radius-md);
+    background: #fff;
+}
+
+@media (min-width: 1181px) {
+    .ft-rfq-prototype-pricing .ft-rfq-prototype-price-line {
+        grid-template-columns: minmax(140px, 1.05fr) minmax(105px, .62fr) minmax(170px, 1fr) minmax(130px, .8fr) minmax(170px, 1fr) 180px;
+        gap: 12px;
+    }
+    .ft-rfq-prototype-pricing .ft-rfq-prototype-cost-row {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+    }
+}
+
+@media (max-width: 1180px) and (min-width: 901px) {
+    .ft-rfq-prototype-pricing .ft-rfq-prototype-price-line {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+    }
+    .ft-rfq-prototype-pricing .ft-rfq-prototype-subtotal {
+        grid-column: 1 / span 2;
+    }
+    .ft-rfq-prototype-pricing .ft-rfq-add-price-break-btn {
+        grid-column: 3 / span 2;
+    }
+    .ft-rfq-prototype-pricing .ft-rfq-prototype-cost-row {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+    }
+}
+
+@media (max-width: 900px) {
+    .ft-rfq-prototype-pricing {
+        padding: 12px;
+    }
+    .ft-rfq-prototype-pricing .ft-rfq-prototype-section-head {
+        margin-bottom: 10px;
+    }
+    .ft-rfq-prototype-pricing .ft-rfq-prototype-section-head h2 {
+        font-size: var(--ft-theme-font-size-lg);
+    }
+    .ft-rfq-prototype-pricing .ft-rfq-prototype-section-head p {
+        font-size: var(--ft-theme-form-page-copy-size);
+    }
+    .ft-rfq-prototype-pricing .ft-rfq-prototype-price-line,
+    .ft-rfq-prototype-pricing .ft-rfq-prototype-cost-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
+    .ft-rfq-prototype-pricing .ft-rfq-prototype-subtotal,
+    .ft-rfq-prototype-pricing .ft-rfq-add-price-break-btn {
+        min-height: 58px;
+    }
+}
+
+@media (max-width: 620px) {
+    .ft-rfq-prototype-pricing .ft-rfq-prototype-section-head.is-inline-copy {
+        align-items: center;
+    }
+    .ft-rfq-prototype-pricing .ft-rfq-prototype-section-head.is-inline-copy p {
+        flex-basis: 100%;
+        margin: 2px 0 0 31px;
+    }
+    .ft-rfq-prototype-pricing .ft-rfq-prototype-price-line,
+    .ft-rfq-prototype-pricing .ft-rfq-prototype-cost-row {
+        grid-template-columns: 1fr;
+    }
+    .ft-rfq-prototype-costs-heading {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 2px;
+    }
+}
+
+/* --------------------------------------------------------------------------
+   Public quotation form — application typography parity + upload interaction.
+   The quotation portal uses the same centralized form typography tokens as
+   FlowTrack's Create Order / Inquiry / Client forms. Layout remains isolated.
+   -------------------------------------------------------------------------- */
+.ft-rfq-portal-page {
+    font-size: var(--ft-theme-font-size-base);
+    line-height: var(--ft-theme-line-height-normal);
+}
+
+.ft-rfq-portal-title-row h1 {
+    font-size: var(--ft-theme-form-page-title-size);
+    font-weight: var(--ft-theme-form-page-title-weight);
+}
+.ft-rfq-portal-title-row p,
+.ft-rfq-portal-card p,
+.ft-rfq-review-intro p {
+    font-size: var(--ft-theme-form-page-copy-size);
+    font-weight: var(--ft-theme-form-page-copy-weight);
+}
+.ft-rfq-portal-backlink,
+.ft-rfq-portal-private-note,
+.ft-rfq-portal-feedback,
+.ft-rfq-portal-save-state small,
+.ft-rfq-portal-draft-pill {
+    font-size: var(--ft-theme-form-breadcrumb-size);
+    font-weight: var(--ft-theme-form-breadcrumb-weight);
+}
+.ft-rfq-portal-step a {
+    font-size: var(--ft-theme-font-size-sm);
+}
+.ft-rfq-portal-step__circle,
+.ft-rfq-portal-step__number {
+    font-size: var(--ft-theme-font-size-xs);
+}
+
+.ft-rfq-portal-card h2,
+.ft-rfq-prototype-section-head h2,
+.ft-rfq-pricing-prototype .ft-rfq-numbered-section-head h2,
+.ft-rfq-review-card__head h2,
+.ft-rfq-final-declaration h2,
+.ft-rfq-summary-card > h2 {
+    color: var(--ft-theme-form-section-title-color);
+    font-size: var(--ft-theme-form-section-title-size);
+    font-weight: var(--ft-theme-form-section-title-weight);
+    line-height: var(--ft-theme-line-height-snug);
+}
+.ft-rfq-prototype-section-head p {
+    color: var(--ft-theme-form-page-copy-color);
+    font-size: var(--ft-theme-form-page-copy-size);
+    font-weight: var(--ft-theme-form-page-copy-weight);
+    line-height: var(--ft-theme-line-height-snug);
+}
+.ft-rfq-prototype-section-number,
+.ft-rfq-pricing-prototype .ft-rfq-numbered-section-head__number {
+    font-size: var(--ft-theme-font-size-xs);
+    font-weight: var(--ft-theme-font-weight-bold);
+}
+
+.ft-rfq-form-grid label > span,
+.ft-rfq-inline-select > span,
+.ft-rfq-document-notes > span,
+.ft-rfq-prototype-field > span:first-child,
+.ft-rfq-prototype-subtotal > span,
+.ft-rfq-prototype-costs-heading strong {
+    color: var(--ft-theme-form-label-color);
+    font-size: var(--ft-theme-form-label-size);
+    font-weight: var(--ft-theme-form-label-weight);
+    line-height: var(--ft-theme-line-height-snug);
+}
+.ft-rfq-prototype-field > span:first-child,
+.ft-rfq-prototype-subtotal > span {
+    white-space: normal;
+}
+.ft-rfq-form-grid input,
+.ft-rfq-form-grid select,
+.ft-rfq-form-grid textarea,
+.ft-rfq-inline-select select,
+.ft-rfq-doc-table select,
+.ft-rfq-document-notes textarea,
+.ft-rfq-prototype-field input,
+.ft-rfq-prototype-field select,
+.ft-rfq-prototype-field textarea {
+    color: var(--ft-theme-form-control-color);
+    font-size: var(--ft-theme-form-control-size);
+    font-weight: var(--ft-theme-form-control-weight);
+}
+.ft-rfq-prototype-suffix-control em {
+    color: var(--ft-theme-form-helper-color);
+    font-size: var(--ft-theme-form-helper-size);
+    font-weight: var(--ft-theme-form-helper-weight);
+}
+.ft-rfq-edit-contact-link,
+.ft-rfq-btn,
+.ft-rfq-summary-actions .ft-rfq-btn,
+.ft-rfq-decline-link,
+.ft-rfq-review-card__head a,
+.ft-rfq-doc-actions a,
+.ft-rfq-doc-actions button,
+.ft-rfq-prototype-remove-file {
+    font-size: var(--ft-theme-form-button-size);
+    font-weight: var(--ft-theme-form-button-weight);
+}
+
+/* Product to quote */
+.ft-rfq-pricing-prototype .ft-rfq-product-quote-copy > strong,
+.ft-rfq-product-quote-copy > strong,
+.ft-rfq-summary-product strong {
+    font-size: var(--ft-theme-font-size-base);
+    font-weight: var(--ft-theme-font-weight-semibold);
+}
+.ft-rfq-pricing-prototype .ft-rfq-product-quote-meta,
+.ft-rfq-product-quote-meta,
+.ft-rfq-pricing-prototype .ft-rfq-buyer-requirements > strong,
+.ft-rfq-pricing-prototype .ft-rfq-buyer-requirements p,
+.ft-rfq-pricing-prototype .ft-rfq-buyer-requirements__actions a,
+.ft-rfq-buyer-requirements > strong,
+.ft-rfq-buyer-requirements p,
+.ft-rfq-buyer-requirements__actions a,
+.ft-rfq-pricing-prototype .ft-rfq-product-scope-note,
+.ft-rfq-product-scope-note {
+    font-size: var(--ft-theme-form-page-copy-size);
+}
+.ft-rfq-pricing-prototype .ft-rfq-requested-quantity small,
+.ft-rfq-requested-quantity small {
+    font-size: var(--ft-theme-form-helper-size);
+    font-weight: var(--ft-theme-form-helper-weight);
+}
+.ft-rfq-pricing-prototype .ft-rfq-requested-quantity strong,
+.ft-rfq-requested-quantity strong {
+    font-size: var(--ft-theme-font-size-lg);
+    font-weight: var(--ft-theme-font-weight-bold);
+}
+
+/* Pricing, production and supporting documents */
+.ft-rfq-prototype-pricing .ft-rfq-prototype-subtotal strong {
+    font-size: var(--ft-theme-font-size-lg);
+    font-weight: var(--ft-theme-font-weight-bold);
+}
+.ft-rfq-prototype-pricing .ft-rfq-prototype-subtotal small,
+.ft-rfq-prototype-costs-heading span,
+.ft-rfq-add-price-break-copy small,
+.ft-rfq-prototype-dropzone small,
+.ft-rfq-prototype-confirmation p,
+.ft-rfq-prototype-confirmation small,
+.ft-rfq-prototype-pending-label {
+    color: var(--ft-theme-form-helper-color);
+    font-size: var(--ft-theme-form-helper-size);
+    font-weight: var(--ft-theme-form-helper-weight);
+}
+.ft-rfq-add-price-break-copy strong,
+.ft-rfq-prototype-dropzone strong {
+    font-size: var(--ft-theme-form-control-size);
+    font-weight: var(--ft-theme-font-weight-medium);
+}
+.ft-rfq-prototype-file-row,
+.ft-rfq-prototype-empty-file,
+.ft-rfq-prototype-confirmation label {
+    font-size: var(--ft-theme-form-control-size);
+    font-weight: var(--ft-theme-form-control-weight);
+}
+.ft-rfq-prototype-file-ready {
+    font-size: var(--ft-theme-form-helper-size);
+}
+
+/* Documents step */
+.ft-rfq-documents-meta small,
+.ft-rfq-readonly-field small,
+.ft-rfq-review-details-grid small,
+.ft-rfq-review-price-table small,
+.ft-rfq-review-costs-row small,
+.ft-rfq-review-delivery-grid small,
+.ft-rfq-summary-meta dt,
+.ft-rfq-summary-costs dt,
+.ft-rfq-summary-total span {
+    color: var(--ft-theme-form-label-color);
+    font-size: var(--ft-theme-form-label-size);
+    font-weight: var(--ft-theme-form-label-weight);
+}
+.ft-rfq-documents-meta strong,
+.ft-rfq-readonly-field strong,
+.ft-rfq-required-row strong,
+.ft-rfq-doc-table td,
+.ft-rfq-review-details-grid strong,
+.ft-rfq-review-price-table strong,
+.ft-rfq-review-costs-row strong,
+.ft-rfq-review-delivery-grid strong,
+.ft-rfq-summary-meta dd,
+.ft-rfq-summary-costs dd,
+.ft-rfq-summary-progress > div {
+    font-size: var(--ft-theme-form-control-size);
+    font-weight: var(--ft-theme-form-control-weight);
+}
+.ft-rfq-required-row small,
+.ft-rfq-info-strip,
+.ft-rfq-uploaded-status,
+.ft-rfq-dropzone__copy small,
+.ft-rfq-review-product-info span,
+.ft-rfq-review-doc-row small,
+.ft-rfq-review-production-note,
+.ft-rfq-confirmation-note,
+.ft-rfq-secure-submission {
+    font-size: var(--ft-theme-form-helper-size);
+    font-weight: var(--ft-theme-form-helper-weight);
+}
+.ft-rfq-dropzone__copy strong,
+.ft-rfq-uploaded-heading,
+.ft-rfq-file-name strong,
+.ft-rfq-review-doc-row strong,
+.ft-rfq-final-declaration label {
+    font-size: var(--ft-theme-form-control-size);
+}
+.ft-rfq-summary-total strong,
+.ft-rfq-review-costs-row .is-total strong {
+    font-size: var(--ft-theme-font-size-xl);
+    font-weight: var(--ft-theme-font-weight-bold);
+}
+
+/* Both upload surfaces use the same clear drag state. */
+.ft-rfq-dropzone,
+.ft-rfq-prototype-dropzone {
+    transition: border-color var(--ft-theme-transition-fast), background var(--ft-theme-transition-fast), box-shadow var(--ft-theme-transition-fast);
+}
+.ft-rfq-dropzone.is-dragging,
+.ft-rfq-prototype-dropzone.is-dragging {
+    border-color: var(--ft-theme-primary-500);
+    background: var(--ft-theme-primary-soft);
+    box-shadow: 0 0 0 3px var(--ft-theme-focus-ring);
+}
+
+@media (max-width: 900px) {
+    .ft-rfq-prototype-section-head h2,
+    .ft-rfq-pricing-prototype .ft-rfq-prototype-section-head h2,
+    .ft-rfq-pricing-prototype .ft-rfq-numbered-section-head h2 {
+        font-size: var(--ft-theme-form-section-title-size);
+    }
+}
+
+/* Supplier-visible note added from Inquiry > RFQ settings. */
+.ft-rfq-buyer-requirements .ft-rfq-buyer-note {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid #dbe7f2;
+    color: #315b55;
+    -webkit-line-clamp: 2;
+}
+.ft-rfq-buyer-requirements .ft-rfq-buyer-note strong { color: #087363; font-weight: var(--ft-theme-font-weight-semibold); }

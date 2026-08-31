@@ -1,11 +1,9 @@
 @props(['invitation', 'token', 'products'])
 @php
     $productCollection = collect($products);
-    $rawRequirements = trim((string) ($invitation->request_message ?? ''));
-    if ($rawRequirements === '') {
-        $rawRequirements = trim((string) ($invitation->inquiry?->requirement_notes ?? ''));
-    }
+    $rawRequirements = trim((string) ($invitation->supplier_details ?? ''));
     $requirements = trim((string) preg_replace('/\s+/', ' ', html_entity_decode(strip_tags($rawRequirements), ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+    $buyerNote = trim((string) preg_replace('/\s+/', ' ', html_entity_decode(strip_tags((string) ($invitation->request_message ?? '')), ENT_QUOTES | ENT_HTML5, 'UTF-8')));
 @endphp
 <section class="ft-rfq-portal-card ft-rfq-product-to-quote" aria-labelledby="rfq-product-to-quote-title">
     <div class="ft-rfq-numbered-section-head">
@@ -34,6 +32,9 @@
             <aside class="ft-rfq-buyer-requirements" id="rfq-buyer-requirements-{{ $product['item_id'] }}">
                 <strong>Buyer requirements</strong>
                 <p data-rfq-requirements-copy>{{ $requirements !== '' ? $requirements : 'No additional buyer requirements were provided for this quotation request.' }}</p>
+                @if($buyerNote !== '')
+                    <p class="ft-rfq-buyer-note"><strong>Buyer note:</strong> {{ $buyerNote }}</p>
+                @endif
                 <div class="ft-rfq-buyer-requirements__actions">
                     <a href="#rfq-buyer-requirements-{{ $product['item_id'] }}" data-rfq-toggle-requirements aria-expanded="false">View specifications <x-rfq.public.icon name="external" /></a>
                     @if(!empty($product['reference_documents']))

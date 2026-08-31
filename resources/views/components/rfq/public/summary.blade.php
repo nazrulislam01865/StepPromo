@@ -24,7 +24,7 @@
     };
     $primaryLabel = match($step) {
         'details' => 'Continue to pricing',
-        'pricing' => 'Continue to documents',
+        'pricing' => 'Review & submit',
         'documents' => 'Continue to review',
         default => 'Submit quotation',
     };
@@ -43,9 +43,9 @@
     </dl>
     <div class="ft-rfq-summary-divider"></div>
     <dl class="ft-rfq-summary-costs">
-        <div><dt>Product subtotal</dt><dd>{{ $currency }} {{ number_format((float) $productSubtotal, 2) }}</dd></div>
-        <div><dt>Sample cost</dt><dd>{{ $currency }} {{ number_format((float) $sampleCost, 2) }}</dd></div>
-        <div><dt>Other costs</dt><dd>{{ $currency }} {{ number_format((float) $otherCosts, 2) }}</dd></div>
+        <div><dt>Product subtotal</dt><dd data-rfq-summary-product-subtotal>{{ $currency }} {{ number_format((float) $productSubtotal, 2) }}</dd></div>
+        <div><dt>Sample cost</dt><dd data-rfq-summary-sample-cost>{{ $currency }} {{ number_format((float) $sampleCost, 2) }}</dd></div>
+        <div><dt>Other costs</dt><dd data-rfq-summary-other-costs>{{ $currency }} {{ number_format((float) $otherCosts, 2) }}</dd></div>
     </dl>
     <div class="ft-rfq-summary-divider"></div>
     <div class="ft-rfq-summary-total"><span>Total quoted value</span><strong>{{ $currency }} {{ number_format((float) $totalQuotedValue, 2) }}</strong></div>
@@ -53,8 +53,13 @@
     <div class="ft-rfq-summary-progress">
         <div class="{{ $detailsComplete ? 'is-complete' : '' }}"><span>{{ $detailsComplete ? '✓' : '○' }}</span> Product reviewed</div>
         <div class="{{ $pricingComplete ? 'is-complete' : '' }}"><span>{{ $pricingComplete ? '✓' : '○' }}</span> Pricing completed</div>
-        <div class="{{ $documentsComplete ? 'is-complete' : '' }}"><span>{{ $documentsComplete ? '✓' : '○' }}</span> {{ $docs->count() }} {{ \Illuminate\Support\Str::plural('document', $docs->count()) }} attached</div>
-        <div class="{{ ($step === 'review' && $readyToSubmit) || $submitted ? 'is-complete' : 'is-pending' }}"><span>{{ (($step === 'review' && $readyToSubmit) || $submitted) ? '✓' : '○' }}</span> {{ $submitted ? 'Quotation submitted' : (($step === 'review' && $readyToSubmit) ? 'Ready to submit' : 'Review not completed') }}</div>
+        @if($step === 'pricing')
+            <div class="{{ $docs->isNotEmpty() ? 'is-complete' : '' }}" data-rfq-summary-document data-existing-documents="{{ $docs->count() }}"><span>{{ $docs->isNotEmpty() ? '✓' : '○' }}</span> Document attached</div>
+            <div class="is-pending" data-rfq-summary-confirmation><span>○</span> Confirmation required</div>
+        @else
+            <div class="{{ $documentsComplete ? 'is-complete' : '' }}"><span>{{ $documentsComplete ? '✓' : '○' }}</span> {{ $docs->count() }} {{ \Illuminate\Support\Str::plural('document', $docs->count()) }} attached</div>
+            <div class="{{ ($step === 'review' && $readyToSubmit) || $submitted ? 'is-complete' : 'is-pending' }}"><span>{{ (($step === 'review' && $readyToSubmit) || $submitted) ? '✓' : '○' }}</span> {{ $submitted ? 'Quotation submitted' : (($step === 'review' && $readyToSubmit) ? 'Ready to submit' : 'Review not completed') }}</div>
+        @endif
     </div>
 
     @unless($locked)
