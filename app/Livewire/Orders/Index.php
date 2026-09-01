@@ -42,6 +42,9 @@ class Index extends Component
     public string $metricFilter = '';
     public string $dateFrom = '';
     public string $dateTo = '';
+    public int $dashboardScope = 0;
+    public int $dashboardRangeDays = 0;
+    public string $dashboardTeam = '';
     #[Url(as: 'import', history: true, except: 0)]
     public int $importBatchId = 0;
     public string $importBatchLabel = '';
@@ -62,6 +65,8 @@ class Index extends Component
     public bool $showOrderWorkflowActionModal = false;
     public ?int $orderWorkflowActionTaskId = null;
     public string $orderWorkflowActionComment = '';
+    /** Optional reference files attached to an artwork revision request. */
+    public array $orderWorkflowActionAttachments = [];
     public string $orderWorkflowActionStep = 'main';
     /** @var array<string,mixed> */
     public array $orderWorkflowActionPayload = [];
@@ -74,6 +79,8 @@ class Index extends Component
     public string $overviewTaskDocumentSource = 'upload';
     /** Files selected in the Order workflow upload modal. */
     public array $overviewTaskDocumentUpload = [];
+    /** Artwork files selected for replacement in an active revision upload. */
+    public array $overviewTaskRevisionDocumentIds = [];
     public ?int $overviewTaskExistingDocumentId = null;
     public string $overviewTaskDocumentNote = '';
 
@@ -90,6 +97,19 @@ class Index extends Component
         $this->dateFrom = $this->normalizeDateFilter((string) request('date_from', ''));
         $this->dateTo = $this->normalizeDateFilter((string) request('date_to', ''));
         $this->normalizeDateRange('from');
+        $this->dashboardScope = (int) request('dashboard_scope', 0) === 1 ? 1 : 0;
+        $requestedDashboardRange = (int) request('dashboard_range', 0);
+        $this->dashboardRangeDays = in_array($requestedDashboardRange, [1, 7, 30], true) ? $requestedDashboardRange : 0;
+        $this->dashboardTeam = $this->numericFilterFromRequest('dashboard_team');
+
+        // A dashboard deep link is valid only with an explicit local date range.
+        // Falling back to the normal Orders semantics avoids a hidden updated_at
+        // filter if somebody manually removes the dates from the URL.
+        if ($this->dashboardScope === 1 && ($this->dateFrom === '' || $this->dateTo === '')) {
+            $this->dashboardScope = 0;
+            $this->dashboardRangeDays = 0;
+            $this->dashboardTeam = '';
+        }
 
         $this->importBatchId = max(0, (int) request('import', $this->importBatchId));
         if ($this->importBatchId > 0) {
@@ -243,6 +263,9 @@ class Index extends Component
         $this->metricFilter = '';
         $this->dateFrom = '';
         $this->dateTo = '';
+        $this->dashboardScope = 0;
+        $this->dashboardRangeDays = 0;
+        $this->dashboardTeam = '';
         $this->importBatchId = 0;
         $this->importBatchLabel = '';
         $this->resetStageSpecificFilters();
@@ -428,6 +451,7 @@ class Index extends Component
         $this->showOverviewTaskDocumentModal = false;
         $this->orderWorkflowActionTaskId = $taskId;
         $this->orderWorkflowActionComment = '';
+        $this->orderWorkflowActionAttachments = [];
         $this->orderWorkflowActionStep = 'main';
         $this->orderWorkflowActionPayload = $workflowActions->initialPayload($task, $task->job);
         $this->resetOrderWorkflowEmailFallbackState();
@@ -439,7 +463,7 @@ class Index extends Component
             }
         }
 
-        $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
+        $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionAttachments', 'orderWorkflowActionAttachments.*', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
         $this->showOrderWorkflowActionModal = true;
     }
 
@@ -448,11 +472,12 @@ class Index extends Component
         $this->showOrderWorkflowActionModal = false;
         $this->orderWorkflowActionTaskId = null;
         $this->orderWorkflowActionComment = '';
+        $this->orderWorkflowActionAttachments = [];
         $this->orderWorkflowActionStep = 'main';
         $this->orderWorkflowActionPayload = [];
         $this->listActionOrderId = null;
         $this->resetOrderWorkflowEmailFallbackState();
-        $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
+        $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionAttachments', 'orderWorkflowActionAttachments.*', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
     }
 
     public function submitOrderWorkflowAction(string $decision = 'confirm'): void
@@ -473,7 +498,8 @@ class Index extends Component
             && in_array($key, ['ART_INTERNAL_REVIEW', 'ART_CLIENT_ERP_DECISION'], true)) {
             $this->orderWorkflowActionStep = 'revision';
             $this->orderWorkflowActionComment = '';
-            $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
+            $this->orderWorkflowActionAttachments = [];
+            $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionAttachments', 'orderWorkflowActionAttachments.*', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
             return;
         }
 
@@ -501,6 +527,19 @@ class Index extends Component
             $this->forgetOrderWorkflowEmailFallbackMarker($task);
         }
 
+        $isArtworkRevisionSubmission = $this->orderWorkflowActionStep === 'revision'
+            && $decision === 'revise'
+            && in_array($key, ['ART_INTERNAL_REVIEW', 'ART_CLIENT_ERP_DECISION'], true);
+        if ($isArtworkRevisionSubmission) {
+            $this->validate([
+                'orderWorkflowActionAttachments' => ['array', 'max:10'],
+                'orderWorkflowActionAttachments.*' => AttachmentUpload::itemRules(AttachmentUpload::DOCUMENTS_WITH_AI, 20480),
+            ], [
+                'orderWorkflowActionAttachments.max' => 'You can attach a maximum of 10 files.',
+                'orderWorkflowActionAttachments.*.max' => 'Each attachment must be 20 MB or smaller.',
+            ]);
+        }
+
         try {
             $workflowActions->perform(
                 $task,
@@ -508,7 +547,19 @@ class Index extends Component
                 $decision,
                 $this->orderWorkflowActionComment,
                 $this->orderWorkflowActionPayload,
+                $isArtworkRevisionSubmission ? $this->orderWorkflowActionAttachments : [],
             );
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $exception) {
+            if (! $isArtworkRevisionSubmission || $exception->getStatusCode() !== 422) {
+                throw $exception;
+            }
+
+            $message = trim((string) $exception->getMessage());
+            $this->addError(
+                'orderWorkflowActionAttachments',
+                $message !== '' ? $message : 'One of the attachments could not be verified. Re-export it and try again.',
+            );
+            return;
         } catch (EmailDeliveryException $exception) {
             if (! in_array($key, ['NEW_SEND_PO_ARTWORK', 'ART_SEND_ORDER_TEAM'], true)) {
                 throw $exception;
@@ -589,6 +640,15 @@ class Index extends Component
         $this->orderWorkflowEmailFallbackMessage = 'Due to some technical issue, the email could not be sent after '.$attempts.' attempts. Please download the '.$attachmentLabel.' and send it manually. After sending it manually, you can complete this task to continue the workflow.';
     }
 
+    public function removeOrderWorkflowActionAttachment(int $index): void
+    {
+        if (! array_key_exists($index, $this->orderWorkflowActionAttachments)) return;
+
+        unset($this->orderWorkflowActionAttachments[$index]);
+        $this->orderWorkflowActionAttachments = array_values($this->orderWorkflowActionAttachments);
+        $this->resetValidation(['orderWorkflowActionAttachments', 'orderWorkflowActionAttachments.*']);
+    }
+
     /** @return array<string,mixed>|null */
     private function orderWorkflowEmailFallbackMarker(Task $task): ?array
     {
@@ -625,10 +685,17 @@ class Index extends Component
         $this->overviewTaskDocumentModalTaskId = (int) $task->id;
         $this->overviewTaskDocumentSource = $canCreate ? 'upload' : 'existing';
         $this->overviewTaskDocumentUpload = [];
+        $pendingArtworkRevision = app(OrderWorkflowActionService::class)->automationKey($task) === 'ART_PREPARE_UPLOAD'
+            ? app(DocumentService::class)->pendingArtworkRevision($task)
+            : ['active' => false, 'document_ids' => []];
+        $this->overviewTaskRevisionDocumentIds = (bool) ($pendingArtworkRevision['active'] ?? false)
+            ? array_values(array_map('intval', $pendingArtworkRevision['document_ids'] ?? []))
+            : [];
         $this->overviewTaskExistingDocumentId = null;
         $this->overviewTaskDocumentNote = '';
         $this->resetValidation([
             'overviewTaskDocumentUpload',
+            'overviewTaskRevisionDocumentIds',
             'overviewTaskExistingDocumentId',
             'overviewTaskDocumentNote',
         ]);
@@ -641,11 +708,13 @@ class Index extends Component
         $this->overviewTaskDocumentModalTaskId = null;
         $this->overviewTaskDocumentSource = 'upload';
         $this->overviewTaskDocumentUpload = [];
+        $this->overviewTaskRevisionDocumentIds = [];
         $this->overviewTaskExistingDocumentId = null;
         $this->overviewTaskDocumentNote = '';
         $this->listActionOrderId = null;
         $this->resetValidation([
             'overviewTaskDocumentUpload',
+            'overviewTaskRevisionDocumentIds',
             'overviewTaskExistingDocumentId',
             'overviewTaskDocumentNote',
         ]);
@@ -688,32 +757,78 @@ class Index extends Component
 
         if ($this->overviewTaskDocumentSource === 'upload') {
             abort_unless(auth()->user()->canModule('documents', 'create'), 403);
-            $allowsMultiple = app(OrderWorkflowActionService::class)->automationKey($task) === 'ART_PREPARE_UPLOAD'
-                || (bool) ($task->setupTemplate?->allow_multiple_documents ?? false);
+            $isArtworkUpload = app(OrderWorkflowActionService::class)->automationKey($task) === 'ART_PREPARE_UPLOAD';
+            $artworkRevision = $isArtworkUpload ? $documentService->pendingArtworkRevision($task) : ['active' => false, 'documents' => collect()];
+            if ($isArtworkUpload && (bool) ($artworkRevision['active'] ?? false)) {
+                $this->validate([
+                    'overviewTaskRevisionDocumentIds' => ['required', 'array', 'min:1'],
+                    'overviewTaskRevisionDocumentIds.*' => ['integer', 'distinct'],
+                ], [
+                    'overviewTaskRevisionDocumentIds.required' => 'Select at least one artwork file that needs revision.',
+                    'overviewTaskRevisionDocumentIds.min' => 'Select at least one artwork file that needs revision.',
+                ]);
+                $artworkRevision = $documentService->updatePendingArtworkRevisionSelection(
+                    $task,
+                    $this->overviewTaskRevisionDocumentIds,
+                );
+            }
+            $revisionFileCount = (bool) ($artworkRevision['active'] ?? false)
+                ? collect($artworkRevision['documents'] ?? [])->count()
+                : 0;
+            $allowsMultiple = $isArtworkUpload || (bool) ($task->setupTemplate?->allow_multiple_documents ?? false);
+            $uploadRules = ['required', 'array', 'min:1', 'max:'.($allowsMultiple ? 10 : 1)];
+            if ($revisionFileCount > 0) {
+                $uploadRules[] = 'size:'.$revisionFileCount;
+            }
             $this->validate([
-                'overviewTaskDocumentUpload' => ['required', 'array', 'min:1', 'max:'.($allowsMultiple ? 10 : 1)],
+                'overviewTaskDocumentUpload' => $uploadRules,
                 'overviewTaskDocumentUpload.*' => AttachmentUpload::itemRules(AttachmentUpload::DOCUMENTS_WITH_AI, 20480),
             ], [
                 'overviewTaskDocumentUpload.max' => $allowsMultiple
                     ? 'You can upload a maximum of 10 files at a time.'
                     : 'Choose one file for this task.',
+                'overviewTaskDocumentUpload.size' => $revisionFileCount > 0
+                    ? 'Upload exactly '.$revisionFileCount.' revised file'.($revisionFileCount === 1 ? '' : 's').' — one for each artwork selected for revision.'
+                    : 'Choose the required file set.',
                 'overviewTaskDocumentUpload.*.max' => 'Each file must be 20 MB or smaller.',
             ]);
 
-            $storeData = [
-                'flow_job_id' => $task->flow_job_id,
-                'client_id' => $task->job?->client_id,
-                'task_id' => $task->id,
-                'note' => $note,
-            ];
+            try {
+                if ($revisionFileCount > 0) {
+                    $documentService->storeArtworkRevision(
+                        $this->overviewTaskDocumentUpload,
+                        $task,
+                        auth()->user(),
+                        $note,
+                    );
+                } else {
+                    $storeData = [
+                        'flow_job_id' => $task->flow_job_id,
+                        'client_id' => $task->job?->client_id,
+                        'task_id' => $task->id,
+                        'note' => $note,
+                    ];
 
-            if ($documentService->taskHasRequirement($task)) {
-                $storeData['require_task_pack_requirement'] = true;
-            } else {
-                $storeData['category'] = 'Task attachment';
+                    if ($documentService->taskHasRequirement($task)) {
+                        $storeData['require_task_pack_requirement'] = true;
+                    } else {
+                        $storeData['category'] = 'Task attachment';
+                    }
+
+                    $documentService->storeMany($this->overviewTaskDocumentUpload, $storeData, auth()->user());
+                }
+            } catch (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $exception) {
+                if ($exception->getStatusCode() !== 422) {
+                    throw $exception;
+                }
+
+                $message = trim((string) $exception->getMessage());
+                $this->addError(
+                    'overviewTaskDocumentUpload',
+                    $message !== '' ? $message : 'One of the selected files could not be verified. Re-export it and try again.',
+                );
+                return;
             }
-
-            $documentService->storeMany($this->overviewTaskDocumentUpload, $storeData, auth()->user());
         } else {
             abort_unless(auth()->user()->canModule('documents', 'link'), 403);
             $this->validate([
@@ -788,6 +903,8 @@ class Index extends Component
             'metric' => $this->metricFilter,
             'date_from' => $this->dateFrom,
             'date_to' => $this->dateTo,
+            'dashboard_scope' => $this->dashboardScope === 1,
+            'dashboard_team_id' => $this->filterId($this->dashboardTeam),
             'import_id' => $this->importBatchId > 0 ? $this->importBatchId : null,
             'stage_quick' => $this->stageQuick,
             'stage_supplier_id' => $this->filterId($this->stageSupplier),
@@ -807,6 +924,7 @@ class Index extends Component
         $listActionContext = [];
         $listActionWorkflowModal = [];
         $listActionAvailableDocuments = collect();
+        $listActionArtworkRevision = ['active' => false, 'documents' => collect(), 'retained_documents' => collect()];
 
         if ($this->listActionOrderId && ($this->showOrderWorkflowActionModal || $this->showOverviewTaskDocumentModal)) {
             $orderQuery = app(VisibleOrderQuery::class);
@@ -823,6 +941,10 @@ class Index extends Component
 
             if ($listActionTask) {
                 $listActionContext = app(OrderDetailViewService::class)->build($listActionOrder, $user, $urgencies);
+                if ($this->showOverviewTaskDocumentModal
+                    && app(OrderWorkflowActionService::class)->automationKey($listActionTask) === 'ART_PREPARE_UPLOAD') {
+                    $listActionArtworkRevision = app(DocumentService::class)->pendingArtworkRevision($listActionTask);
+                }
                 $listActionWorkflowModal = data_get(
                     $listActionContext,
                     'taskActionModals.'.(int) $listActionTask->id,
@@ -840,24 +962,58 @@ class Index extends Component
             }
         }
 
+        $dashboardTeamLabel = '';
+        if ($this->dashboardScope === 1 && $this->dashboardTeam !== '') {
+            $dashboardTeamLabel = (string) data_get(
+                $options->selectedOptions($user, 'departments', 'dashboard', [(int) $this->dashboardTeam])->first(),
+                'label',
+                '',
+            );
+        }
+
         return view('livewire.orders.index', [
             'jobs' => $jobs,
             'orderRows' => $list->rows($jobs, $urgencies),
             'orderStages' => $stages,
             'selectedStage' => $selectedStage,
             'stageQuickFilters' => OrderListPrototypeService::QUICK_FILTERS[$stageSequence] ?? ['all' => 'All'],
-            'clientFilterOptions' => $options->options($user, 'clients', 'jobs', '', $this->filterId($this->client), 20),
-            'ownerFilterOptions' => $options->options($user, 'users', 'order-list-user-filter', '', $this->filterId($this->owner), 20),
-            'stageAssigneeOptions' => $options->options($user, 'users', 'order-list-user-filter', '', $this->filterId($this->stageAssignee), 20),
-            'stageClientFilterOptions' => $options->options($user, 'clients', 'jobs', '', $this->filterId($this->stageClient), 20),
-            'supplierFilterOptions' => $options->options($user, 'suppliers', 'order-list', '', $this->filterId($this->stageSupplier), 20),
+            // Priority 7: remote Orders filters fetch their recent/search
+            // options only when opened. During normal list renders we resolve
+            // just an already-selected row so the visible label survives page
+            // refreshes, deep links and Livewire morphs without five page-one
+            // option queries on every request.
+            'clientFilterOptions' => $this->selectedFilterOptions($options, $user, 'clients', 'jobs', $this->client),
+            'ownerFilterOptions' => $this->selectedFilterOptions($options, $user, 'users', 'order-list-user-filter', $this->owner),
+            'stageAssigneeOptions' => $this->selectedFilterOptions($options, $user, 'users', 'order-list-user-filter', $this->stageAssignee),
+            'stageClientFilterOptions' => $this->selectedFilterOptions($options, $user, 'clients', 'jobs', $this->stageClient),
+            'supplierFilterOptions' => $this->selectedFilterOptions($options, $user, 'suppliers', 'order-list', $this->stageSupplier),
             'shipmentUrgencyOptions' => $urgencies,
+            'dashboardScope' => $this->dashboardScope === 1,
+            'dashboardRangeDays' => $this->dashboardRangeDays,
+            'dashboardTeamLabel' => $dashboardTeamLabel,
             'listActionOrder' => $listActionOrder,
             'listActionTask' => $listActionTask,
             'listActionContext' => $listActionContext,
             'listActionWorkflowModal' => $listActionWorkflowModal,
             'listActionAvailableDocuments' => $listActionAvailableDocuments,
+            'listActionArtworkRevision' => $listActionArtworkRevision,
         ]);
+    }
+
+    private function selectedFilterOptions(
+        FilterOptionService $options,
+        User $user,
+        string $type,
+        string $context,
+        string $value,
+    ): Collection {
+        $selectedId = $this->filterId($value);
+
+        if ($selectedId === null) {
+            return collect();
+        }
+
+        return $options->selectedOptions($user, $type, $context, [$selectedId]);
     }
 
     private function clearListFiltersExcept(string $except): void
@@ -877,6 +1033,9 @@ class Index extends Component
         if ($except !== 'dateRange') {
             $this->dateFrom = '';
             $this->dateTo = '';
+            $this->dashboardScope = 0;
+            $this->dashboardRangeDays = 0;
+            $this->dashboardTeam = '';
         }
         if ($except !== 'importBatch') {
             $this->importBatchId = 0;
@@ -894,6 +1053,9 @@ class Index extends Component
         $this->owner = '';
         $this->dateFrom = '';
         $this->dateTo = '';
+        $this->dashboardScope = 0;
+        $this->dashboardRangeDays = 0;
+        $this->dashboardTeam = '';
         $this->importBatchId = 0;
         $this->importBatchLabel = '';
     }
@@ -926,20 +1088,6 @@ class Index extends Component
         }
 
         $this->dateTo = $this->dateFrom;
-    }
-
-    private function selectedFilterOptions(
-        FilterOptionService $options,
-        User $user,
-        string $type,
-        string $context,
-        string $value,
-    ): Collection {
-        $id = $this->filterId($value);
-
-        return $id
-            ? $options->options($user, $type, $context, '', $id, 5)
-            : collect();
     }
 
     private function resetStageSpecificFilters(): void

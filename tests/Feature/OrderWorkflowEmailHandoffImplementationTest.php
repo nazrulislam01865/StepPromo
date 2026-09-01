@@ -38,12 +38,17 @@ class OrderWorkflowEmailHandoffImplementationTest extends TestCase
         $this->assertStringContainsString("Order Team role + '.strtoupper(\$businessUnit).' business unit", $service);
         $this->assertStringContainsString("'business_unit' => \$key === self::ARTWORK_HANDOFF", $service);
 
-        // Purchase Order -> Artwork Team uses every active assignee from this
-        // Order's Artwork phase, not one hard-coded user/email.
-        $this->assertStringContainsString('artworkPhaseAssignees($job)', $service);
-        $this->assertStringContainsString("whereIn('workflow_phase_id', \$artworkPhaseIds->all())", $service);
-        $this->assertStringContainsString("whereNotNull('assignee_id')", $service);
-        $this->assertStringContainsString("All assignees in this Order's Artwork phase", $service);
+        // Purchase Order -> Artwork Team uses Administration > Users & role
+        // assignments. It no longer depends on current Order task assignees.
+        $this->assertStringContainsString('artworkTeamMembers()', $service);
+        $this->assertStringContainsString('Department::query()', $service);
+        $this->assertStringContainsString("'artworkteam'", $service);
+        $this->assertStringContainsString("'design'", $service);
+        $this->assertStringContainsString("whereIn('department_id', \$departmentIds->all())", $service);
+        $this->assertStringContainsString("whereHas('roles'", $service);
+        $this->assertStringContainsString("['artworkteam', 'artwork']", $service);
+        $this->assertStringContainsString('Users & role assignments — Artwork Team users', $service);
+        $this->assertStringNotContainsString('artworkPhaseAssignees($job)', $service);
 
         // Preview and send share the exact same email Blade/view data.
         $this->assertStringContainsString("view('emails.orders.workflow-handoff', \$viewData)->render()", $service);

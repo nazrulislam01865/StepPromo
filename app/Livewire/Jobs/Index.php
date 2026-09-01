@@ -121,6 +121,8 @@ class Index extends Component
     public bool $showOrderWorkflowActionModal = false;
     public ?int $orderWorkflowActionTaskId = null;
     public string $orderWorkflowActionComment = '';
+    /** @var array<int,\Livewire\Features\SupportFileUploads\TemporaryUploadedFile> */
+    public array $orderWorkflowActionAttachments = [];
     public string $orderWorkflowActionStep = 'main';
     /** @var array<string,mixed> */
     public array $orderWorkflowActionPayload = [];
@@ -249,6 +251,8 @@ class Index extends Component
     public string $overviewTaskDocumentSource = 'upload';
     /** Files selected in the Order Details workflow upload modal. */
     public array $overviewTaskDocumentUpload = [];
+    /** Artwork files selected for replacement in an active revision upload. */
+    public array $overviewTaskRevisionDocumentIds = [];
     public ?int $overviewTaskExistingDocumentId = null;
     public string $overviewTaskDocumentNote = '';
     public ?int $overviewTaskLinkFormTaskId = null;

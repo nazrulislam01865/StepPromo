@@ -41,6 +41,8 @@
     'overviewTaskDocumentSource' => 'upload',
     'overviewTaskDocumentUpload' => null,
     'overviewTaskExistingDocumentId' => null,
+    'overviewTaskArtworkRevision' => [],
+    'overviewTaskRevisionDocumentIds' => [],
     'overviewTaskLinkFormTaskId' => null,
     'showAddOrderTaskForm' => false,
     'newOrderTaskAssigneeId' => null,
@@ -48,6 +50,7 @@
     'orderWorkflowActionTaskId' => null,
     'orderWorkflowActionStep' => 'main',
     'orderWorkflowActionPayload' => [],
+    'orderWorkflowActionAttachments' => [],
     'orderWorkflowEmailFallback' => false,
     'orderWorkflowEmailFallbackMessage' => '',
     'orderWorkflowEmailFallbackAttempts' => 0,
@@ -195,6 +198,8 @@
                 :config="$workflowActionModal"
                 :step="$orderWorkflowActionStep"
                 :payload="$orderWorkflowActionPayload"
+                :attachments="$orderWorkflowActionAttachments"
+                :mention-users="$mentionUsers"
                 :email-fallback="$orderWorkflowEmailFallback"
                 :email-fallback-message="$orderWorkflowEmailFallbackMessage"
                 :email-fallback-attempts="$orderWorkflowEmailFallbackAttempts"
@@ -210,6 +215,8 @@
             :source="$overviewTaskDocumentSource"
             :upload="$overviewTaskDocumentUpload"
             :existing-document-id="$overviewTaskExistingDocumentId"
+            :artwork-revision="$overviewTaskArtworkRevision"
+            :revision-document-ids="$overviewTaskRevisionDocumentIds"
             :context="$orderDetailContext"
         />
     @endif

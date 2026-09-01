@@ -43,6 +43,8 @@
     'overviewTaskDocumentSource'=>'upload',
     'overviewTaskDocumentUpload'=>null,
     'overviewTaskExistingDocumentId'=>null,
+    'overviewTaskArtworkRevision'=>[],
+    'overviewTaskRevisionDocumentIds'=>[],
     'overviewTaskLinkFormTaskId'=>null,
     'jobTaskSearch'=>'',
     'activityTab'=>'all',
@@ -106,6 +108,7 @@
     'orderWorkflowActionTaskId'=>null,
     'orderWorkflowActionStep'=>'main',
     'orderWorkflowActionPayload'=>[],
+    'orderWorkflowActionAttachments'=>[],
     'orderWorkflowEmailFallback'=>false,
     'orderWorkflowEmailFallbackMessage'=>'',
     'orderWorkflowEmailFallbackAttempts'=>0,
@@ -190,6 +193,8 @@
             :overview-task-document-source="$overviewTaskDocumentSource"
             :overview-task-document-upload="$overviewTaskDocumentUpload"
             :overview-task-existing-document-id="$overviewTaskExistingDocumentId"
+            :overview-task-artwork-revision="$overviewTaskArtworkRevision"
+            :overview-task-revision-document-ids="$overviewTaskRevisionDocumentIds"
             :overview-task-link-form-task-id="$overviewTaskLinkFormTaskId"
             :show-add-order-task-form="$showAddOrderTaskForm"
             :new-order-task-assignee-id="$newOrderTaskAssigneeId"
@@ -197,6 +202,7 @@
             :order-workflow-action-task-id="$orderWorkflowActionTaskId"
             :order-workflow-action-step="$orderWorkflowActionStep"
             :order-workflow-action-payload="$orderWorkflowActionPayload"
+            :order-workflow-action-attachments="$orderWorkflowActionAttachments"
             :order-workflow-email-fallback="$orderWorkflowEmailFallback"
             :order-workflow-email-fallback-message="$orderWorkflowEmailFallbackMessage"
             :order-workflow-email-fallback-attempts="$orderWorkflowEmailFallbackAttempts"

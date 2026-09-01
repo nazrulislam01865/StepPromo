@@ -3,6 +3,7 @@
 namespace App\Services\Orders;
 
 use App\DTOs\Email\EmailMessage;
+use App\Models\Department;
 use App\Models\Document;
 use App\Models\FlowJob;
 use App\Models\Role;
@@ -100,7 +101,7 @@ final class OrderWorkflowEmailService
             'empty_recipient_message' => $recipients->isEmpty()
                 ? ($key === self::ARTWORK_HANDOFF
                     ? $this->missingOrderTeamRecipientMessage($job)
-                    : 'No active Artwork phase assignee with a valid email address was found for this Order.')
+                    : $this->missingArtworkTeamRecipientMessage())
                 : '',
             'business_unit' => $key === self::ARTWORK_HANDOFF ? $this->orderBusinessUnit($job) : null,
             'subject' => $subject,
@@ -167,7 +168,7 @@ final class OrderWorkflowEmailService
         if ($recipients->isEmpty()) {
             $message = $key === self::ARTWORK_HANDOFF
                 ? $this->missingOrderTeamRecipientMessage($job)
-                : 'No active Artwork phase assignee with a valid email address could be resolved for this Order. Assign the Artwork phase tasks to the Artwork team members before sending.';
+                : $this->missingArtworkTeamRecipientMessage();
 
             throw ValidationException::withMessages([
                 'orderWorkflowActionEmail' => $message,
@@ -292,7 +293,7 @@ final class OrderWorkflowEmailService
     private function recipients(FlowJob $job, string $handoffKey): Collection
     {
         return match ($handoffKey) {
-            self::PURCHASE_ORDER_HANDOFF => $this->artworkPhaseAssignees($job),
+            self::PURCHASE_ORDER_HANDOFF => $this->artworkTeamMembers(),
             self::ARTWORK_HANDOFF => $this->orderTeamRoleMembers($job),
             default => collect(),
         };
@@ -301,51 +302,93 @@ final class OrderWorkflowEmailService
     /**
      * Purchase Order -> Artwork Team
      *
-     * The Artwork Team for an Order is the set of people actually assigned to
-     * tasks in that Order's Artwork phase. This intentionally follows runtime
-     * task assignment rather than a department/role name, so the email always
-     * goes to the people who are responsible for Artwork on this specific
-     * Order. Every unique active assignee with a valid email is included.
+     * Artwork Team membership is owned by Administration > Users & role
+     * assignments, not by runtime task assignment. Every active user in the
+     * current workspace who is configured as part of the Artwork Team receives
+     * the Purchase Order handoff.
+     *
+     * The user list can represent that team either through an "Artwork Team" /
+     * "Artwork" role or through the Artwork/Design department. Department
+     * aliases preserve older installations that still use the seeded "Design"
+     * / "DES" department. Duplicate email addresses are removed.
      *
      * @return Collection<int,User>
      */
-    private function artworkPhaseAssignees(FlowJob $job): Collection
+    private function artworkTeamMembers(): Collection
     {
-        // Locate the Artwork phase from the known Artwork workflow tasks rather
-        // than relying on the displayed phase name. This remains safe if the
-        // phase is renamed in Order Workflow Setup.
-        $artworkPhaseIds = Task::query()
-            ->where('flow_job_id', $job->id)
-            ->with('setupTemplate:id,automation_key')
-            ->get(['id', 'flow_job_id', 'workflow_phase_id', 'task_pack_task_id', 'title'])
-            ->filter(function (Task $task): bool {
-                return in_array($this->automationKey($task), [
-                    'ART_PREPARE_UPLOAD',
-                    'ART_INTERNAL_REVIEW',
-                    self::ARTWORK_HANDOFF,
-                    'ART_CLIENT_ERP_DECISION',
-                    'ART_SAMPLE_APPROVAL',
-                ], true);
+        $workspaceId = app(SetupContext::class)->workspaceId();
+
+        $departmentIds = Department::query()
+            ->where('is_active', true)
+            ->get(['id', 'name', 'code'])
+            ->filter(function (Department $department): bool {
+                return collect([$department->name, $department->code])
+                    ->filter(fn ($value) => filled($value))
+                    ->contains(function ($value): bool {
+                        return in_array($this->normalizeTeamIdentity((string) $value), [
+                            'artwork',
+                            'artworkteam',
+                            'design',
+                            'designteam',
+                            'des',
+                        ], true);
+                    });
             })
-            ->pluck('workflow_phase_id')
-            ->filter(fn ($id) => (int) $id > 0)
+            ->pluck('id')
             ->map(fn ($id) => (int) $id)
             ->unique()
             ->values();
 
-        if ($artworkPhaseIds->isEmpty()) return collect();
+        $roleIds = Role::query()
+            ->where('workspace_id', $workspaceId)
+            ->where('is_active', true)
+            ->get(['id', 'name', 'slug', 'code'])
+            ->filter(function (Role $role): bool {
+                return collect([$role->name, $role->slug, $role->code])
+                    ->filter(fn ($value) => filled($value))
+                    ->contains(fn ($value) => in_array($this->normalizeTeamIdentity((string) $value), ['artworkteam', 'artwork'], true));
+            })
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
 
-        return Task::query()
-            ->where('flow_job_id', $job->id)
-            ->whereIn('workflow_phase_id', $artworkPhaseIds->all())
-            ->whereNotNull('assignee_id')
-            ->with('assignee')
-            ->orderBy('id')
+        if ($departmentIds->isEmpty() && $roleIds->isEmpty()) return collect();
+
+        return User::query()
+            ->where('is_active', true)
+            ->whereNotNull('email')
+            ->where('email', '!=', '')
+            ->where(function ($query) use ($departmentIds, $roleIds, $workspaceId): void {
+                if ($departmentIds->isNotEmpty()) {
+                    // users.department_id is what Administration > Users & role
+                    // assignments displays. workspace_memberships.department_id
+                    // remains a compatibility path for migrated accounts.
+                    $query->whereIn('department_id', $departmentIds->all())
+                        ->orWhereHas('workspaceMemberships', function ($memberships) use ($departmentIds, $workspaceId): void {
+                            $memberships
+                                ->where('workspace_id', $workspaceId)
+                                ->whereIn('department_id', $departmentIds->all());
+                        });
+                }
+
+                if ($roleIds->isNotEmpty()) {
+                    $method = $departmentIds->isNotEmpty() ? 'orWhereHas' : 'whereHas';
+                    $query->{$method}('roles', fn ($roles) => $roles->whereIn('roles.id', $roleIds->all()));
+
+                    $query->orWhereIn('role_id', $roleIds->all());
+                }
+            })
+            ->whereHas('workspaceMemberships', function ($query) use ($workspaceId): void {
+                $query
+                    ->where('workspace_id', $workspaceId)
+                    ->where('status', 'active');
+            })
+            ->with(['department:id,name,code', 'roles:id,name,slug,code'])
+            ->orderBy('name')
             ->get()
-            ->map(fn (Task $task) => $task->assignee)
-            ->filter(fn ($user) => $this->isDeliverableUser($user))
+            ->filter(fn (User $user) => $this->isDeliverableUser($user))
             ->unique(fn (User $user) => mb_strtolower(trim((string) $user->email)))
-            ->sortBy(fn (User $user) => mb_strtolower((string) $user->name))
             ->values();
     }
 
@@ -453,7 +496,7 @@ final class OrderWorkflowEmailService
     private function recipientSourceLabel(string $key, ?FlowJob $job = null): string
     {
         if ($key === self::PURCHASE_ORDER_HANDOFF) {
-            return "All assignees in this Order's Artwork phase";
+            return 'Users & role assignments — Artwork Team users';
         }
 
         $businessUnit = $job ? $this->orderBusinessUnit($job) : null;
@@ -462,6 +505,12 @@ final class OrderWorkflowEmailService
         }
 
         return 'Users & role assignments — Order Team role + Both business units';
+    }
+
+    private function missingArtworkTeamRecipientMessage(): string
+    {
+        return 'No active Artwork Team email address could be resolved from Users & role assignments. '
+            .'Assign an active user with a valid email address to the Artwork Team role or Artwork/Design department.';
     }
 
     private function missingOrderTeamRecipientMessage(FlowJob $job): string

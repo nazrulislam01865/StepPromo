@@ -9,6 +9,9 @@ use App\Models\Task;
 use App\Services\AccessControlService;
 use App\Services\Orders\OrderWorkflowEmailService;
 use App\Services\TaskService;
+use App\Support\AttachmentUpload;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 /**
  * Phase 5 Order UI workflow extracted from the legacy Jobs coordinator.
@@ -71,6 +74,7 @@ trait ManagesOrderWorkflow
         if (($descriptor['interaction'] ?? null) === 'direct') {
             $decision = ($descriptor['key'] ?? null) === 'SHIP_LABEL' ? 'generate' : 'confirm';
             $workflowActions->perform($task, auth()->user(), $decision);
+            $this->dispatchTaskAssigneeSync($task->id);
             $currentPhaseId = FlowJob::query()->whereKey($this->selectedJobId)->value('workflow_phase_id');
             if ($currentPhaseId) $this->overviewPhaseId = (int) $currentPhaseId;
             session()->flash('success', 'Order workflow updated.');
@@ -79,6 +83,7 @@ trait ManagesOrderWorkflow
 
         $this->orderWorkflowActionTaskId = $taskId;
         $this->orderWorkflowActionComment = '';
+        $this->orderWorkflowActionAttachments = [];
         $this->orderWorkflowActionStep = 'main';
         $this->orderWorkflowActionPayload = $workflowActions->initialPayload($task, $task->job);
         $this->resetOrderWorkflowEmailFallbackState();
@@ -90,7 +95,7 @@ trait ManagesOrderWorkflow
             }
         }
 
-        $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
+        $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionAttachments', 'orderWorkflowActionAttachments.*', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
         $this->showOrderWorkflowActionModal = true;
     }
 
@@ -99,10 +104,151 @@ trait ManagesOrderWorkflow
         $this->showOrderWorkflowActionModal = false;
         $this->orderWorkflowActionTaskId = null;
         $this->orderWorkflowActionComment = '';
+        $this->orderWorkflowActionAttachments = [];
         $this->orderWorkflowActionStep = 'main';
         $this->orderWorkflowActionPayload = [];
         $this->resetOrderWorkflowEmailFallbackState();
-        $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
+        $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionAttachments', 'orderWorkflowActionAttachments.*', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
+    }
+
+    public function confirmShipmentDetailsWithoutChanges(int $taskId): void
+    {
+        $task = $this->shipmentActionTask($taskId, 'SHIP_CONFIRM_INFO');
+        $workflowActions = app(\App\Services\OrderWorkflowActionService::class);
+        $payload = $workflowActions->initialPayload($task, $task->job);
+
+        try {
+            $workflowActions->perform($task, auth()->user(), 'confirm', null, $payload);
+        } catch (ValidationException $exception) {
+            $this->orderWorkflowActionTaskId = $taskId;
+            $this->orderWorkflowActionStep = 'main';
+            $this->orderWorkflowActionPayload = $payload;
+            $this->showOrderWorkflowActionModal = true;
+            foreach ($exception->errors() as $field => $messages) {
+                foreach ((array) $messages as $message) $this->addError($field, $message);
+            }
+            return;
+        }
+
+        $this->dispatchTaskAssigneeSync($task->id);
+        $this->refreshShipmentWorkflowSelection();
+        session()->flash('success', 'Shipment details confirmed. Tracking setup is now available.');
+    }
+
+    public function generateShipmentCourierLabel(int $taskId, string $carrier, string $trackingNumber): void
+    {
+        $task = $this->shipmentActionTask($taskId, 'SHIP_LABEL');
+        $carrier = trim($carrier);
+        $trackingNumber = trim($trackingNumber);
+        $this->resetValidation('shipmentLabel');
+
+        if ($carrier === '' || $trackingNumber === '') {
+            $this->addError('shipmentLabel', 'Select a courier and enter the tracking number first.');
+            return;
+        }
+
+        $workflowActions = app(\App\Services\OrderWorkflowActionService::class);
+        $payload = $workflowActions->initialPayload($task, $task->job);
+        $payload['carrier'] = $carrier;
+        $payload['tracking_number'] = $trackingNumber;
+        $workflowActions->perform($task, auth()->user(), 'generate', null, $payload);
+
+        $this->dispatchTaskAssigneeSync($task->id);
+        $this->refreshShipmentWorkflowSelection();
+        session()->flash('success', 'Courier label generated. Review and print it to continue.');
+    }
+
+    public function completeShipmentTrackingTask(int $taskId, string $carrier, string $trackingNumber): void
+    {
+        $task = $this->shipmentActionTask($taskId, 'SHIP_LABEL');
+        $carrier = trim($carrier);
+        $trackingNumber = trim($trackingNumber);
+        $this->resetValidation('shipmentLabel');
+
+        if ($carrier === '' || $trackingNumber === '') {
+            $this->addError('shipmentLabel', 'Select a courier and enter the tracking number first.');
+            return;
+        }
+
+        $workflowActions = app(\App\Services\OrderWorkflowActionService::class);
+        $payload = $workflowActions->initialPayload($task, $task->job);
+        $payload['carrier'] = $carrier;
+        $payload['tracking_number'] = $trackingNumber;
+        $workflowActions->perform($task, auth()->user(), 'complete', null, $payload);
+
+        $this->dispatchTaskAssigneeSync($task->id);
+        $this->refreshShipmentWorkflowSelection();
+        session()->flash('success', 'Tracking details saved. Dispatch shipment is now available.');
+    }
+
+    public function dispatchShipment(int $taskId): void
+    {
+        $task = $this->shipmentActionTask($taskId, 'SHIP_PACKAGE');
+        $workflowActions = app(\App\Services\OrderWorkflowActionService::class);
+        $payload = $workflowActions->initialPayload($task, $task->job);
+        $this->resetValidation('shipmentDispatch');
+
+        if (trim((string) ($payload['carrier'] ?? '')) === '' || trim((string) ($payload['tracking_number'] ?? '')) === '') {
+            $this->addError('shipmentDispatch', 'Generate the courier label with a tracking number before dispatching the shipment.');
+            return;
+        }
+
+        $workflowActions->perform($task, auth()->user(), 'confirm', null, $payload);
+        $this->dispatchTaskAssigneeSync($task->id);
+        $this->refreshShipmentWorkflowSelection();
+        session()->flash('success', 'Shipment marked as dispatched.');
+    }
+
+    public function selectShipmentContact(string $selection): void
+    {
+        abort_unless($this->selectedJobId && $this->orderWorkflowActionTaskId, 422);
+        $options = collect($this->orderWorkflowActionPayload['contact_options'] ?? []);
+        $option = $options->firstWhere('value', $selection);
+        if (! $option) return;
+
+        $this->orderWorkflowActionPayload['contact_selection'] = $selection;
+        $this->orderWorkflowActionPayload['contact_name'] = (string) ($option['name'] ?? '');
+        $this->orderWorkflowActionPayload['contact_type'] = (string) ($option['contact_type'] ?? 'middle_client');
+        $this->orderWorkflowActionPayload['phone_country_code'] = (string) ($option['country_code'] ?? '');
+        $this->orderWorkflowActionPayload['phone_number'] = (string) ($option['phone'] ?? '');
+        $this->orderWorkflowActionPayload['recipient'] = (string) ($option['name'] ?? '');
+        $this->orderWorkflowActionPayload['contact'] = trim((string) (($option['country_code'] ?? '').' '.($option['phone'] ?? '')));
+        $this->resetValidation([
+            'orderWorkflowActionPayload.contact_name',
+            'orderWorkflowActionPayload.phone_country_code',
+            'orderWorkflowActionPayload.phone_number',
+        ]);
+    }
+
+    public function useShipmentSavedAddress(string $selection = ''): void
+    {
+        abort_unless($this->selectedJobId && $this->orderWorkflowActionTaskId, 422);
+        $options = collect($this->orderWorkflowActionPayload['address_options'] ?? []);
+        if ($options->isEmpty()) return;
+
+        $option = $selection !== '' ? $options->firstWhere('value', $selection) : null;
+        $option ??= $options->firstWhere('is_default', true) ?: $options->first();
+        if (! $option) return;
+
+        $this->orderWorkflowActionPayload['address_selection'] = (string) ($option['value'] ?? '');
+        $this->orderWorkflowActionPayload['address'] = (string) ($option['address'] ?? '');
+        $this->orderWorkflowActionPayload['city'] = (string) ($option['city'] ?? '');
+        $this->orderWorkflowActionPayload['state'] = (string) ($option['state'] ?? '');
+        $this->orderWorkflowActionPayload['country'] = (string) ($option['country'] ?? '');
+        $this->orderWorkflowActionPayload['postal_code'] = (string) ($option['postal_code'] ?? '');
+        $this->resetValidation([
+            'orderWorkflowActionPayload.address',
+            'orderWorkflowActionPayload.country',
+            'orderWorkflowActionPayload.postal_code',
+        ]);
+    }
+
+    public function resetShipmentActionDetails(): void
+    {
+        abort_unless($this->selectedJobId && $this->orderWorkflowActionTaskId, 422);
+        $task = $this->shipmentActionTask((int) $this->orderWorkflowActionTaskId, 'SHIP_CONFIRM_INFO');
+        $this->orderWorkflowActionPayload = app(\App\Services\OrderWorkflowActionService::class)->initialPayload($task, $task->job);
+        $this->resetValidation('orderWorkflowActionPayload');
     }
 
     public function submitOrderWorkflowAction(string $decision = 'confirm'): void
@@ -123,7 +269,8 @@ trait ManagesOrderWorkflow
             && in_array($key, ['ART_INTERNAL_REVIEW', 'ART_CLIENT_ERP_DECISION'], true)) {
             $this->orderWorkflowActionStep = 'revision';
             $this->orderWorkflowActionComment = '';
-            $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
+            $this->orderWorkflowActionAttachments = [];
+            $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionAttachments', 'orderWorkflowActionAttachments.*', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
             return;
         }
         if ($this->orderWorkflowActionStep === 'main' && $decision === 'issue'
@@ -153,6 +300,19 @@ trait ManagesOrderWorkflow
             $this->forgetOrderWorkflowEmailFallbackMarker($task);
         }
 
+        $isArtworkRevisionSubmission = $this->orderWorkflowActionStep === 'revision'
+            && $decision === 'revise'
+            && in_array($key, ['ART_INTERNAL_REVIEW', 'ART_CLIENT_ERP_DECISION'], true);
+        if ($isArtworkRevisionSubmission) {
+            $this->validate([
+                'orderWorkflowActionAttachments' => ['array', 'max:10'],
+                'orderWorkflowActionAttachments.*' => AttachmentUpload::itemRules(AttachmentUpload::DOCUMENTS_WITH_AI, 20480),
+            ], [
+                'orderWorkflowActionAttachments.max' => 'You can attach a maximum of 10 files.',
+                'orderWorkflowActionAttachments.*.max' => 'Each attachment must be 20 MB or smaller.',
+            ]);
+        }
+
         try {
             $workflowActions->perform(
                 $task,
@@ -160,7 +320,19 @@ trait ManagesOrderWorkflow
                 $decision,
                 $this->orderWorkflowActionComment,
                 $this->orderWorkflowActionPayload,
+                $isArtworkRevisionSubmission ? $this->orderWorkflowActionAttachments : [],
             );
+        } catch (HttpExceptionInterface $exception) {
+            if (! $isArtworkRevisionSubmission || $exception->getStatusCode() !== 422) {
+                throw $exception;
+            }
+
+            $message = trim((string) $exception->getMessage());
+            $this->addError(
+                'orderWorkflowActionAttachments',
+                $message !== '' ? $message : 'One of the attachments could not be verified. Re-export it and try again.',
+            );
+            return;
         } catch (EmailDeliveryException $exception) {
             if (! in_array($key, ['NEW_SEND_PO_ARTWORK', 'ART_SEND_ORDER_TEAM'], true)) {
                 throw $exception;
@@ -193,6 +365,8 @@ trait ManagesOrderWorkflow
             $this->forgetOrderWorkflowEmailFallbackMarker($task);
         }
 
+        $this->dispatchTaskAssigneeSync($task->id);
+
         $successMessage = match ($key) {
             'NEW_SEND_PO_ARTWORK' => 'Purchase Order emailed to the Artwork Team.',
             'ART_SEND_ORDER_TEAM' => 'Artwork emailed to the Order Team.',
@@ -203,6 +377,35 @@ trait ManagesOrderWorkflow
         $currentPhaseId = FlowJob::query()->whereKey($this->selectedJobId)->value('workflow_phase_id');
         if ($currentPhaseId) $this->overviewPhaseId = (int) $currentPhaseId;
         session()->flash('success', $successMessage);
+    }
+
+    public function removeOrderWorkflowActionAttachment(int $index): void
+    {
+        if (! array_key_exists($index, $this->orderWorkflowActionAttachments)) return;
+
+        unset($this->orderWorkflowActionAttachments[$index]);
+        $this->orderWorkflowActionAttachments = array_values($this->orderWorkflowActionAttachments);
+        $this->resetValidation(['orderWorkflowActionAttachments', 'orderWorkflowActionAttachments.*']);
+    }
+
+    private function shipmentActionTask(int $taskId, string $expectedKey): Task
+    {
+        abort_unless($this->selectedJobId && $this->detailTab === 'overview', 422);
+        $task = app(TaskService::class)->visibleQuery(auth()->user())
+            ->with(['job.client', 'job.items', 'job.phase', 'setupTemplate', 'documents', 'links'])
+            ->where('flow_job_id', $this->selectedJobId)
+            ->findOrFail($taskId);
+        abort_unless(app(AccessControlService::class)->canEditTask(auth()->user(), $task), 403);
+        abort_unless(app(\App\Services\OrderWorkflowActionService::class)->automationKey($task) === $expectedKey, 422);
+        app(\App\Services\OrderTaskSequenceService::class)->assertStatusActionable($task);
+
+        return $task;
+    }
+
+    private function refreshShipmentWorkflowSelection(): void
+    {
+        $currentPhaseId = FlowJob::query()->whereKey($this->selectedJobId)->value('workflow_phase_id');
+        if ($currentPhaseId) $this->overviewPhaseId = (int) $currentPhaseId;
     }
 
     public function completeOrderWorkflowEmailTaskAfterFailure(): void
@@ -227,6 +430,7 @@ trait ManagesOrderWorkflow
         }
 
         $workflowActions->completeEmailHandoffAfterFailure($task, auth()->user(), $failure);
+        $this->dispatchTaskAssigneeSync($task->id);
         $this->forgetOrderWorkflowEmailFallbackMarker($task);
 
         $attachmentLabel = $key === 'ART_SEND_ORDER_TEAM' ? 'artwork' : 'Purchase Order';

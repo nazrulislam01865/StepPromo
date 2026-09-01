@@ -33,11 +33,11 @@
                 <div class="ft-upload-zone compact ft-task-upload-zone">
                     @if($canUploadDocument)
                         <label class="ft-task-upload-drop ft-livewire-upload-zone" data-file-dropzone data-auto-upload-method="uploadSelectedTaskDocuments" for="taskDocumentUpload-{{ $task->id }}">
-                            <input id="taskDocumentUpload-{{ $task->id }}" type="file" wire:model="taskDocumentUploads" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.zip,.txt,.csv,.eps,.esp">
+                            <input id="taskDocumentUpload-{{ $task->id }}" type="file" wire:model="taskDocumentUploads" multiple accept="{{ \App\Support\AttachmentUpload::accept() }}">
                             <span class="ft-paperclip" aria-hidden="true">⌕</span>
                             <div class="ft-task-upload-copy">
                                 <div class="ft-task-upload-title">Drop files here or <strong>browse</strong></div>
-                                <small data-drop-status>{{ $taskDocumentName ? 'Required document: '.$taskDocumentName.' · ' : '' }}PDF, Office files, JPG, PNG, ZIP, EPS or ESP · Max 20 MB</small>
+                                <small data-drop-status>{{ $taskDocumentName ? 'Required document: '.$taskDocumentName.' · ' : '' }}{{ \App\Support\AttachmentUpload::helperText(20) }}</small>
                                 @if($taskDocumentInstructions !== '')
                                     <small class="ft-task-upload-instruction">{{ $taskDocumentInstructions }}</small>
                                 @endif

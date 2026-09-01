@@ -1,4 +1,4 @@
-@props(['job', 'task', 'config' => [], 'step' => 'main', 'payload' => [], 'emailFallback' => false, 'emailFallbackMessage' => '', 'emailFallbackAttempts' => 0])
+@props(['job', 'task', 'config' => [], 'step' => 'main', 'payload' => [], 'attachments' => [], 'mentionUsers' => collect(), 'emailFallback' => false, 'emailFallbackMessage' => '', 'emailFallbackAttempts' => 0])
 @php
     $variant = (string) ($config['variant'] ?? 'confirm');
     $title = (string) ($config['title'] ?? 'Task action');
@@ -36,6 +36,19 @@
         ? $job->documents->firstWhere('id', $emailFallbackDocumentId)
         : null;
     $emailFallbackAttachmentLabel = $variant === 'artwork_email' ? 'Artwork' : 'Purchase Order';
+    $revisionMentionUsers = collect($mentionUsers)->values();
+    $revisionAttachments = collect(is_array($attachments) ? $attachments : ($attachments ? [$attachments] : []))->filter()->values();
+    $revisionAttachmentDetails = $revisionAttachments->map(function ($file) {
+        $name = $file->getClientOriginalName();
+
+        return [
+            'name' => $name,
+            'type' => strtoupper((string) pathinfo($name, PATHINFO_EXTENSION)) ?: 'FILE',
+            'size' => $file->getSize() >= 1048576
+                ? number_format($file->getSize() / 1048576, 1).' MB'
+                : number_format(max(1, (int) ceil($file->getSize() / 1024))).' KB',
+        ];
+    });
 
     // Only the main Artwork preview/handoff screens need the large landscape
     // layout. Revision/issue follow-up steps must stay on the normal compact
@@ -47,7 +60,10 @@
     // or horizontally shift the popup after submit.
     $usesStableFinanceValidation = $step === 'main'
         && in_array($variant, ['invoice_prepare', 'payment'], true);
-    $modalWide = $variant === 'courier_label';
+    $modalWide = in_array($variant, ['courier_label', 'shipment_info'], true);
+    // Every artwork revision dialog uses the same compact prototype shell.
+    // The copy/labels still vary by task, but layout and controls stay consistent.
+    $isArtworkRevisionRequest = $step === 'revision';
 
     if ($step === 'sample') {
         $title = 'Is a Sample or Swatch Required?';
@@ -55,7 +71,7 @@
     } elseif ($step === 'revision') {
         $title = $automationKey === 'ART_INTERNAL_REVIEW' ? 'Request Artwork Revision' : 'Client Revision Request';
         $copy = $automationKey === 'ART_INTERNAL_REVIEW'
-            ? 'Add the internal revision instructions before returning the Artwork task to upload.'
+            ? 'Provide details about the changes needed and attach reference files.'
             : 'Record the client feedback before restarting the artwork approval cycle.';
     } elseif ($step === 'issue') {
         $title = $automationKey === 'QC_CHECK' ? 'Report QC Issue' : 'Report Production Issue';
@@ -63,7 +79,29 @@
     }
 @endphp
 <div class="ft-order-task-document-modal-backdrop" wire:key="order-workflow-action-modal-{{ $task->id }}-{{ $step }}" wire:click.self="closeOrderWorkflowAction">
-    <section class="ft-order-task-document-modal ft-order-workflow-action-modal {{ $isArtworkPreviewModal ? 'ft-order-workflow-action-modal--artwork-preview' : ($modalWide ? 'ft-order-workflow-action-modal--wide' : '') }} {{ $usesStableFinanceValidation ? 'ft-order-workflow-action-modal--stable-finance-validation' : '' }}" data-ft-feedback-scope="form" role="dialog" aria-modal="true" aria-labelledby="order-workflow-action-modal-title">
+    <section
+        class="ft-order-task-document-modal ft-order-workflow-action-modal {{ $isArtworkPreviewModal ? 'ft-order-workflow-action-modal--artwork-preview' : ($modalWide ? 'ft-order-workflow-action-modal--wide' : '') }} {{ $usesStableFinanceValidation ? 'ft-order-workflow-action-modal--stable-finance-validation' : '' }} {{ $isArtworkRevisionRequest ? 'ft-order-workflow-action-modal--artwork-revision-request' : '' }}"
+        data-ft-feedback-scope="form"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="order-workflow-action-modal-title"
+        x-data="{
+            revisionSubmitting: false,
+            async submitArtworkRevision(source) {
+                if (this.revisionSubmitting) return;
+                this.revisionSubmitting = true;
+                try {
+                    const value = typeof source?.__flowtrackRichTextValueAsync === 'function'
+                        ? await source.__flowtrackRichTextValueAsync()
+                        : String(source?.value ?? '');
+                    await $wire.set('orderWorkflowActionComment', value);
+                    await $wire.submitOrderWorkflowAction('revise');
+                } finally {
+                    this.revisionSubmitting = false;
+                }
+            }
+        }"
+    >
         <header class="ft-order-task-document-modal-head">
             <div><h2 id="order-workflow-action-modal-title">{{ $title }}</h2><p>{{ $copy }}</p></div>
             <button type="button" wire:click="closeOrderWorkflowAction" aria-label="Close">×</button>
@@ -84,11 +122,89 @@
                     </button>
                 </div>
             @elseif($step === 'revision')
-                <label class="ft-prototype-field">
-                    <span>{{ $automationKey === 'ART_INTERNAL_REVIEW' ? 'Revision instructions' : 'Client feedback' }}</span>
-                    <textarea wire:model="orderWorkflowActionComment" rows="5" placeholder="Describe the required artwork changes..."></textarea>
+                <div class="ft-artwork-revision-selector">
+                    <div class="ft-artwork-revision-selector-head">
+                        <div>
+                            <strong>Which artwork needs revision?</strong>
+                            <span>Select the artwork file or files that need to be replaced.</span>
+                        </div>
+                    </div>
+                    <div class="ft-artwork-revision-selector-list">
+                        @forelse($latestArtworkDocuments as $revisionDocument)
+                            @php $revisionExtension = strtoupper(pathinfo((string) $revisionDocument->name, PATHINFO_EXTENSION) ?: 'FILE'); @endphp
+                            <label class="ft-artwork-revision-selector-item">
+                                <input type="checkbox" wire:model="orderWorkflowActionPayload.revision_document_ids" value="{{ $revisionDocument->id }}">
+                                <span class="ft-artwork-revision-selector-check" aria-hidden="true">✓</span>
+                                <x-ui.file-type-badge :extension="$revisionExtension" size="sm" />
+                                <span class="ft-artwork-revision-selector-copy">
+                                    <b title="{{ $revisionDocument->name }}">{{ $revisionDocument->name }}</b>
+                                    <small>Artwork V{{ max(1, (int) $revisionDocument->version) }} · Select to replace this file only</small>
+                                </span>
+                                <a href="{{ route('documents.open', $revisionDocument) }}" target="_blank" rel="noopener" onclick="event.stopPropagation()">View</a>
+                            </label>
+                        @empty
+                            <div class="ft-artwork-revision-selector-empty">No current artwork files are available to revise.</div>
+                        @endforelse
+                    </div>
+                    @error('orderWorkflowActionPayload.revision_document_ids')<p class="validation-error">{{ $message }}</p>@enderror
+                </div>
+
+                <div class="ft-prototype-field ft-artwork-revision-instructions ft-mention-host">
+                    <span id="artwork-revision-instructions-label">{{ $automationKey === 'ART_INTERNAL_REVIEW' ? 'Required change' : 'Client feedback' }}</span>
+                    <textarea
+                        x-ref="revisionInstructions"
+                        class="ft-mention-input"
+                        data-rich-text
+                        wire:model="orderWorkflowActionComment"
+                        rows="3"
+                        autocomplete="off"
+                        aria-labelledby="artwork-revision-instructions-label"
+                        data-mention-users="{{ json_encode($revisionMentionUsers->all(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}"
+                        placeholder="{{ $automationKey === 'ART_INTERNAL_REVIEW' ? 'Describe the required artwork changes...' : 'Record the client feedback...' }}"
+                    ></textarea>
                     @error('orderWorkflowActionComment')<p class="validation-error">{{ $message }}</p>@enderror
-                </label>
+                </div>
+
+                <div class="ft-artwork-revision-evidence">
+                    <div class="ft-artwork-revision-evidence-head">
+                        <div>
+                            <strong>{{ $automationKey === 'ART_INTERNAL_REVIEW' ? 'Attach reference files (optional)' : 'Supporting attachments' }}</strong>
+                            <span>{{ $automationKey === 'ART_INTERNAL_REVIEW' ? 'Upload supporting files to help the assignee understand the requested changes.' : 'Optional marked-up artwork, screenshots, or reference documents.' }}</span>
+                        </div>
+                        @if($revisionAttachments->isNotEmpty())<em>{{ $revisionAttachments->count() }} selected</em>@endif
+                    </div>
+
+                    <label class="ft-artwork-revision-evidence-dropzone" data-file-dropzone for="artwork-revision-evidence-input-{{ $task->id }}">
+                        <input id="artwork-revision-evidence-input-{{ $task->id }}" type="file" wire:model="orderWorkflowActionAttachments" multiple accept="{{ \App\Support\AttachmentUpload::accept() }}" aria-label="Choose revision supporting attachments">
+                        <span class="ft-artwork-revision-evidence-upload-icon" aria-hidden="true">↥</span>
+                        <div>
+                            <strong>Drag &amp; drop files here, or <b>Upload files</b></strong>
+                            <small data-drop-status>{{ \App\Support\AttachmentUpload::helperText(20) }}</small>
+                        </div>
+                    </label>
+
+                    @foreach($revisionAttachmentDetails as $index => $attachment)
+                        <div class="ft-artwork-revision-evidence-file" wire:key="artwork-revision-evidence-{{ $task->id }}-{{ $index }}-{{ md5($attachment['name']) }}">
+                            <x-ui.file-type-badge :extension="$attachment['type']" size="sm" />
+                            <div><b title="{{ $attachment['name'] }}">{{ $attachment['name'] }}</b><small>{{ $attachment['size'] }}</small></div>
+                            <div class="ft-artwork-revision-evidence-file-actions">
+                                <span>Ready</span>
+                                <button type="button" wire:click="removeOrderWorkflowActionAttachment({{ $index }})" wire:loading.attr="disabled" wire:target="orderWorkflowActionAttachments,removeOrderWorkflowActionAttachment({{ $index }})" aria-label="Remove {{ $attachment['name'] }}">×</button>
+                            </div>
+                        </div>
+                    @endforeach
+
+                    <div class="ft-artwork-revision-evidence-uploading" wire:loading wire:target="orderWorkflowActionAttachments">Uploading attachments…</div>
+                    @error('orderWorkflowActionAttachments')<p class="validation-error">{{ $message }}</p>@enderror
+                    @error('orderWorkflowActionAttachments.*')<p class="validation-error">{{ $message }}</p>@enderror
+                </div>
+
+                @if($automationKey === 'ART_INTERNAL_REVIEW')
+                    <div class="ft-artwork-revision-visibility-note">
+                        <span aria-hidden="true">▢</span>
+                        These attachments will be visible to the artwork assignee and other relevant team members.
+                    </div>
+                @endif
             @elseif($step === 'issue')
                 <div class="ft-prototype-form-grid">
                     <label class="ft-prototype-field"><span>Issue category</span><select wire:model="orderWorkflowActionPayload.issue_category"><option>Fabric color variance</option><option>Print color mismatch</option><option>Incorrect dimensions</option><option>Damaged items</option><option>Other</option></select>@error('orderWorkflowActionPayload.issue_category')<p class="validation-error">{{ $message }}</p>@enderror</label>
@@ -110,19 +226,30 @@
                 <x-email.handoff-preview
                     :preview="$emailHandoffPreview"
                     :defaultSubject="'Purchase Order ready — '.$orderNumber"
-                    emptyRecipientText="No active user with a valid email is assigned to this Order's Artwork phase."
+                    emptyRecipientText="No active Artwork Team user with a valid email was found in Users &amp; role assignments."
                 />
                 @error('orderWorkflowActionEmail')<p class="validation-error">{{ $message }}</p>@enderror
             @elseif($variant === 'artwork_review' || $variant === 'artwork_email' || $variant === 'client_erp')
-                <div class="ft-prototype-artwork-preview">
+                <div
+                    class="ft-prototype-artwork-preview"
+                    x-data="{ selectedArtworkId: {{ (int) ($latestArtwork?->id ?? 0) }} }"
+                >
                     <div class="ft-prototype-artwork-canvas">
-                        @if($latestArtwork)
-                            @php $extension = strtolower(pathinfo((string) $latestArtwork->name, PATHINFO_EXTENSION)); @endphp
-                            @if(in_array($extension, ['jpg','jpeg','png','webp','gif'], true))
-                                <img src="{{ route('documents.open', $latestArtwork) }}" alt="Latest artwork preview">
-                            @else
-                                <div class="ft-prototype-artwork-file"><span>{{ strtoupper($extension ?: 'FILE') }}</span><strong>{{ $latestArtwork->name }} · Version {{ max(1, (int) $latestArtwork->version) }}</strong><a href="{{ route('documents.open', $latestArtwork) }}" target="_blank" rel="noopener">Open artwork</a></div>
-                            @endif
+                        @if($latestArtworkDocuments->isNotEmpty())
+                            @foreach($latestArtworkDocuments as $previewDocument)
+                                @php $previewExtension = strtolower(pathinfo((string) $previewDocument->name, PATHINFO_EXTENSION)); @endphp
+                                <div
+                                    class="ft-prototype-artwork-canvas-item"
+                                    x-cloak
+                                    x-show="selectedArtworkId === {{ (int) $previewDocument->id }}"
+                                >
+                                    @if(in_array($previewExtension, ['jpg','jpeg','png','webp','gif'], true))
+                                        <img src="{{ route('documents.open', $previewDocument) }}" alt="Artwork preview: {{ $previewDocument->name }}">
+                                    @else
+                                        <div class="ft-prototype-artwork-file"><span>{{ strtoupper($previewExtension ?: 'FILE') }}</span><strong>{{ $previewDocument->name }} · Version {{ max(1, (int) $previewDocument->version) }}</strong><a href="{{ route('documents.open', $previewDocument) }}" target="_blank" rel="noopener">Open artwork</a></div>
+                                    @endif
+                                </div>
+                            @endforeach
                         @else
                             <div class="ft-prototype-artwork-file"><span>ART</span><strong>Artwork file</strong><small>No previewable image available</small></div>
                         @endif
@@ -136,25 +263,56 @@
                             <div><dt>Uploaded by</dt><dd>{{ $latestArtwork?->uploader?->name ?: $task->assignee?->name ?: 'FlowTrack' }}</dd></div>
                             <div><dt>Client</dt><dd>{{ $clientName }}</dd></div>
                         </dl>
-                        @if($latestArtwork)
-                            <div class="ft-prototype-artwork-actions"><a href="{{ route('documents.open', $latestArtwork) }}" target="_blank" rel="noopener">Open</a><a href="{{ route('documents.download', $latestArtwork) }}">Download</a></div>
-                        @endif
-                        @if($artworkDocs->isNotEmpty())
-                            <div class="ft-prototype-version-list">
-                                @foreach($artworkDocs->reverse()->values() as $index => $doc)
-                                    <div>
-                                        <span class="ft-prototype-version-file">
-                                            <strong>{{ $doc->name }} · Version {{ max(1, (int) $doc->version) }}</strong>
-                                            <small>{{ \App\Support\UserLocalTime::format($doc->created_at, 'M j, Y, g:i A') }}</small>
-                                        </span>
-                                        <span class="ft-prototype-version-status">
-                                            <b>{{ (int) $doc->version === $artworkVersion ? 'Latest' : 'Archived' }}</b>
-                                            <a href="{{ route('documents.open', $doc) }}" target="_blank" rel="noopener">Open</a>
-                                            <a href="{{ route('documents.download', $doc) }}">Download</a>
-                                        </span>
-                                    </div>
+                        @if($latestArtworkDocuments->isNotEmpty())
+                            <div class="ft-prototype-artwork-actions">
+                                @foreach($latestArtworkDocuments as $previewDocument)
+                                    <span x-cloak x-show="selectedArtworkId === {{ (int) $previewDocument->id }}">
+                                        <a href="{{ route('documents.open', $previewDocument) }}" target="_blank" rel="noopener">Open</a>
+                                        <a href="{{ route('documents.download', $previewDocument) }}">Download</a>
+                                    </span>
                                 @endforeach
                             </div>
+                            <div class="ft-artwork-current-file-picker" aria-label="Current artwork files">
+                                <div class="ft-artwork-current-file-picker-head">
+                                    <strong>Current artwork files</strong>
+                                    <span>Select a file below to preview it on the left.</span>
+                                </div>
+                                @foreach($latestArtworkDocuments as $doc)
+                                    <button
+                                        type="button"
+                                        class="ft-artwork-current-file-choice"
+                                        x-on:click="selectedArtworkId = {{ (int) $doc->id }}"
+                                        x-bind:class="{ 'is-active': selectedArtworkId === {{ (int) $doc->id }} }"
+                                    >
+                                        <span class="ft-artwork-current-file-choice-type">{{ strtoupper(pathinfo((string) $doc->name, PATHINFO_EXTENSION) ?: 'FILE') }}</span>
+                                        <span class="ft-artwork-current-file-choice-copy">
+                                            <b title="{{ $doc->name }}">{{ $doc->name }}</b>
+                                            <small>Artwork V{{ max(1, (int) $doc->version) }}</small>
+                                        </span>
+                                        <em x-text="selectedArtworkId === {{ (int) $doc->id }} ? 'Viewing' : 'Preview'">Preview</em>
+                                    </button>
+                                @endforeach
+                            </div>
+                        @endif
+                        @if($artworkDocs->where('version', '!=', $artworkVersion)->isNotEmpty())
+                            <details class="ft-prototype-version-history">
+                                <summary>Previous artwork versions</summary>
+                                <div class="ft-prototype-version-list">
+                                    @foreach($artworkDocs->where('version', '!=', $artworkVersion)->sortByDesc('id')->values() as $index => $doc)
+                                        <div>
+                                            <span class="ft-prototype-version-file">
+                                                <strong>{{ $doc->name }} · Version {{ max(1, (int) $doc->version) }}</strong>
+                                                <small>{{ \App\Support\UserLocalTime::format($doc->created_at, 'M j, Y, g:i A') }}</small>
+                                            </span>
+                                            <span class="ft-prototype-version-status">
+                                                <b>Archived</b>
+                                                <a href="{{ route('documents.open', $doc) }}" target="_blank" rel="noopener">Open</a>
+                                                <a href="{{ route('documents.download', $doc) }}">Download</a>
+                                            </span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </details>
                         @endif
                     </div>
                 </div>
@@ -214,17 +372,7 @@
                     <button type="button" wire:click="submitOrderWorkflowAction('pass')"><span class="ft-prototype-choice-icon">✓</span><strong>QC Passed</strong><small>Continue toward Shipment</small></button>
                 </div>
             @elseif($variant === 'shipment_info')
-                <div class="ft-prototype-form-grid">
-                    <label class="ft-prototype-field"><span>Recipient</span><input wire:model="orderWorkflowActionPayload.recipient">@error('orderWorkflowActionPayload.recipient')<p class="validation-error">{{ $message }}</p>@enderror</label>
-                    <label class="ft-prototype-field"><span>Contact</span><input wire:model="orderWorkflowActionPayload.contact">@error('orderWorkflowActionPayload.contact')<p class="validation-error">{{ $message }}</p>@enderror</label>
-                </div>
-                <label class="ft-prototype-field"><span>Delivery address</span><textarea wire:model="orderWorkflowActionPayload.address" rows="4"></textarea>@error('orderWorkflowActionPayload.address')<p class="validation-error">{{ $message }}</p>@enderror</label>
-                <div class="ft-prototype-form-grid">
-                    <label class="ft-prototype-field"><span>Packages</span><input wire:model="orderWorkflowActionPayload.packages" placeholder="e.g. 24 cartons">@error('orderWorkflowActionPayload.packages')<p class="validation-error">{{ $message }}</p>@enderror</label>
-                    <label class="ft-prototype-field"><span>Total weight</span><input wire:model="orderWorkflowActionPayload.weight" placeholder="e.g. 312 kg">@error('orderWorkflowActionPayload.weight')<p class="validation-error">{{ $message }}</p>@enderror</label>
-                    <label class="ft-prototype-field"><span>Dimensions / carton</span><input wire:model="orderWorkflowActionPayload.dimensions" placeholder="e.g. 60 × 45 × 40 cm">@error('orderWorkflowActionPayload.dimensions')<p class="validation-error">{{ $message }}</p>@enderror</label>
-                    <label class="ft-prototype-field"><span>Declared value</span><input wire:model="orderWorkflowActionPayload.declared_value" placeholder="{{ number_format($orderTotal,2) }}">@error('orderWorkflowActionPayload.declared_value')<p class="validation-error">{{ $message }}</p>@enderror</label>
-                </div>
+                <x-jobs.order-detail.shipment.update-details-form :job="$job" :payload="$payload" />
             @elseif($variant === 'courier_label')
                 <div class="ft-prototype-label-preview">
                     <div><small>SHIP TO</small><h3>{{ mb_strtoupper($clientName) }}</h3><p>{!! nl2br(e((string) ($payload['address'] ?? $job->shipping_address ?? ''))) !!}</p><div class="ft-prototype-barcode"></div><b>FLOWTRACK · {{ $orderNumber }}</b></div>
@@ -280,12 +428,25 @@
             // normal footer must return so the user can actually submit it.
             $usesInlineWorkflowActions = $step === 'main'
                 && in_array($variant, ['client_decision','production_check','qc_check'], true);
+            $usesShipmentFooter = $step === 'main' && $variant === 'shipment_info';
         @endphp
-        @unless($usesInlineWorkflowActions || $step === 'sample')
+        @if($usesShipmentFooter)
+            <footer class="ft-order-task-document-modal-actions ft-shipment-modal-footer">
+                <button type="button" class="ft-shipment-modal-reset" wire:click="resetShipmentActionDetails">Reset changes</button>
+                <div class="ft-shipment-modal-footer__actions">
+                    <div>
+                        <button type="button" class="secondary" wire:click="closeOrderWorkflowAction">Cancel</button>
+                        <button type="button" class="primary" wire:click="submitOrderWorkflowAction('confirm')" wire:loading.attr="disabled" wire:target="submitOrderWorkflowAction">Save &amp; complete task</button>
+                    </div>
+                    <small>Saving unlocks Add tracking number &amp; print courier label.</small>
+                </div>
+            </footer>
+        @endif
+        @unless($usesInlineWorkflowActions || $usesShipmentFooter || $step === 'sample')
             <footer class="ft-order-task-document-modal-actions ft-order-workflow-action-buttons">
                 <button type="button" class="secondary" wire:click="closeOrderWorkflowAction">Cancel</button>
                 @if($step === 'revision')
-                    <button type="button" class="primary" wire:click="submitOrderWorkflowAction('revise')" wire:loading.attr="disabled" wire:target="submitOrderWorkflowAction">{{ $automationKey === 'ART_INTERNAL_REVIEW' ? 'Request Revision' : 'Activate Revision Task' }}</button>
+                    <button type="button" class="danger ft-artwork-revision-submit" data-rich-text-submit x-on:click="submitArtworkRevision($refs.revisionInstructions)" x-bind:disabled="revisionSubmitting" wire:loading.attr="disabled" wire:target="submitOrderWorkflowAction,orderWorkflowActionAttachments">{{ $automationKey === 'ART_INTERNAL_REVIEW' ? 'Submit Revision' : 'Activate Revision Task' }}</button>
                 @elseif($step === 'issue')
                     <button type="button" class="danger" wire:click="submitOrderWorkflowAction('issue')" wire:loading.attr="disabled" wire:target="submitOrderWorkflowAction">Report Issue</button>
                 @elseif($emailFallback && $emailServiceEnabled && in_array($variant, ['purchase_order_email', 'artwork_email'], true))

@@ -12,6 +12,7 @@ use App\Models\WorkflowTemplate;
 use Illuminate\Support\Arr;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -99,9 +100,9 @@ class OrderWorkflowSetupService
             [
                 'key' => 'ship', 'name' => 'Shipment', 'short' => 'Shipment', 'color' => '#1873a8',
                 'tasks' => [
-                    self::task('SHIP_CONFIRM_INFO', 'Confirm Shipment Information', 'Order Team', 0),
-                    self::task('SHIP_LABEL', 'Generate & Print Courier Label', 'Shipping', 0, true, 'Shipping Document', true, false, 'Attach or generate the final courier label.'),
-                    self::task('SHIP_PACKAGE', 'Ship Package', 'Shipping', 0, true, 'Shipping Document', false, true, 'Optional shipment receipt or dispatch document.'),
+                    self::task('SHIP_CONFIRM_INFO', 'Review or update shipment details', 'Order Team', 0),
+                    self::task('SHIP_LABEL', 'Add tracking number & print courier label', 'Shipping', 0, true, 'Shipping Document', true, false, 'Attach or generate the final courier label.'),
+                    self::task('SHIP_PACKAGE', 'Dispatch shipment', 'Shipping', 0, true, 'Shipping Document', false, true, 'Optional shipment receipt or dispatch document.'),
                 ],
             ],
             [
@@ -654,6 +655,8 @@ class OrderWorkflowSetupService
                 ->when($keptPhaseIds, fn ($query) => $query->whereNotIn('id', $keptPhaseIds))
                 ->delete();
         });
+
+        Cache::forget(OrderListPrototypeService::stageDefinitionCacheKey($workspaceId));
 
         // Publish the saved seven-stage definition to every active Order.
         // This is intentionally different from the original reusable Workflow

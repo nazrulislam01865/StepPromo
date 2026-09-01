@@ -1712,6 +1712,19 @@
     overflow-wrap: anywhere
 }
 
+.ft-order-prototype-detail .ft-order-artwork-revision-change.ft-rich-text-content {
+    display: block;
+    white-space: normal;
+}
+
+.ft-order-prototype-detail .ft-order-artwork-revision-supporting-field {
+    grid-column: 1 / -1;
+}
+
+.ft-order-prototype-detail .ft-order-artwork-revision-inline-image-list {
+    margin-top: 7px;
+}
+
 .ft-order-prototype-detail .ft-order-artwork-revision-attachment {
     display: grid;
     grid-template-columns: 36px minmax(0, 1fr) auto;
@@ -1975,6 +1988,116 @@
     margin-top: 3px
 }
 
+/* Revision instructions can contain pasted screenshots. In the activity feed,
+ * present those images as compact references instead of full-width artwork. */
+.ft-revision-activity-content {
+    min-width: 0;
+    max-width: 760px
+}
+
+.ft-revision-activity-instruction {
+    color: #25344a;
+    line-height: 1.45
+}
+
+.ft-revision-activity-instruction p {
+    margin: 0 0 5px
+}
+
+.ft-revision-activity-instruction p:last-child {
+    margin-bottom: 0
+}
+
+.ft-revision-activity-image-list {
+    display: grid;
+    gap: 7px;
+    margin-top: 8px
+}
+
+.ft-revision-activity-image-row {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    min-width: 0;
+    padding: 7px;
+    border: 1px solid #dfe6ed;
+    border-radius: 9px;
+    background: #f9fbfc
+}
+
+.ft-revision-activity-thumbnail {
+    display: block;
+    width: 52px;
+    height: 42px;
+    overflow: hidden;
+    border: 1px solid #d8e1e9;
+    border-radius: 7px;
+    background: #eef3f6
+}
+
+.ft-revision-activity-thumbnail img,
+.ft-rich-text-content .ft-revision-activity-thumbnail img {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0 !important;
+    border: 0;
+    border-radius: 0;
+    object-fit: cover;
+    cursor: pointer
+}
+
+.ft-revision-activity-image-copy {
+    min-width: 0
+}
+
+.ft-revision-activity-image-copy b,
+.ft-revision-activity-image-copy small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap
+}
+
+.ft-revision-activity-image-copy b {
+    color: #1d2c42;
+    font-size: .6875rem;
+    font-weight: 800
+}
+
+.ft-revision-activity-image-copy small {
+    margin-top: 2px;
+    color: #78879a;
+    font-size: .5625rem
+}
+
+.ft-revision-activity-image-actions {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    white-space: nowrap
+}
+
+.ft-revision-activity-image-actions>span {
+    width: 1px;
+    height: 16px;
+    background: #dfe6ed
+}
+
+.ft-revision-activity-image-actions a {
+    color: var(--ft-theme-primary);
+    font-size: .59375rem;
+    font-weight: 700;
+    text-decoration: none
+}
+
+.ft-revision-activity-image-actions a:hover {
+    text-decoration: underline
+}
+
 /* Cancelled-order evidence can contain very tall pasted screenshots.
  * Keep the activity feed compact and let the shared rich-text image viewer
  * handle full-size inspection when the thumbnail is clicked.
@@ -2001,6 +2124,15 @@
 }
 
 @media (max-width: 620px) {
+    .ft-revision-activity-image-row {
+        grid-template-columns: 52px minmax(0, 1fr)
+    }
+
+    .ft-revision-activity-image-actions {
+        grid-column: 2;
+        justify-content: flex-start
+    }
+
     .ft-order-prototype-detail .ft-order-cancellation-activity-copy img {
         width: min(100%, 280px) !important;
         height: 160px !important;

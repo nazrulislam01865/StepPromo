@@ -15,7 +15,7 @@ class OrderArtworkMultiFileUploadTest extends TestCase
         $documents = file_get_contents(app_path('Services/DocumentService.php'));
 
         $this->assertStringContainsString("\$allowMultipleUploads = \$automationKey === 'ART_PREPARE_UPLOAD'", $modal);
-        $this->assertStringContainsString('@if($allowMultipleUploads) multiple @endif', $modal);
+        $this->assertStringContainsString('@if($inputAllowsMultiple) multiple @endif', $modal);
         $this->assertStringContainsString('Up to 10 files', $modal);
         $this->assertStringContainsString('removeOverviewTaskDocumentUpload({{ $index }})', $modal);
 
@@ -24,10 +24,14 @@ class OrderArtworkMultiFileUploadTest extends TestCase
             $this->assertStringContainsString("'overviewTaskDocumentUpload' => ['required', 'array', 'min:1'", $component);
             $this->assertStringContainsString("'overviewTaskDocumentUpload.*' => AttachmentUpload::itemRules", $component);
             $this->assertStringContainsString('storeMany($this->overviewTaskDocumentUpload', $component);
+            $this->assertStringContainsString('storeArtworkRevision(', $component);
+            $this->assertStringContainsString('catch (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $exception)', $component);
+            $this->assertStringContainsString("\$this->addError(\n                    'overviewTaskDocumentUpload'", $component);
             $this->assertStringContainsString('function removeOverviewTaskDocumentUpload(', $component);
         }
 
         $this->assertStringContainsString('public function storeMany(', $documents);
+        $this->assertStringContainsString('return DB::transaction(function () use ($files, $data, $user, $permissionModule, &$storedPaths)', $documents);
         $this->assertStringContainsString("\$fileData['artwork_batch_version'] = \$artworkBatchVersion", $documents);
         $this->assertStringContainsString('$version = $isArtworkTask && $batchVersion > 0', $documents);
     }

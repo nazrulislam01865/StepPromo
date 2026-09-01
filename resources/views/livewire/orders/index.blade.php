@@ -24,6 +24,9 @@
         :stage-client-filter-options="$stageClientFilterOptions"
         :supplier-filter-options="$supplierFilterOptions"
         :shipment-urgency-options="$shipmentUrgencyOptions"
+        :dashboard-scope="$dashboardScope"
+        :dashboard-range-days="$dashboardRangeDays"
+        :dashboard-team-label="$dashboardTeamLabel"
         :import-filter-id="$importBatchId"
         :import-filter-label="$importBatchLabel"
         wire:key="orders-prototype-v5"
@@ -46,6 +49,7 @@
                     :config="$listActionWorkflowModal"
                     :step="$orderWorkflowActionStep"
                     :payload="$orderWorkflowActionPayload"
+                    :attachments="$orderWorkflowActionAttachments"
                     :email-fallback="$orderWorkflowEmailFallback"
                     :email-fallback-message="$orderWorkflowEmailFallbackMessage"
                     :email-fallback-attempts="$orderWorkflowEmailFallbackAttempts"
@@ -60,6 +64,8 @@
                     :source="$overviewTaskDocumentSource"
                     :upload="$overviewTaskDocumentUpload"
                     :existing-document-id="$overviewTaskExistingDocumentId"
+                    :artwork-revision="$listActionArtworkRevision"
+                    :revision-document-ids="$overviewTaskRevisionDocumentIds"
                     :context="$listActionContext"
                 />
             @endif

@@ -3028,3 +3028,1593 @@
 .ft-order-prototype-detail .ft-order-owner-picker .ft-remote-filter-list:has(.ft-remote-filter-option){
     min-height:108px;
 }
+
+/* Selective artwork preview + revision workflow, 2026-08-31. */
+.ft-order-prototype-detail .ft-prototype-artwork-canvas-item {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    display: grid;
+    place-items: center;
+}
+
+.ft-order-prototype-detail .ft-prototype-artwork-canvas-item > img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #f8fafc;
+}
+
+.ft-order-prototype-detail .ft-prototype-artwork-actions > span {
+    display: inline-flex;
+    gap: 8px;
+}
+
+.ft-order-prototype-detail .ft-artwork-current-file-picker {
+    display: grid;
+    gap: 6px;
+    margin-top: 12px;
+}
+
+.ft-order-prototype-detail .ft-artwork-current-file-picker-head {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 2px;
+}
+
+.ft-order-prototype-detail .ft-artwork-current-file-picker-head strong {
+    color: #1c304a;
+    font-size: .6875rem;
+    font-weight: 850;
+}
+
+.ft-order-prototype-detail .ft-artwork-current-file-picker-head span {
+    color: #718198;
+    font-size: .5625rem;
+    text-align: right;
+}
+
+.ft-order-prototype-detail .ft-artwork-current-file-choice {
+    width: 100%;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 30px minmax(0,1fr) auto;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 9px;
+    border: 1px solid #dbe5ef;
+    border-radius: 9px;
+    background: #fbfdff;
+    color: #20344d;
+    text-align: left;
+    transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+
+.ft-order-prototype-detail .ft-artwork-current-file-choice:hover,
+.ft-order-prototype-detail .ft-artwork-current-file-choice.is-active {
+    border-color: color-mix(in srgb, var(--ft-theme-primary) 52%, #dbe5ef);
+    background: color-mix(in srgb, var(--ft-theme-primary) 5%, #fff);
+}
+
+.ft-order-prototype-detail .ft-artwork-current-file-choice.is-active {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ft-theme-primary) 10%, transparent);
+}
+
+.ft-order-prototype-detail .ft-artwork-current-file-choice-type {
+    display: grid;
+    place-items: center;
+    min-width: 30px;
+    height: 30px;
+    padding: 0 4px;
+    border-radius: 7px;
+    background: #eef4f8;
+    color: #58708d;
+    font-size: .5rem;
+    font-weight: 900;
+}
+
+.ft-order-prototype-detail .ft-artwork-current-file-choice-copy {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+}
+
+.ft-order-prototype-detail .ft-artwork-current-file-choice-copy b {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: .625rem;
+    font-weight: 800;
+}
+
+.ft-order-prototype-detail .ft-artwork-current-file-choice-copy small {
+    color: #74859a;
+    font-size: .53125rem;
+}
+
+.ft-order-prototype-detail .ft-artwork-current-file-choice > em {
+    color: var(--ft-theme-primary);
+    font-size: .53125rem;
+    font-style: normal;
+    font-weight: 850;
+}
+
+.ft-order-prototype-detail .ft-prototype-version-history {
+    margin-top: 11px;
+    border-top: 1px solid #e7edf3;
+    padding-top: 8px;
+}
+
+.ft-order-prototype-detail .ft-prototype-version-history > summary {
+    cursor: pointer;
+    color: #64758c;
+    font-size: .5625rem;
+    font-weight: 800;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-selector {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding: 12px;
+    border: 1px solid #d8e4ee;
+    border-radius: 10px;
+    background: #f9fbfd;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-selector-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    align-items: flex-start;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-selector-head > div {
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-selector-head strong {
+    color: #182c45;
+    font-size: .75rem;
+    font-weight: 850;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-selector-head span {
+    color: #64778e;
+    font-size: .59375rem;
+    line-height: 1.45;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-selector-head > em {
+    flex: none;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: #e9f7f3;
+    color: var(--ft-theme-primary);
+    font-size: .53125rem;
+    font-style: normal;
+    font-weight: 850;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-selector-list {
+    display: grid;
+    gap: 6px;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-selector-item {
+    position: relative;
+    display: grid;
+    grid-template-columns: 22px 31px minmax(0,1fr) auto;
+    gap: 9px;
+    align-items: center;
+    padding: 9px 10px;
+    border: 1px solid #dce6ef;
+    border-radius: 9px;
+    background: #fff;
+    cursor: pointer;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-selector-item:has(input:checked) {
+    border-color: color-mix(in srgb, var(--ft-theme-primary) 55%, #dce6ef);
+    background: color-mix(in srgb, var(--ft-theme-primary) 5%, #fff);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ft-theme-primary) 8%, transparent);
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-selector-item > input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-selector-check {
+    width: 20px;
+    height: 20px;
+    display: grid;
+    place-items: center;
+    border: 1px solid #b9c8d7;
+    border-radius: 6px;
+    background: #fff;
+    color: transparent;
+    font-size: .6875rem;
+    font-weight: 900;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-selector-item:has(input:checked) .ft-artwork-revision-selector-check {
+    border-color: var(--ft-theme-primary);
+    background: var(--ft-theme-primary);
+    color: #fff;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-selector-type {
+    display: grid;
+    place-items: center;
+    min-width: 31px;
+    height: 31px;
+    padding: 0 4px;
+    border-radius: 7px;
+    background: #edf3f7;
+    color: #586f89;
+    font-size: .5rem;
+    font-weight: 900;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-selector-copy {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-selector-copy b {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #20344d;
+    font-size: .625rem;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-selector-copy small {
+    color: #75869a;
+    font-size: .53125rem;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-selector-item > a {
+    color: var(--ft-theme-primary);
+    font-size: .5625rem;
+    font-weight: 800;
+    text-decoration: none;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-selector-empty {
+    padding: 12px;
+    border: 1px dashed #d7e1eb;
+    border-radius: 8px;
+    color: #718198;
+    font-size: .625rem;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-instructions .ft-rich-text {
+    width: 100%;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-instructions .ft-rich-text-editor {
+    min-height: 132px;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-evidence {
+    display: grid;
+    gap: 8px;
+    margin-top: 2px;
+    padding: 12px;
+    border: 1px solid #d8e4ee;
+    border-radius: 10px;
+    background: #f9fbfd;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-evidence-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-evidence-head > div {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-evidence-head strong {
+    color: #182c45;
+    font-size: .6875rem;
+    font-weight: 850;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-evidence-head span,
+.ft-order-prototype-detail .ft-artwork-revision-evidence-head em,
+.ft-order-prototype-detail .ft-artwork-revision-evidence-uploading {
+    color: #6f8095;
+    font-size: .5625rem;
+    font-style: normal;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-evidence-file {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 10px;
+    border: 1px solid #dce6ef;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-evidence-file > span {
+    display: grid;
+    place-items: center;
+    min-height: 32px;
+    border-radius: 7px;
+    background: #edf3f7;
+    color: #586f89;
+    font-size: .46875rem;
+    font-weight: 900;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-evidence-file > div {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-evidence-file b {
+    overflow: hidden;
+    color: #20344d;
+    font-size: .625rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-evidence-file small {
+    color: #75869a;
+    font-size: .53125rem;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-evidence-file button {
+    border: 0;
+    background: transparent;
+    color: #b42318;
+    font-size: .5625rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-evidence-dropzone {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 58px;
+    padding: 9px 11px;
+    border: 1px dashed #afc3d5;
+    border-radius: 9px;
+    background: #fff;
+    cursor: pointer;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-evidence-dropzone:hover,
+.ft-order-prototype-detail .ft-artwork-revision-evidence-dropzone.is-dragging {
+    border-color: var(--ft-theme-primary);
+    background: color-mix(in srgb, var(--ft-theme-primary) 4%, #fff);
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-evidence-dropzone > input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-evidence-dropzone > span {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--ft-theme-primary) 9%, #fff);
+    color: var(--ft-theme-primary);
+    font-size: .875rem;
+    font-weight: 900;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-evidence-dropzone > div {
+    display: grid;
+    gap: 2px;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-evidence-dropzone strong {
+    color: #27415d;
+    font-size: .625rem;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-evidence-dropzone small {
+    color: #77889b;
+    font-size: .53125rem;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-evidence > .validation-error {
+    margin: 0;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-upload-plan {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 12px;
+    padding: 12px;
+    border: 1px solid #d6e4ec;
+    border-radius: 10px;
+    background: #f8fbfc;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-upload-plan-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-upload-plan-head > div {
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-upload-plan-head strong {
+    color: #17304a;
+    font-size: .71875rem;
+    font-weight: 850;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-upload-plan-head span,
+.ft-order-prototype-detail .ft-artwork-revision-upload-plan > p,
+.ft-order-prototype-detail .ft-artwork-revision-upload-instruction {
+    color: #62768c;
+    font-size: .5625rem;
+    line-height: 1.45;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-upload-plan-head > em {
+    flex: none;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: #fff0f0;
+    color: #b63c3c;
+    font-size: .53125rem;
+    font-style: normal;
+    font-weight: 850;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-upload-columns {
+    display: grid;
+    grid-template-columns: repeat(2,minmax(0,1fr));
+    gap: 10px;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-upload-columns > div {
+    min-width: 0;
+    display: grid;
+    align-content: start;
+    gap: 5px;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-upload-columns > div > small {
+    color: #718297;
+    font-size: .5rem;
+    font-weight: 900;
+    letter-spacing: .06em;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-upload-item {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 22px minmax(0,1fr) auto;
+    gap: 7px;
+    align-items: center;
+    padding: 7px 8px;
+    border: 1px solid #dce6ee;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-upload-item > span {
+    width: 20px;
+    height: 20px;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    background: #edf3f7;
+    color: #526b84;
+    font-size: .53125rem;
+    font-weight: 900;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-upload-item.is-replace > span {
+    background: #fff0f0;
+    color: #b83d3d;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-upload-item.is-retained > span {
+    background: #e9f7f2;
+    color: var(--ft-theme-primary);
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-upload-item > b {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #21364e;
+    font-size: .5625rem;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-upload-item > a,
+.ft-order-prototype-detail .ft-artwork-revision-upload-item > em {
+    color: var(--ft-theme-primary);
+    font-size: .53125rem;
+    font-style: normal;
+    font-weight: 800;
+    text-decoration: none;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-upload-empty {
+    padding: 8px;
+    border: 1px dashed #dce6ee;
+    border-radius: 8px;
+    color: #718298;
+    font-size: .5625rem;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-upload-plan > p,
+.ft-order-prototype-detail .ft-artwork-revision-upload-instruction {
+    margin: 0;
+    padding-top: 8px;
+    border-top: 1px solid #e2eaf0;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-upload-instruction {
+    display: grid;
+    gap: 5px;
+}
+
+.ft-order-prototype-detail .ft-order-artwork-revision-attachment-list {
+    display: grid;
+    gap: 6px;
+}
+
+@media(max-width:760px) {
+    .ft-order-prototype-detail .ft-artwork-revision-upload-columns {
+        grid-template-columns: 1fr;
+    }
+
+    .ft-order-prototype-detail .ft-artwork-revision-selector-head,
+    .ft-order-prototype-detail .ft-artwork-revision-upload-plan-head,
+    .ft-order-prototype-detail .ft-artwork-current-file-picker-head {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .ft-order-prototype-detail .ft-artwork-current-file-picker-head span {
+        text-align: left;
+    }
+
+    .ft-order-prototype-detail .ft-artwork-revision-selector-item {
+        grid-template-columns: 22px 31px minmax(0,1fr);
+    }
+
+    .ft-order-prototype-detail .ft-artwork-revision-selector-item > a {
+        grid-column: 3;
+        justify-self: start;
+    }
+}
+
+/* ==========================================================================
+   Artwork revision prototype refinement — 2026-09-01
+   Shared file-type badges + prototype-matched revision request/upload surfaces.
+   ========================================================================== */
+.ft-order-prototype-detail .ft-file-type-badge {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    display: inline-grid;
+    place-items: center;
+    border-radius: 8px;
+    color: #fff;
+    background: #718096;
+    font-size: .5rem;
+    font-weight: 900;
+    letter-spacing: .01em;
+    line-height: 1;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.16);
+    flex: none;
+}
+
+.ft-order-prototype-detail .ft-file-type-badge--sm {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    border-radius: 7px;
+    font-size: .46875rem;
+}
+
+.ft-order-prototype-detail .ft-file-type-badge--pdf { background: #ef334f; }
+.ft-order-prototype-detail .ft-file-type-badge--jpg,
+.ft-order-prototype-detail .ft-file-type-badge--image { background: #3478df; }
+.ft-order-prototype-detail .ft-file-type-badge--ai { background: #f5a800; }
+.ft-order-prototype-detail .ft-file-type-badge--eps { background: #ed7d31; }
+.ft-order-prototype-detail .ft-file-type-badge--cdr { background: #7b61c9; }
+.ft-order-prototype-detail .ft-file-type-badge--archive { background: #64748b; }
+.ft-order-prototype-detail .ft-file-type-badge--doc { background: #2f67c7; }
+.ft-order-prototype-detail .ft-file-type-badge--sheet { background: #20875a; }
+.ft-order-prototype-detail .ft-file-type-badge--slide { background: #d85b32; }
+.ft-order-prototype-detail .ft-file-type-badge--text { background: #66788a; }
+
+/* Revision warning panel: keep the approved two-column composition. */
+.ft-order-prototype-detail .ft-order-artwork-revision-card {
+    margin: 10px 12px 12px;
+    padding: 12px 14px 14px;
+    border-color: #f1d7dc;
+    border-left-width: 3px;
+    border-radius: 9px;
+    background: #fffafa;
+}
+
+.ft-order-prototype-detail .ft-order-artwork-revision-grid {
+    grid-template-columns: minmax(0, 1.45fr) minmax(320px, .95fr);
+    gap: 18px;
+    margin-top: 14px;
+    align-items: end;
+}
+
+.ft-order-prototype-detail .ft-order-artwork-revision-change-field,
+.ft-order-prototype-detail .ft-order-artwork-revision-selected-field {
+    display: grid;
+    align-content: start;
+}
+
+.ft-order-prototype-detail .ft-order-artwork-revision-change {
+    min-height: 54px;
+    padding: 9px 11px;
+}
+
+.ft-order-prototype-detail .ft-order-artwork-revision-reviewer-files {
+    margin-top: 8px;
+}
+
+.ft-order-prototype-detail .ft-order-artwork-revision-reviewer-files > .ft-order-artwork-revision-label {
+    margin-left: 0;
+}
+
+.ft-order-prototype-detail .ft-order-artwork-revision-reviewer-file-list {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px;
+}
+
+.ft-order-prototype-detail .ft-order-artwork-revision-reviewer-file {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 32px minmax(0,1fr) auto;
+    gap: 8px;
+    align-items: center;
+    min-height: 48px;
+    padding: 7px 8px;
+    border: 1px solid #dfe4e9;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.ft-order-prototype-detail .ft-order-artwork-revision-reviewer-file .ft-order-artwork-revision-file-actions {
+    gap: 7px;
+}
+
+.ft-order-prototype-detail .ft-order-artwork-revision-reviewer-file .ft-order-artwork-revision-action-divider {
+    height: 15px;
+}
+
+/* Request Artwork Revision popup — mirrors the supplied prototype. */
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request {
+    width: min(660px, calc(100vw - 36px));
+    max-height: min(720px, calc(100vh - 36px));
+    border-radius: 10px;
+    overflow: hidden;
+    display: grid;
+    grid-template-rows: auto minmax(0,1fr) auto;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-order-task-document-modal-head {
+    padding: 18px 20px 10px;
+    border-bottom: 0;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-order-task-document-modal-head h2 {
+    font-size: 1rem;
+    font-weight: 850;
+    color: #152238;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-order-task-document-modal-head p {
+    margin-top: 3px;
+    color: #7a8797;
+    font-size: .625rem;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-order-task-document-modal-head > button {
+    width: 26px;
+    height: 26px;
+    border-radius: 4px;
+    background: transparent;
+    color: #455466;
+    font-size: 1.25rem;
+    line-height: 1;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-prototype-action-body {
+    min-height: 0;
+    overflow-y: auto;
+    padding: 10px 20px 14px;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-selector {
+    gap: 7px;
+    margin: 0 0 13px;
+    padding: 10px;
+    border-color: #d9e1e9;
+    border-radius: 8px;
+    background: #fbfcfd;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-selector-head strong {
+    font-size: .625rem;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-selector-head span {
+    font-size: .53125rem;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-selector-list {
+    max-height: 168px;
+    overflow-y: auto;
+    padding-right: 2px;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-selector-item {
+    grid-template-columns: 20px 30px minmax(0,1fr) auto;
+    gap: 8px;
+    padding: 7px 8px;
+    border-radius: 7px;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-selector-copy b {
+    font-size: .59375rem;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-selector-copy small,
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-selector-item > a {
+    font-size: .5rem;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-instructions {
+    margin-bottom: 15px;
+    gap: 6px;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-instructions > span {
+    color: #1e293b;
+    font-size: .625rem;
+    font-weight: 850;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-instructions .ft-rich-text {
+    border: 1px solid #cfd7df;
+    border-radius: 7px;
+    background: #fff;
+    box-shadow: none;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-instructions .ft-rich-text-toolbar,
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-instructions .ft-rich-text-footer {
+    display: none;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-instructions .ft-rich-text-editor {
+    min-height: 66px;
+    padding: 10px 11px;
+    border: 0;
+    font-size: .6875rem;
+    line-height: 1.45;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-evidence {
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-evidence-head strong {
+    color: #1e293b;
+    font-size: .625rem;
+    font-weight: 850;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-evidence-head span,
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-evidence-head em {
+    margin-top: 2px;
+    color: #7b8795;
+    font-size: .5625rem;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-evidence-dropzone {
+    min-height: 88px;
+    justify-content: center;
+    gap: 12px;
+    padding: 14px 18px;
+    border-color: #cbd5df;
+    border-radius: 8px;
+    background: #fbfcfd;
+    text-align: center;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-evidence-dropzone > .ft-artwork-revision-evidence-upload-icon {
+    width: 30px;
+    height: 30px;
+    flex-basis: 30px;
+    border: 0;
+    background: transparent;
+    color: #6d7886;
+    font-size: 1.25rem;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-evidence-dropzone > div {
+    justify-items: center;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-evidence-dropzone strong {
+    color: #354152;
+    font-size: .625rem;
+    font-weight: 650;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-evidence-dropzone strong b {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 6px 11px;
+    border: 1px solid #d5dce3;
+    border-radius: 6px;
+    background: #fff;
+    color: #253247;
+    font-size: .59375rem;
+    font-weight: 800;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-evidence-dropzone small {
+    margin-top: 5px;
+    color: #8894a2;
+    font-size: .53125rem;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-evidence-file > .ft-file-type-badge {
+    min-height: 32px;
+    border-radius: 7px;
+    color: #fff;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-evidence-file {
+    min-height: 48px;
+    grid-template-columns: 32px minmax(0,1fr) auto;
+    padding: 7px 9px;
+    border-color: #e1e6eb;
+    border-radius: 7px;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-evidence-file-actions {
+    display: flex !important;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px !important;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-evidence-file-actions > span {
+    color: #0f806d;
+    font-size: .53125rem;
+    font-weight: 700;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-evidence-file-actions > button {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    color: #8995a3;
+    font-size: .875rem;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-visibility-note {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    color: #8a95a2;
+    font-size: .53125rem;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-order-task-document-modal-actions {
+    padding: 12px 20px 16px;
+    border-top: 0;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-order-task-document-modal-actions button {
+    min-height: 34px;
+    padding: 7px 14px;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-order-task-document-modal-actions .ft-artwork-revision-submit {
+    border-color: #ed334e !important;
+    background: #ed334e !important;
+    color: #fff !important;
+}
+
+.ft-order-prototype-detail .ft-order-workflow-action-modal--artwork-revision-request .ft-order-task-document-modal-actions .ft-artwork-revision-submit:hover:not(:disabled) {
+    border-color: #d92943 !important;
+    background: #d92943 !important;
+}
+
+/* Revised-artwork upload keeps the request selection visible and adjustable before replacement. */
+.ft-order-prototype-detail .ft-artwork-revision-upload-selector-list {
+    display: grid;
+    gap: 6px;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-upload-selector-item {
+    position: relative;
+    display: grid;
+    grid-template-columns: 22px 32px minmax(0,1fr) auto;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 9px;
+    border: 1px solid #dce5ec;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-upload-selector-item:has(input:checked) {
+    border-color: #85cbbf;
+    background: #f2faf8;
+    box-shadow: 0 0 0 2px rgba(8,137,117,.06);
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-upload-selector-item > input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-upload-selector-copy {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-upload-selector-copy b {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #1f334a;
+    font-size: .59375rem;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-upload-selector-copy small {
+    color: #7b8998;
+    font-size: .515625rem;
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-upload-selector-item > a {
+    color: var(--ft-theme-primary);
+    font-size: .53125rem;
+    font-weight: 800;
+    text-decoration: none;
+}
+
+@media(max-width: 980px) {
+    .ft-order-prototype-detail .ft-order-artwork-revision-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .ft-order-prototype-detail .ft-order-artwork-revision-reviewer-file-list {
+        grid-template-columns: repeat(2,minmax(0,1fr));
+    }
+}
+
+@media(max-width: 640px) {
+    .ft-order-prototype-detail .ft-order-artwork-revision-reviewer-file-list {
+        grid-template-columns: 1fr;
+    }
+
+    .ft-order-prototype-detail .ft-artwork-revision-upload-selector-item {
+        grid-template-columns: 22px 32px minmax(0,1fr);
+    }
+
+    .ft-order-prototype-detail .ft-artwork-revision-upload-selector-item > a {
+        grid-column: 3;
+        justify-self: start;
+    }
+}
+
+.ft-order-prototype-detail .ft-artwork-revision-upload-selector-item:has(input:checked) .ft-artwork-revision-selector-check {
+    border-color: var(--ft-theme-primary);
+    background: var(--ft-theme-primary);
+    color: #fff;
+}
+
+/* 2026-09-01: compact prototype parity for all Artwork Revision dialogs.
+   The artwork selector stays directly before Required change / Client feedback.
+   Keep these selectors unscoped so the same modal renders correctly from both
+   Order Details and the Orders list host. */
+.ft-order-workflow-action-modal--artwork-revision-request {
+    width: min(660px, calc(100vw - 32px)) !important;
+    max-width: 660px !important;
+    max-height: min(720px, calc(100vh - 32px)) !important;
+    border-radius: 10px !important;
+    overflow: hidden !important;
+    display: grid !important;
+    grid-template-rows: auto minmax(0, 1fr) auto !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-order-task-document-modal-head {
+    padding: 18px 20px 10px !important;
+    border-bottom: 0 !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-order-task-document-modal-head h2 {
+    margin: 0 !important;
+    font-size: 1rem !important;
+    line-height: 1.2 !important;
+    font-weight: 850 !important;
+    color: #152238 !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-order-task-document-modal-head p {
+    margin: 3px 0 0 !important;
+    color: #7a8797 !important;
+    font-size: .625rem !important;
+    line-height: 1.35 !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-order-task-document-modal-head > button {
+    width: 26px !important;
+    height: 26px !important;
+    min-width: 26px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 4px !important;
+    background: transparent !important;
+    color: #455466 !important;
+    font-size: 1.2rem !important;
+    line-height: 1 !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-prototype-action-body {
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    padding: 10px 20px 14px !important;
+}
+
+/* Selector: compact, visually subordinate, and directly above Required change. */
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-selector {
+    display: grid !important;
+    gap: 7px !important;
+    margin: 0 0 14px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-selector-head {
+    display: block !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-selector-head > div {
+    display: grid !important;
+    gap: 2px !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-selector-head strong {
+    color: #1e293b !important;
+    font-size: .625rem !important;
+    font-weight: 850 !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-selector-head span {
+    color: #7b8795 !important;
+    font-size: .5625rem !important;
+    line-height: 1.35 !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-selector-head > em {
+    display: none !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-selector-list {
+    display: grid !important;
+    gap: 5px !important;
+    max-height: 142px !important;
+    overflow-y: auto !important;
+    padding-right: 2px !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-selector-item {
+    position: relative !important;
+    display: grid !important;
+    grid-template-columns: 18px 28px minmax(0, 1fr) auto !important;
+    gap: 8px !important;
+    align-items: center !important;
+    min-height: 40px !important;
+    padding: 6px 8px !important;
+    border: 1px solid #dfe4e9 !important;
+    border-radius: 7px !important;
+    background: #fff !important;
+    box-shadow: none !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-selector-item:has(input:checked) {
+    border-color: #8bcfc2 !important;
+    background: #f3fbf8 !important;
+    box-shadow: none !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-selector-check {
+    width: 18px !important;
+    height: 18px !important;
+    border: 1px solid #b9c8d7 !important;
+    border-radius: 5px !important;
+    font-size: .625rem !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-selector-item:has(input:checked) .ft-artwork-revision-selector-check {
+    border-color: var(--ft-theme-primary, #0f806d) !important;
+    background: var(--ft-theme-primary, #0f806d) !important;
+    color: #fff !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-selector-copy {
+    min-width: 0 !important;
+    display: grid !important;
+    gap: 1px !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-selector-copy b {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    color: #243247 !important;
+    font-size: .59375rem !important;
+    font-weight: 750 !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-selector-copy small {
+    color: #84909e !important;
+    font-size: .5rem !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-selector-item > a {
+    color: var(--ft-theme-primary, #0f806d) !important;
+    font-size: .53125rem !important;
+    font-weight: 750 !important;
+    text-decoration: none !important;
+}
+
+/* Required change: exactly the compact field from the supplied prototype. */
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-instructions {
+    margin: 0 0 15px !important;
+    gap: 6px !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-instructions > span {
+    color: #1e293b !important;
+    font-size: .625rem !important;
+    font-weight: 850 !important;
+    letter-spacing: 0 !important;
+    text-transform: none !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-instructions .ft-rich-text {
+    border: 1px solid #cfd7df !important;
+    border-radius: 7px !important;
+    background: #fff !important;
+    box-shadow: none !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-instructions .ft-rich-text-toolbar,
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-instructions .ft-rich-text-footer {
+    display: none !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-instructions .ft-rich-text-editor {
+    min-height: 66px !important;
+    padding: 10px 11px !important;
+    border: 0 !important;
+    font-size: .6875rem !important;
+    line-height: 1.45 !important;
+}
+
+/* Attachments: no surrounding card; match prototype drop zone and list. */
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-evidence {
+    display: grid !important;
+    gap: 8px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-evidence-head strong {
+    color: #1e293b !important;
+    font-size: .625rem !important;
+    font-weight: 850 !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-evidence-head span,
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-evidence-head em {
+    margin-top: 2px !important;
+    color: #7b8795 !important;
+    font-size: .5625rem !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-evidence-dropzone {
+    min-height: 88px !important;
+    justify-content: center !important;
+    gap: 12px !important;
+    padding: 14px 18px !important;
+    border: 1px dashed #cbd5df !important;
+    border-radius: 8px !important;
+    background: #fbfcfd !important;
+    text-align: center !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-evidence-dropzone > .ft-artwork-revision-evidence-upload-icon {
+    width: 30px !important;
+    height: 30px !important;
+    flex-basis: 30px !important;
+    border: 0 !important;
+    background: transparent !important;
+    color: #6d7886 !important;
+    font-size: 1.25rem !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-evidence-dropzone > div {
+    justify-items: center !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-evidence-dropzone strong {
+    color: #354152 !important;
+    font-size: .625rem !important;
+    font-weight: 650 !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-evidence-dropzone strong b {
+    display: inline-block !important;
+    margin-left: 6px !important;
+    padding: 6px 11px !important;
+    border: 1px solid #d5dce3 !important;
+    border-radius: 6px !important;
+    background: #fff !important;
+    color: #253247 !important;
+    font-size: .59375rem !important;
+    font-weight: 800 !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-evidence-dropzone small {
+    margin-top: 5px !important;
+    color: #8894a2 !important;
+    font-size: .53125rem !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-evidence-file {
+    min-height: 44px !important;
+    grid-template-columns: 30px minmax(0, 1fr) auto !important;
+    padding: 6px 8px !important;
+    border: 1px solid #e1e6eb !important;
+    border-radius: 7px !important;
+    background: #fff !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-visibility-note {
+    margin-top: 9px !important;
+    color: #8a95a2 !important;
+    font-size: .53125rem !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-order-task-document-modal-actions {
+    padding: 12px 20px 16px !important;
+    border-top: 0 !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-order-task-document-modal-actions button {
+    min-height: 34px !important;
+    padding: 7px 14px !important;
+    border-radius: 6px !important;
+    font-size: .625rem !important;
+}
+
+.ft-order-workflow-action-modal--artwork-revision-request .ft-order-task-document-modal-actions .ft-artwork-revision-submit {
+    border-color: #ed334e !important;
+    background: #ed334e !important;
+    color: #fff !important;
+}
+
+/* File type badge colors must be available in the revision modal itself. */
+.ft-order-workflow-action-modal--artwork-revision-request .ft-file-type-badge {
+    display: inline-grid !important;
+    place-items: center !important;
+    min-width: 28px !important;
+    height: 28px !important;
+    padding: 0 4px !important;
+    border-radius: 6px !important;
+    color: #fff !important;
+    font-size: .46875rem !important;
+    font-weight: 900 !important;
+    line-height: 1 !important;
+}
+.ft-order-workflow-action-modal--artwork-revision-request .ft-file-type-badge--pdf { background: #ef334f !important; }
+.ft-order-workflow-action-modal--artwork-revision-request .ft-file-type-badge--jpg,
+.ft-order-workflow-action-modal--artwork-revision-request .ft-file-type-badge--image { background: #3478df !important; }
+.ft-order-workflow-action-modal--artwork-revision-request .ft-file-type-badge--ai { background: #f5a800 !important; }
+.ft-order-workflow-action-modal--artwork-revision-request .ft-file-type-badge--eps { background: #ed7d31 !important; }
+.ft-order-workflow-action-modal--artwork-revision-request .ft-file-type-badge--cdr { background: #7b61c9 !important; }
+.ft-order-workflow-action-modal--artwork-revision-request .ft-file-type-badge--archive { background: #64748b !important; }
+.ft-order-workflow-action-modal--artwork-revision-request .ft-file-type-badge--doc { background: #2f67c7 !important; }
+.ft-order-workflow-action-modal--artwork-revision-request .ft-file-type-badge--sheet { background: #20875a !important; }
+.ft-order-workflow-action-modal--artwork-revision-request .ft-file-type-badge--slide { background: #d85b32 !important; }
+.ft-order-workflow-action-modal--artwork-revision-request .ft-file-type-badge--text,
+.ft-order-workflow-action-modal--artwork-revision-request .ft-file-type-badge--file { background: #66788a !important; }
+
+@media (max-width: 680px) {
+    .ft-order-workflow-action-modal--artwork-revision-request {
+        width: calc(100vw - 20px) !important;
+        max-height: calc(100vh - 20px) !important;
+    }
+
+    .ft-order-workflow-action-modal--artwork-revision-request .ft-order-task-document-modal-head,
+    .ft-order-workflow-action-modal--artwork-revision-request .ft-prototype-action-body,
+    .ft-order-workflow-action-modal--artwork-revision-request .ft-order-task-document-modal-actions {
+        padding-left: 14px !important;
+        padding-right: 14px !important;
+    }
+
+    .ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-selector-item {
+        grid-template-columns: 18px 28px minmax(0, 1fr) !important;
+    }
+
+    .ft-order-workflow-action-modal--artwork-revision-request .ft-artwork-revision-selector-item > a {
+        grid-column: 3 !important;
+        justify-self: start !important;
+    }
+}
+
+
+/* 2026-09-01: revised-artwork upload usability.
+   Keep the replacement picker and upload control visible together on desktop.
+   Long artwork lists scroll inside the selector instead of pushing the file
+   dropzone below the modal fold. */
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision {
+    width: min(660px, calc(100vw - 28px));
+    height: auto;
+    max-height: calc(100vh - 24px);
+}
+
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-order-task-document-modal-head {
+    padding: 15px 20px 11px;
+}
+
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-order-task-document-modal-head h2 {
+    font-size: 1rem;
+}
+
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-order-task-document-modal-head p {
+    margin-top: 3px;
+    font-size: .625rem;
+}
+
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-order-task-document-modal-body {
+    gap: 8px;
+    padding: 10px 20px 10px;
+    overflow: hidden;
+}
+
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-order-popup-field {
+    min-height: 0;
+    gap: 7px;
+}
+
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-artwork-revision-upload-plan {
+    gap: 7px;
+    margin-bottom: 4px;
+    padding: 9px 10px;
+    border-radius: 8px;
+}
+
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-artwork-revision-upload-plan-head {
+    gap: 8px;
+}
+
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-artwork-revision-upload-plan-head strong {
+    font-size: .65625rem;
+}
+
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-artwork-revision-upload-plan-head span,
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-artwork-revision-upload-instruction {
+    font-size: .515625rem;
+    line-height: 1.35;
+}
+
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-artwork-revision-upload-plan-head > em {
+    padding: 3px 7px;
+    font-size: .5rem;
+}
+
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-artwork-revision-upload-selector-list {
+    max-height: 112px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 2px;
+}
+
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-artwork-revision-upload-selector-item {
+    grid-template-columns: 20px 30px minmax(0,1fr) auto;
+    gap: 7px;
+    padding: 6px 8px;
+    border-radius: 7px;
+}
+
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-artwork-revision-upload-selector-copy b {
+    font-size: .5625rem;
+}
+
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-artwork-revision-upload-selector-copy small,
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-artwork-revision-upload-selector-item > a {
+    font-size: .484375rem;
+}
+
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-artwork-revision-upload-instruction {
+    gap: 3px;
+    padding-top: 6px;
+}
+
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-order-attachment-selected-count {
+    font-size: .59375rem;
+}
+
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-order-attachment-selected-file {
+    min-height: 48px;
+    grid-template-columns: 32px minmax(0,1fr) auto;
+    gap: 9px;
+    padding: 7px 10px;
+}
+
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-order-attachment-selected-copy strong {
+    font-size: .6875rem;
+}
+
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-order-attachment-selected-copy small,
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-order-attachment-selected-file button {
+    font-size: .53125rem;
+}
+
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-prototype-upload-label {
+    margin-bottom: 2px;
+    font-size: .59375rem;
+    letter-spacing: .04em;
+}
+
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-order-attachment-dropzone,
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-order-attachment-dropzone.is-compact {
+    min-height: 112px;
+    max-height: 112px;
+    padding: 10px 16px;
+}
+
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-order-attachment-upload-icon,
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-order-attachment-dropzone.is-compact .ft-order-attachment-upload-icon {
+    width: 28px;
+    height: 28px;
+    margin-bottom: 1px;
+}
+
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-order-task-document-dropzone strong {
+    font-size: .71875rem;
+}
+
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-order-task-document-dropzone b {
+    font-size: .59375rem;
+}
+
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-order-attachment-browse {
+    min-height: 28px;
+    margin-top: 5px;
+    padding: 0 14px;
+    font-size: .59375rem;
+}
+
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-order-attachment-dropzone small {
+    margin-top: 5px;
+    font-size: .5rem;
+}
+
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-prototype-upload-meta {
+    display: none;
+}
+
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-order-task-document-modal-actions {
+    padding: 10px 20px 12px;
+}
+
+.ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-order-task-document-modal-actions button {
+    min-height: 34px;
+}
+
+@media (max-height: 680px) {
+    .ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-order-task-document-modal-body {
+        overflow-y: auto;
+    }
+}
+
+@media (max-width: 640px) {
+    .ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision {
+        width: calc(100vw - 20px);
+        max-height: calc(100vh - 16px);
+    }
+
+    .ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-order-task-document-modal-head,
+    .ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-order-task-document-modal-body,
+    .ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-order-task-document-modal-actions {
+        padding-left: 14px;
+        padding-right: 14px;
+    }
+
+    .ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-order-task-document-modal-body {
+        overflow-y: auto;
+    }
+}
+
+/* 2026-09-01: selective artwork revision modal visibility refinement.
+   On normal desktop screens, show the full artwork selector instead of giving
+   the selector its own scrollbar. The modal is slightly wider, while the
+   overall modal remains viewport-bounded for unusually long artwork lists. */
+@media (min-width: 641px) {
+    .ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision {
+        width: min(760px, calc(100vw - 36px));
+        max-height: calc(100vh - 20px);
+    }
+
+    .ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-artwork-revision-upload-selector-list {
+        max-height: none;
+        overflow: visible;
+        padding-right: 0;
+    }
+
+    .ft-order-prototype-detail .ft-order-prototype-upload-modal--artwork-revision .ft-order-task-document-modal-body {
+        overflow-y: auto;
+        scrollbar-gutter: stable;
+    }
+}
