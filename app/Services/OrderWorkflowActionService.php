@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\EmailDeliveryException;
 use App\Models\Activity;
 use App\Models\Document;
 use App\Models\FlowJob;
@@ -75,7 +76,7 @@ class OrderWorkflowActionService
         $hasEvidence ??= $this->loadedEvidenceState($task);
 
         $label = match ($key) {
-            'NEW_UPLOAD_PO' => 'Upload Purchase Order',
+            'NEW_UPLOAD_PO' => $hasEvidence ? 'Add other documents' : 'Upload Purchase Order',
             'NEW_SEND_PO_ARTWORK' => 'Send to Artwork Team',
             'ART_PREPARE_UPLOAD' => $hasEvidence ? 'Upload Revised Artwork' : 'Upload Artwork',
             'ART_INTERNAL_REVIEW' => 'Review Artwork',
@@ -91,9 +92,9 @@ class OrderWorkflowActionService
             'QC_CHECK' => 'Open QC Check',
             'QC_ISSUE' => str_contains($status, 'issue') ? 'Issue Resolved' : 'Continue',
             'QC_APPROVE_SHIPMENT' => 'Proceed to Shipment',
-            'SHIP_CONFIRM_INFO' => 'Review Information',
-            'SHIP_LABEL' => str_contains($status, 'label generated') ? 'Preview / Print' : 'Generate Label',
-            'SHIP_PACKAGE' => 'Mark as dispatched',
+            'SHIP_CONFIRM_INFO' => 'Review shipment details',
+            'SHIP_LABEL' => 'Add tracking number',
+            'SHIP_PACKAGE' => 'Dispatch shipment',
             'BILL_PREPARE' => 'Prepare Invoice',
             'BILL_SEND' => 'Preview & Send',
             'PAY_PROCESS' => 'Record Payment',
@@ -103,7 +104,9 @@ class OrderWorkflowActionService
         $interaction = match (true) {
             in_array($key, self::DOCUMENT_ACTIONS, true) => 'document',
             in_array($key, ['PROD_START', 'PROD_FINISH', 'QC_APPROVE_SHIPMENT'], true) => 'direct',
-            $key === 'SHIP_LABEL' && ! str_contains($status, 'label generated') => 'direct',
+            // Shipment tracking now requires courier + tracking input. Keep this
+            // as a modal action on the Orders list so it matches Task 5.2 on
+            // Order Details instead of trying the legacy one-click label flow.
             default => 'modal',
         };
 
@@ -187,10 +190,10 @@ class OrderWorkflowActionService
                 'choices' => ['confirm' => 'Save & complete task'],
             ],
             'SHIP_LABEL' => [
-                'variant' => 'courier_label',
-                'title' => 'Courier Label Preview',
-                'copy' => 'Review the generated shipping label and confirm it has been printed.',
-                'choices' => ['print' => 'Print Label'],
+                'variant' => 'shipment_tracking',
+                'title' => 'Add tracking number & print courier label',
+                'copy' => 'Select the courier and enter the tracking number. Completing this task unlocks Dispatch shipment.',
+                'choices' => ['complete' => 'Continue to next task'],
             ],
             'SHIP_PACKAGE' => [
                 'variant' => 'ship_package',
@@ -200,9 +203,9 @@ class OrderWorkflowActionService
             ],
             'BILL_PREPARE' => [
                 'variant' => 'invoice_prepare',
-                'title' => 'Prepare Bulk Invoice',
+                'title' => 'Prepare Invoice',
                 'copy' => 'Prepare the invoice details for this shipped Order.',
-                'choices' => ['confirm' => 'Prepare Bulk Invoice'],
+                'choices' => ['confirm' => 'Prepare Invoice'],
             ],
             'BILL_SEND' => [
                 'variant' => 'invoice_send',
@@ -226,19 +229,47 @@ class OrderWorkflowActionService
     }
 
     /** @return array<string, mixed> */
+    public function invoiceEmailPreview(Task $task, array $payload = []): array
+    {
+        return app(\App\Services\Orders\OrderInvoiceWorkflowEmailService::class)
+            ->preview($task, null, $payload);
+    }
+
+    public function preparedWorkflowInvoice(FlowJob $job): ?\App\Models\Invoice
+    {
+        return app(\App\Services\Orders\OrderInvoiceWorkflowEmailService::class)
+            ->preparedInvoice($job);
+    }
+
+    /** @return array<string, mixed> */
     public function initialPayload(Task $task, FlowJob $job): array
     {
-        $invoice = $job->activities()
-            ->where('event', 'job.workflow_invoice_prepared')
-            ->latest('id')
-            ->first();
+        $key = $this->automationKey($task);
+        $invoiceActivity = in_array($key, ['BILL_PREPARE', 'BILL_SEND'], true)
+            ? $job->activities()->where('event', 'job.workflow_invoice_prepared')->latest('id')->first()
+            : null;
+        $preparedInvoice = in_array($key, ['BILL_PREPARE', 'BILL_SEND'], true)
+            ? app(\App\Services\Orders\OrderInvoiceWorkflowEmailService::class)->preparedInvoice($job)
+            : null;
         $total = $this->orderTotal($job);
         $paid = $this->recordedPaymentTotal($job);
         $units = (int) $job->items->filter(fn ($item) => ! ($item->is_removed ?? false))->sum(fn ($item) => (int) ($item->quantity ?? 0));
         $inspected = $units > 0 ? max(1, min($units, (int) ceil($units * 0.10))) : 1;
 
         $payload = [
+            'revision_document_id' => null,
             'revision_document_ids' => [],
+            'revision_items' => [],
+            'recipient_type' => 'team',
+            'to_user_id' => null,
+            'to_email' => '',
+            'to_emails' => '',
+            'external_to_name' => '',
+            'external_to_email' => '',
+            'assignee_user_id' => null,
+            'cc_user_ids' => [],
+            'cc_emails' => '',
+            'external_cc_emails' => '',
             'qty_received' => $units ?: 1,
             'qty_inspected' => $inspected,
             'qty_accepted' => $inspected,
@@ -257,7 +288,7 @@ class OrderWorkflowActionService
             'tracking_number' => '',
             'shipment_date' => app(WorkspaceSettingsService::class)->localToday()->toDateString(),
             'estimated_delivery_date' => $job->estimated_delivery_date?->format('Y-m-d') ?: '',
-            'invoice_number' => (string) data_get($invoice?->meta, 'invoice_number', ''),
+            'invoice_number' => (string) ($preparedInvoice?->invoice_number ?: data_get($invoiceActivity?->meta, 'invoice_number', '')),
             'invoice_date' => app(WorkspaceSettingsService::class)->localToday()->toDateString(),
             'invoice_amount' => $total > 0 ? number_format($total, 2, '.', '') : '0.00',
             'invoice_currency' => 'USD',
@@ -269,8 +300,29 @@ class OrderWorkflowActionService
             'payment_notes' => '',
         ];
 
-        $key = $this->automationKey($task);
+        if ($preparedInvoice && $key === 'BILL_SEND') {
+            $payload['invoice_id'] = (int) $preparedInvoice->id;
+            $payload['invoice_number'] = (string) $preparedInvoice->invoice_number;
+            $payload['invoice_date'] = $preparedInvoice->issue_date?->format('Y-m-d') ?: $payload['invoice_date'];
+            $payload['invoice_amount'] = number_format((float) $preparedInvoice->total, 2, '.', '');
+            $payload['invoice_currency'] = (string) $preparedInvoice->currency;
+            $payload['invoice_due_date'] = $preparedInvoice->due_date?->format('Y-m-d') ?: $payload['invoice_due_date'];
+            $payload['payment_terms'] = (string) data_get($invoiceActivity?->meta, 'payment_terms', $payload['payment_terms']);
+            $payload['to_email'] = trim((string) ($preparedInvoice->billing_contact_email ?: $job->client?->email ?: ''));
+            $payload['external_to_name'] = trim((string) ($job->client?->billing_recipient ?: $preparedInvoice->billing_contact_name ?: $job->client?->contact_name ?: $job->client?->name ?: 'Client accounts contact'));
+        }
+
         if (in_array($key, ['SHIP_LABEL', 'SHIP_PACKAGE'], true)) {
+            $courierOptions = app(MasterDataService::class)->active('courier')
+                ->map(fn ($record) => [
+                    'value' => trim((string) $record->name),
+                    'label' => trim((string) $record->name),
+                ])
+                ->filter(fn (array $option) => $option['value'] !== '')
+                ->unique(fn (array $option) => mb_strtolower($option['value']))
+                ->values();
+            $payload['courier_options'] = $courierOptions->all();
+
             $shipmentInfoActivity = $job->activities()
                 ->where('event', 'job.shipment_information_confirmed')
                 ->latest('id')
@@ -286,7 +338,18 @@ class OrderWorkflowActionService
                 ->where('event', 'job.courier_label_generated')
                 ->latest('id')
                 ->first();
-            $payload['carrier'] = trim((string) data_get($labelActivity?->meta, 'carrier', $payload['carrier']));
+            $savedCarrier = trim((string) data_get($labelActivity?->meta, 'carrier', ''));
+            if ($savedCarrier !== '') {
+                $payload['carrier'] = $savedCarrier;
+            } else {
+                $configuredCarrier = trim((string) ($payload['carrier'] ?? ''));
+                $carrierIsActive = $courierOptions->contains(
+                    fn (array $option) => strcasecmp($option['value'], $configuredCarrier) === 0,
+                );
+                $payload['carrier'] = $carrierIsActive
+                    ? $configuredCarrier
+                    : (string) data_get($courierOptions->first(), 'value', '');
+            }
             $payload['tracking_number'] = trim((string) data_get($labelActivity?->meta, 'tracking_number', ''));
         }
 
@@ -294,7 +357,103 @@ class OrderWorkflowActionService
             $payload = array_merge($payload, $this->shipmentContactPayload($job));
         }
 
+        if ($key === 'BILL_PREPARE') {
+            // Billing workflow invoice numbers are system-generated so users do
+            // not need to invent or coordinate invoice identifiers manually.
+            // Keep the format aligned with finance invoices while accounting for
+            // both finance records and earlier workflow-prepared invoices.
+            $payload['invoice_number'] = $this->nextWorkflowInvoiceNumber($job);
+        }
+
         return $payload;
+    }
+
+    /**
+     * Update shipment information after its workflow task has already been
+     * completed. This writes a new activity snapshot without reopening the task
+     * or moving the Order backwards in the workflow.
+     *
+     * @param array<string,mixed> $payload
+     */
+    public function updateCompletedShipmentInformation(Task $task, User $actor, array $payload): Task
+    {
+        return DB::transaction(function () use ($task, $actor, $payload): Task {
+            $locked = Task::query()->whereKey($task->id)->lockForUpdate()->with(['job.phase', 'setupTemplate'])->firstOrFail();
+            abort_unless($this->automationKey($locked) === 'SHIP_CONFIRM_INFO', 422, 'This task does not manage shipment information.');
+            abort_unless((bool) $locked->completed_at || strcasecmp(trim((string) $locked->status), 'Completed') === 0, 422, 'Complete the shipment information task before editing historical shipment details.');
+
+            $job = FlowJob::query()->whereKey($locked->flow_job_id)->lockForUpdate()->with(['client', 'items'])->firstOrFail();
+            abort_if(strcasecmp((string) $job->status, 'Cancelled') === 0, 422, 'Cancelled Orders cannot be edited.');
+
+            $this->validateShipmentInfo($payload);
+            if ((bool) ($payload['update_saved_contact'] ?? false)) {
+                $this->updateSavedShipmentContact($job, $actor, $payload);
+            }
+
+            $job->activities()->create([
+                'user_id' => $actor->id,
+                'event' => 'job.shipment_information_confirmed',
+                'description' => 'Shipment information updated after task completion.',
+                'meta' => $this->onlyPayload($payload, [
+                    'client_name','contact_name','contact_type','phone_country_code','phone_number',
+                    'address','city','state','country','postal_code','recipient','contact',
+                ]),
+            ]);
+
+            return $locked->refresh();
+        }, 3);
+    }
+
+    /**
+     * Update courier/tracking data after the tracking task has completed. The
+     * latest activity remains the source of truth used by Shipment presentation.
+     */
+    public function updateCompletedShipmentTracking(Task $task, User $actor, string $carrier, string $trackingNumber): Task
+    {
+        $carrier = trim($carrier);
+        $trackingNumber = trim($trackingNumber);
+
+        return DB::transaction(function () use ($task, $actor, $carrier, $trackingNumber): Task {
+            $locked = Task::query()->whereKey($task->id)->lockForUpdate()->with(['job.phase', 'setupTemplate'])->firstOrFail();
+            abort_unless($this->automationKey($locked) === 'SHIP_LABEL', 422, 'This task does not manage shipment tracking.');
+            abort_unless((bool) $locked->completed_at || strcasecmp(trim((string) $locked->status), 'Completed') === 0, 422, 'Complete the tracking task before editing historical tracking details.');
+
+            $job = FlowJob::query()->whereKey($locked->flow_job_id)->lockForUpdate()->firstOrFail();
+            abort_if(strcasecmp((string) $job->status, 'Cancelled') === 0, 422, 'Cancelled Orders cannot be edited.');
+
+            if ($carrier === '' || $trackingNumber === '') {
+                throw ValidationException::withMessages([
+                    'shipmentLabel' => 'Select a courier and enter the tracking number first.',
+                ]);
+            }
+            $this->validateShipmentCourier($carrier);
+
+            $job->activities()->create([
+                'user_id' => $actor->id,
+                'event' => 'job.courier_label_generated',
+                'description' => 'Courier and tracking details updated after task completion.',
+                'meta' => ['carrier' => $carrier, 'tracking_number' => $trackingNumber],
+            ]);
+
+            // Once the package has been dispatched, Order lists read carrier and
+            // tracking from the dispatch snapshot. Keep that denormalized snapshot
+            // synchronized so a tracking correction is reflected everywhere.
+            $dispatchActivity = $job->activities()
+                ->where('event', 'job.package_shipped')
+                ->latest('id')
+                ->first();
+            if ($dispatchActivity) {
+                $dispatchActivity->update([
+                    'description' => $carrier.' tracking '.$trackingNumber.' recorded.',
+                    'meta' => array_merge((array) ($dispatchActivity->meta ?? []), [
+                        'carrier' => $carrier,
+                        'tracking_number' => $trackingNumber,
+                    ]),
+                ]);
+            }
+
+            return $locked->refresh();
+        }, 3);
     }
 
     /**
@@ -321,8 +480,7 @@ class OrderWorkflowActionService
             ) ?? '';
 
             if ($key === 'ART_INTERNAL_REVIEW' && $decision === 'revise') {
-                $this->requireComment($comment, 'Add revision instructions before requesting a revision.');
-                $activity = $this->restartArtwork($locked, $actor, $comment, 'Internal artwork revision requested', $payload);
+                $activity = $this->restartArtwork($locked, $actor, 'Internal artwork revision requested', $payload, $comment);
                 $this->storeArtworkRevisionAttachments($activity, $locked, $actor, $attachments);
                 return $locked->refresh();
             }
@@ -341,8 +499,7 @@ class OrderWorkflowActionService
             }
 
             if ($key === 'ART_CLIENT_ERP_DECISION' && $decision === 'revise') {
-                $this->requireComment($comment, 'Add the client revision request before continuing.');
-                $activity = $this->restartArtwork($locked, $actor, $comment, 'Client artwork revision requested', $payload);
+                $activity = $this->restartArtwork($locked, $actor, 'Client artwork revision requested', $payload, $comment);
                 $this->storeArtworkRevisionAttachments($activity, $locked, $actor, $attachments);
                 return $locked->refresh();
             }
@@ -539,6 +696,7 @@ class OrderWorkflowActionService
                         'shipmentLabel' => 'Select a courier and enter the tracking number first.',
                     ]);
                 }
+                $this->validateShipmentCourier($carrier);
 
                 $job->activities()->create([
                     'user_id' => $actor->id,
@@ -551,6 +709,15 @@ class OrderWorkflowActionService
             }
 
             if ($key === 'SHIP_LABEL' && $decision === 'generate') {
+                $carrier = trim((string) ($payload['carrier'] ?? ''));
+                $trackingNumber = trim((string) ($payload['tracking_number'] ?? ''));
+                if ($carrier === '' || $trackingNumber === '') {
+                    throw ValidationException::withMessages([
+                        'shipmentLabel' => 'Select a courier and enter the tracking number first.',
+                    ]);
+                }
+                $this->validateShipmentCourier($carrier);
+
                 $locked->update(['status' => 'Courier Label Generated', 'completed_at' => null, 'progress' => 55]);
                 $job->activities()->create([
                     'user_id' => $actor->id,
@@ -586,28 +753,56 @@ class OrderWorkflowActionService
 
             if ($key === 'BILL_PREPARE') {
                 $this->validateInvoice($payload);
+                $invoice = app(\App\Services\Orders\OrderInvoiceWorkflowEmailService::class)
+                    ->prepare($job, $actor, $payload);
+
+                $preparedMeta = $this->onlyPayload($payload, ['payment_terms']);
+                $preparedMeta = array_merge($preparedMeta, [
+                    'invoice_id' => (int) $invoice->id,
+                    'invoice_number' => (string) $invoice->invoice_number,
+                    'invoice_date' => $invoice->issue_date?->format('Y-m-d'),
+                    'invoice_amount' => (float) $invoice->total,
+                    'invoice_currency' => (string) $invoice->currency,
+                    'invoice_due_date' => $invoice->due_date?->format('Y-m-d'),
+                    'pdf_name' => (string) ($invoice->pdf_name ?: ''),
+                ]);
+
                 $job->activities()->create([
                     'user_id' => $actor->id,
                     'event' => 'job.workflow_invoice_prepared',
-                    'description' => 'Bulk invoice '.$payload['invoice_number'].' prepared.',
-                    'meta' => $this->onlyPayload($payload, ['invoice_number','invoice_date','invoice_amount','invoice_currency','payment_terms','invoice_due_date']),
+                    'description' => 'Invoice '.$invoice->invoice_number.' prepared.',
+                    'meta' => $preparedMeta,
                 ]);
                 return $this->complete($locked, $actor);
             }
 
             if ($key === 'BILL_SEND') {
-                $job->activities()->create([
-                    'user_id' => $actor->id,
-                    'event' => 'job.workflow_invoice_sent',
-                    'description' => 'Invoice preview confirmed and sent to the client.',
-                ]);
+                $invoiceEmail = app(\App\Services\Orders\OrderInvoiceWorkflowEmailService::class);
+
+                try {
+                    $trackingId = $invoiceEmail->send($locked, $actor, $payload);
+                } catch (EmailDeliveryException $exception) {
+                    // Billing must continue even when the provider is down. Keep
+                    // the failed delivery as a separate, resendable state just
+                    // like the completed Artwork email handoff.
+                    $invoiceEmail->recordFailedDelivery($locked, $actor, $payload, $exception);
+
+                    return $this->complete($locked, $actor);
+                }
+
+                // A disabled Order email service returns a durable skipped marker
+                // from the invoice service. Do not misreport that as a sent email.
+                if (! str_starts_with($trackingId, 'disabled-')) {
+                    $invoiceEmail->recordSuccessfulDelivery($locked, $actor, $payload, $trackingId);
+                }
+
                 return $this->complete($locked, $actor);
             }
 
             if (in_array($key, ['NEW_SEND_PO_ARTWORK', 'ART_SEND_ORDER_TEAM'], true)) {
                 abort_unless($decision === 'confirm', 422, 'Confirm the email handoff before sending.');
 
-                app(\App\Services\Orders\OrderWorkflowEmailService::class)->send($locked, $actor);
+                app(\App\Services\Orders\OrderWorkflowEmailService::class)->send($locked, $actor, $payload);
 
                 return $this->complete($locked, $actor);
             }
@@ -672,6 +867,21 @@ class OrderWorkflowActionService
             abort_unless((string) ($failure['handoff_key'] ?? '') === (string) $key, 422, 'The email-failure confirmation is no longer valid for this task.');
             abort_unless((int) ($failure['attempts'] ?? 0) >= 3, 422, 'Manual completion is available only after three failed email delivery attempts.');
 
+            if ($key === 'NEW_SEND_PO_ARTWORK') {
+                $recipientId = (int) ($failure['assignment_user_id'] ?? $failure['primary_recipient_user_id'] ?? 0);
+                if ($recipientId > 0) {
+                    $recipient = User::query()->where('is_active', true)->find($recipientId);
+                    abort_unless($recipient, 422, 'The selected Artwork recipient is no longer active. Retry the handoff with another user.');
+                    $artworkTask = Task::query()
+                        ->where('flow_job_id', $job->id)
+                        ->with('setupTemplate')
+                        ->get()
+                        ->first(fn (Task $candidate) => $this->automationKey($candidate) === 'ART_PREPARE_UPLOAD');
+                    abort_unless($artworkTask, 422, 'The Prepare & Upload Artwork task is not configured for this Order.');
+                    app(TaskService::class)->assignFromWorkflowHandoff($artworkTask, $recipient, $actor);
+                }
+            }
+
             $attachmentLabel = $key === 'ART_SEND_ORDER_TEAM' ? 'Artwork' : 'Purchase Order';
             $job->activities()->create([
                 'user_id' => $actor->id,
@@ -697,6 +907,11 @@ class OrderWorkflowActionService
         $key = $this->automationKey($task);
         if (! in_array($key, self::DOCUMENT_ACTIONS, true)) return;
 
+        // Completed file-backed tasks can still accept supporting documents.
+        // Adding those files is evidence management only and must not run the
+        // completion/phase-advance side effects for a second time.
+        if ($task->completed_at || strcasecmp(trim((string) $task->status), 'Completed') === 0) return;
+
         if ($key === 'ART_SAMPLE_APPROVAL') {
             $this->complete($task, $actor);
             $waiting = Task::query()
@@ -720,15 +935,20 @@ class OrderWorkflowActionService
     }
 
     /**
-     * Reopen the Artwork upload task for only the artwork files explicitly
-     * selected by the reviewer. The selection is stored on the revision event
-     * so the later upload can replace only those files while carrying the other
-     * files forward unchanged into the next artwork version.
+     * Reopen Artwork preparation for one or more current artwork files.
+     * Every selected artwork carries its own required-change note and can carry
+     * its own set of supporting attachments. Unselected artwork is preserved in
+     * the next version by DocumentService.
      *
      * @param array<string,mixed> $payload
      */
-    private function restartArtwork(Task $current, User $actor, string $comment, string $description, array $payload = []): Activity
-    {
+    private function restartArtwork(
+        Task $current,
+        User $actor,
+        string $description,
+        array $payload = [],
+        string $legacyComment = '',
+    ): Activity {
         $job = $current->job;
         $tasks = Task::query()
             ->where('flow_job_id', $current->flow_job_id)
@@ -739,16 +959,8 @@ class OrderWorkflowActionService
         $upload = $tasks->first(fn (Task $candidate) => $this->automationKey($candidate) === 'ART_PREPARE_UPLOAD');
         abort_unless($upload, 422, 'Artwork upload task is not configured.');
 
-        $latestVersion = max(0, (int) $upload->documents()->max('version'));
-        $latestDocuments = $latestVersion > 0
-            ? $upload->documents()->where('version', $latestVersion)->orderBy('id')->get()
-            : collect();
-
-        $requestedDocumentIds = collect($payload['revision_document_ids'] ?? [])
-            ->map(fn ($id) => (int) $id)
-            ->filter(fn ($id) => $id > 0)
-            ->unique()
-            ->values();
+        $latestDocuments = app(DocumentService::class)->currentArtworkDocuments($upload);
+        $latestVersion = max(0, (int) ($latestDocuments->max('version') ?? 0));
 
         if ($latestDocuments->isEmpty()) {
             throw ValidationException::withMessages([
@@ -756,26 +968,76 @@ class OrderWorkflowActionService
             ]);
         }
 
-        if ($requestedDocumentIds->isEmpty()) {
+        $requestedIds = collect($payload['revision_document_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values();
+
+        // Backward compatibility with an already-open dialog from the previous
+        // single-artwork implementation.
+        if ($requestedIds->isEmpty()) {
+            $legacyId = (int) ($payload['revision_document_id'] ?? 0);
+            if ($legacyId > 0) $requestedIds = collect([$legacyId]);
+        }
+
+        if ($requestedIds->isEmpty()) {
             throw ValidationException::withMessages([
                 'orderWorkflowActionPayload.revision_document_ids' => 'Select at least one artwork file that needs revision.',
             ]);
         }
 
         $latestIds = $latestDocuments->pluck('id')->map(fn ($id) => (int) $id);
-        if ($requestedDocumentIds->contains(fn ($id) => ! $latestIds->contains((int) $id))) {
+        if ($requestedIds->contains(fn ($id) => ! $latestIds->contains((int) $id))) {
             throw ValidationException::withMessages([
                 'orderWorkflowActionPayload.revision_document_ids' => 'One of the selected artwork files is no longer part of the latest artwork set. Reopen the review and try again.',
             ]);
         }
 
-        // Preserve the visual order from the latest artwork set instead of the
-        // checkbox submission order. This gives the upload step a deterministic
-        // one-to-one replacement order when several files require revision.
         $revisionDocuments = $latestDocuments
-            ->filter(fn (Document $document) => $requestedDocumentIds->contains((int) $document->id))
+            ->filter(fn (Document $document) => $requestedIds->contains((int) $document->id))
             ->values();
         $revisionDocumentIds = $revisionDocuments->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+        $payloadItems = collect($payload['revision_items'] ?? [])
+            ->mapWithKeys(function ($item) {
+                $id = (int) data_get($item, 'document_id', 0);
+                return $id > 0 ? [$id => (array) $item] : [];
+            });
+
+        $richText = app(RichTextService::class);
+        $revisionItems = [];
+        $mentionIds = collect();
+        foreach ($revisionDocuments as $document) {
+            $documentId = (int) $document->id;
+            $rawComment = trim((string) data_get($payloadItems->get($documentId, []), 'comment', ''));
+            if ($rawComment === '' && count($revisionDocumentIds) === 1) {
+                $rawComment = trim($legacyComment);
+            }
+
+            $comment = $richText->normalize(
+                $rawComment,
+                10000,
+                'orderWorkflowActionRevisionComments.'.$documentId,
+            ) ?? '';
+            if (trim((string) $richText->withoutImages($comment)) === '' && $richText->imageAttachments($comment) === []) {
+                throw ValidationException::withMessages([
+                    'orderWorkflowActionRevisionComments.'.$documentId => 'Describe the required change for this artwork.',
+                ]);
+            }
+
+            $itemMentionIds = app(MentionService::class)->userIdsFromText($comment);
+            $mentionIds = $mentionIds->merge($itemMentionIds);
+            $revisionItems[] = [
+                'document_id' => $documentId,
+                'document_name' => (string) $document->name,
+                'comment' => $comment,
+                'mention_user_ids' => array_values(array_unique(array_map('intval', $itemMentionIds))),
+                'revision_attachment_document_ids' => [],
+                'revision_attachment_document_names' => [],
+            ];
+        }
+        $mentionIds = $mentionIds->map(fn ($id) => (int) $id)->filter()->unique()->values()->all();
 
         $ready = app(OrderTaskFlagService::class)->readyStatus();
         $notStarted = app(OrderTaskFlagService::class)->notStartedStatus();
@@ -797,23 +1059,33 @@ class OrderWorkflowActionService
         }
 
         $referenceDocumentId = (int) ($revisionDocuments->last()?->id ?? 0);
+        $legacyRevisionComment = count($revisionItems) === 1
+            ? (string) ($revisionItems[0]['comment'] ?? '')
+            : collect($revisionItems)
+                ->map(fn ($item) => ($item['document_name'] ?? 'Artwork').': '.trim((string) ($item['comment'] ?? '')))
+                ->implode("\n");
+        $activityDescription = count($revisionItems) === 1
+            ? $richText->prependText($description.':', $legacyRevisionComment)
+            : $description.' for '.count($revisionItems).' artworks.';
 
-        $mentionIds = app(MentionService::class)->userIdsFromText($comment);
         $activity = $job?->activities()->create([
             'user_id' => $actor->id,
             'event' => 'job.artwork_revision_requested',
-            'description' => app(RichTextService::class)->prependText($description.':', $comment),
+            'description' => $activityDescription,
             'meta' => [
-                'revision_comment' => $comment,
+                'revision_comment' => $legacyRevisionComment,
+                'revision_items' => $revisionItems,
                 'mention_user_ids' => $mentionIds,
                 'source_task_id' => (int) $current->id,
                 'target_task_id' => (int) $upload->id,
                 'workflow_phase_id' => (int) $current->workflow_phase_id,
                 'reference_document_id' => $referenceDocumentId > 0 ? $referenceDocumentId : null,
                 'revision_document_ids' => $revisionDocumentIds,
+                'revision_document_id' => count($revisionDocumentIds) === 1 ? $revisionDocumentIds[0] : null,
                 'revision_document_names' => $revisionDocuments->pluck('name')->values()->all(),
                 'revision_selection_pending' => false,
                 'source_artwork_version' => $latestVersion,
+                'source_artwork_document_ids' => $latestDocuments->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
             ],
         ]);
 
@@ -822,7 +1094,7 @@ class OrderWorkflowActionService
         app(NotificationService::class)->notifyMentionedUsers(
             $mentionIds,
             $actor->name.' mentioned you in '.$job->displayOrderNumber(),
-            $comment,
+            $legacyRevisionComment,
             $job,
             $upload,
             $actor,
@@ -832,29 +1104,51 @@ class OrderWorkflowActionService
     }
 
     /**
-     * Store optional marked-up artwork, screenshots, or supporting documents
-     * against the review task. Keeping these off ART_PREPARE_UPLOAD prevents
-     * evidence files from being mistaken for a new artwork version.
+     * Store supporting files under the review task, grouped by the artwork they
+     * explain. A flat attachment id list is also kept for backward-compatible
+     * activity rendering and exports.
      *
-     * @param array<int,\Illuminate\Http\UploadedFile> $attachments
+     * @param array<int|string,mixed> $attachments
      */
     private function storeArtworkRevisionAttachments(Activity $activity, Task $reviewTask, User $actor, array $attachments): void
     {
-        $attachments = array_values(array_filter($attachments));
-        if ($attachments === []) return;
-
-        $documents = app(DocumentService::class)->storeMany($attachments, [
-            'flow_job_id' => $reviewTask->flow_job_id,
-            'client_id' => $reviewTask->job?->client_id,
-            'task_id' => $reviewTask->id,
-            'category' => 'Artwork revision evidence',
-            'note' => 'Supporting attachment for artwork revision request.',
-        ], $actor);
-
         $meta = (array) $activity->meta;
-        $meta['revision_attachment_document_ids'] = $documents
-            ->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
-        $meta['revision_attachment_document_names'] = $documents->pluck('name')->values()->all();
+        $revisionItems = collect($meta['revision_items'] ?? [])->values();
+        if ($revisionItems->isEmpty()) return;
+
+        // Compatibility with callers that still pass one flat file array.
+        $isFlat = collect($attachments)->filter()->contains(
+            fn ($value) => is_object($value) && method_exists($value, 'getClientOriginalName')
+        );
+        if ($isFlat) {
+            $firstDocumentId = (int) data_get($revisionItems->first(), 'document_id', 0);
+            $attachments = $firstDocumentId > 0 ? [$firstDocumentId => $attachments] : [];
+        }
+
+        $allStored = collect();
+        $updatedItems = $revisionItems->map(function ($item) use ($attachments, $reviewTask, $actor, $allStored) {
+            $item = (array) $item;
+            $documentId = (int) ($item['document_id'] ?? 0);
+            $files = array_values(array_filter((array) ($attachments[$documentId] ?? $attachments[(string) $documentId] ?? [])));
+            if ($files === []) return $item;
+
+            $documents = app(DocumentService::class)->storeMany($files, [
+                'flow_job_id' => $reviewTask->flow_job_id,
+                'client_id' => $reviewTask->job?->client_id,
+                'task_id' => $reviewTask->id,
+                'category' => 'Artwork revision evidence',
+                'note' => 'Supporting attachment for artwork revision request: '.($item['document_name'] ?? 'Artwork').'.',
+            ], $actor);
+
+            foreach ($documents as $document) $allStored->push($document);
+            $item['revision_attachment_document_ids'] = $documents->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
+            $item['revision_attachment_document_names'] = $documents->pluck('name')->values()->all();
+            return $item;
+        })->values()->all();
+
+        $meta['revision_items'] = $updatedItems;
+        $meta['revision_attachment_document_ids'] = $allStored->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
+        $meta['revision_attachment_document_names'] = $allStored->pluck('name')->values()->all();
         $activity->update(['meta' => $meta]);
     }
 
@@ -945,7 +1239,13 @@ class OrderWorkflowActionService
         ]);
 
         $client = $job->client;
-        $contactType = trim((string) ($job->shipping_contact_type ?: 'middle_client'));
+        $latestShipmentActivity = $job->activities()
+            ->where('event', 'job.shipment_information_confirmed')
+            ->latest('id')
+            ->first();
+        $latestShipmentMeta = (array) ($latestShipmentActivity?->meta ?? []);
+
+        $contactType = trim((string) ($latestShipmentMeta['contact_type'] ?? ($job->shipping_contact_type ?: 'middle_client')));
         if (! in_array($contactType, ['middle_client', 'end_customer', 'other_contact'], true)) {
             $contactType = 'middle_client';
         }
@@ -975,7 +1275,7 @@ class OrderWorkflowActionService
             }
         }
 
-        $contactName = trim((string) ($job->shipping_contact_name ?: $client?->contact_name ?: $client?->name ?: ''));
+        $contactName = trim((string) ($latestShipmentMeta['contact_name'] ?? ($job->shipping_contact_name ?: $client?->contact_name ?: $client?->name ?: '')));
         $selectedContact = $contactOptions->first(function (array $option) use ($contactName, $contactType): bool {
             return $option['contact_type'] === $contactType
                 && mb_strtolower(trim((string) $option['name'])) === mb_strtolower($contactName);
@@ -987,8 +1287,8 @@ class OrderWorkflowActionService
                 'label' => $contactName,
                 'contact_type' => $contactType,
                 'name' => $contactName,
-                'country_code' => (string) ($job->shipping_phone_country_code ?? ''),
-                'phone' => (string) ($job->shipping_phone ?? ''),
+                'country_code' => (string) ($latestShipmentMeta['phone_country_code'] ?? $job->shipping_phone_country_code ?? ''),
+                'phone' => (string) ($latestShipmentMeta['phone_number'] ?? $job->shipping_phone ?? ''),
             ]);
             $selectedContact = $contactOptions->first();
         }
@@ -1015,9 +1315,9 @@ class OrderWorkflowActionService
             $selectedAddress = (string) (($addressOptions->firstWhere('is_default', true) ?? $addressOptions->first())['value'] ?? '');
         }
 
-        $countryCode = trim((string) ($job->shipping_phone_country_code ?: data_get($selectedContact, 'country_code', '')));
-        $phoneNumber = trim((string) ($job->shipping_phone ?: data_get($selectedContact, 'phone', '')));
-        $address = trim((string) ($job->shipping_address ?: ($sourceAddress ? $this->shipmentAddressText($sourceAddress) : '')));
+        $countryCode = trim((string) ($latestShipmentMeta['phone_country_code'] ?? ($job->shipping_phone_country_code ?: data_get($selectedContact, 'country_code', ''))));
+        $phoneNumber = trim((string) ($latestShipmentMeta['phone_number'] ?? ($job->shipping_phone ?: data_get($selectedContact, 'phone', ''))));
+        $address = trim((string) ($latestShipmentMeta['address'] ?? ($job->shipping_address ?: ($sourceAddress ? $this->shipmentAddressText($sourceAddress) : ''))));
         $masterData = app(MasterDataService::class);
         $phoneCountryCodeOptions = $masterData->active('phone_country_code')
             ->map(fn ($record) => [
@@ -1037,7 +1337,7 @@ class OrderWorkflowActionService
             ->all();
 
         return [
-            'client_name' => trim((string) ($client?->name ?: 'Client')),
+            'client_name' => trim((string) ($latestShipmentMeta['client_name'] ?? ($client?->name ?: 'Client'))),
             'contact_name' => $contactName,
             'contact_type' => $contactType,
             'contact_selection' => (string) data_get($selectedContact, 'value', 'current'),
@@ -1046,11 +1346,11 @@ class OrderWorkflowActionService
             'phone_country_code_options' => $phoneCountryCodeOptions,
             'phone_number' => $phoneNumber,
             'address' => $address,
-            'city' => (string) ($sourceAddress?->city ?? ''),
-            'state' => (string) ($sourceAddress?->state ?? ''),
-            'country' => (string) ($sourceAddress?->country ?? $client?->country ?? ''),
+            'city' => (string) ($latestShipmentMeta['city'] ?? $sourceAddress?->city ?? ''),
+            'state' => (string) ($latestShipmentMeta['state'] ?? $sourceAddress?->state ?? ''),
+            'country' => (string) ($latestShipmentMeta['country'] ?? $sourceAddress?->country ?? $client?->country ?? ''),
             'country_options' => $countryOptions,
-            'postal_code' => trim((string) ($job->shipping_postal_code ?: $sourceAddress?->zip ?: '')),
+            'postal_code' => trim((string) ($latestShipmentMeta['postal_code'] ?? ($job->shipping_postal_code ?: $sourceAddress?->zip ?: ''))),
             'address_selection' => $selectedAddress,
             'address_options' => $addressOptions->values()->all(),
             'update_saved_contact' => false,
@@ -1097,6 +1397,32 @@ class OrderWorkflowActionService
         if (in_array($type, ['end_customer', 'other_contact'], true)) {
             (new \App\Actions\Clients\SaveClientDeliveryContact())->execute($actor, $job->client, $type, $name, $countryCode, $phone);
         }
+    }
+
+    private function validateShipmentCourier(string $carrier): void
+    {
+        $normalized = mb_strtolower(trim($carrier));
+        $allowed = app(MasterDataService::class)->active('courier')
+            ->contains(fn ($record) => mb_strtolower(trim((string) $record->name)) === $normalized);
+
+        if (! $allowed) {
+            throw ValidationException::withMessages([
+                'shipmentLabel' => 'Choose an active courier from Master Data.',
+            ]);
+        }
+    }
+
+    private function nextWorkflowInvoiceNumber(FlowJob $job): string
+    {
+        $workflowSequence = (int) $job->activities()
+            ->where('event', 'job.workflow_invoice_prepared')
+            ->count();
+        $financeSequence = (int) \App\Models\Invoice::query()
+            ->where('flow_job_id', $job->id)
+            ->max('sequence');
+        $sequence = max($workflowSequence, $financeSequence) + 1;
+
+        return sprintf('INV-%05d-%02d', (int) $job->id, $sequence);
     }
 
     /** @param array<string,mixed> $payload */

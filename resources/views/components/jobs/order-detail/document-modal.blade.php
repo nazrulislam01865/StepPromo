@@ -1,4 +1,4 @@
-@props(['job', 'task', 'availableDocuments' => collect(), 'source' => 'upload', 'upload' => null, 'existingDocumentId' => null, 'artworkRevision' => [], 'revisionDocumentIds' => [], 'context' => []])
+@props(['job', 'task', 'availableDocuments' => collect(), 'source' => 'upload', 'upload' => null, 'revisionUpload' => null, 'existingDocumentId' => null, 'artworkRevision' => [], 'revisionDocumentIds' => [], 'context' => []])
 @php
     $canUpload = (bool) ($context['canUploadDocument'] ?? false);
     $canLink = (bool) ($context['canLinkDocument'] ?? false);
@@ -6,6 +6,7 @@
     $automationKey = $workflowActions->automationKey($task);
     $prototypeUpload = in_array($automationKey, ['NEW_UPLOAD_PO', 'ART_PREPARE_UPLOAD', 'ART_SAMPLE_APPROVAL'], true);
     $allowMultipleUploads = $automationKey === 'ART_PREPARE_UPLOAD'
+        || $automationKey === 'NEW_UPLOAD_PO'
         || (bool) ($task->setupTemplate?->allow_multiple_documents ?? false);
     $hasExistingEvidence = $task->relationLoaded('documents') ? $task->documents->isNotEmpty() : false;
     $artworkRevisionActive = $automationKey === 'ART_PREPARE_UPLOAD' && (bool) ($artworkRevision['active'] ?? false);
@@ -24,35 +25,39 @@
         ? $allRevisionCandidates->reject(fn($document) => $selectedRevisionIds->contains((int) $document->id))->values()
         : collect();
     $revisionCount = $revisionDocuments->count();
-    // Keep Artwork bound to a multiple-file input because Livewire stores this
-    // field in an array property even when a selective revision needs one file.
+    // Normal Artwork uploads can still be multi-file. Selective revision replacements
+    // are intentionally chosen one-at-a-time under the exact source artwork.
     $inputAllowsMultiple = $allowMultipleUploads;
-    $uploadCopyPlural = $artworkRevisionActive ? $revisionCount > 1 : $allowMultipleUploads;
+    $uploadCopyPlural = $allowMultipleUploads;
+    $revisionItemsByDocumentId = collect($artworkRevision['items'] ?? [])->mapWithKeys(function ($item) {
+        $id = (int) data_get($item, 'document_id', 0);
+        return $id > 0 ? [$id => (array) $item] : [];
+    });
 
     $prototypeConfig = match ($automationKey) {
         'NEW_UPLOAD_PO' => [
-            'title' => 'Upload Purchase Order',
-            'label' => 'Purchase order file',
-            'copy' => 'Upload the client purchase order to begin processing this Order.',
-            'hint' => \App\Support\AttachmentUpload::helperText(20),
-            'button' => 'Upload Purchase Order',
+            'title' => $hasExistingEvidence ? 'Add other documents' : 'Upload Purchase Order',
+            'label' => $hasExistingEvidence ? 'Other purchase order documents' : 'Purchase order documents',
+            'copy' => $hasExistingEvidence
+                ? 'Add more documents to the completed Purchase Order task.'
+                : 'Upload the client purchase order and any supporting documents to begin processing this Order.',
+            'hint' => \App\Support\AttachmentUpload::helperText(20).' · Up to 10 files',
+            'button' => $hasExistingEvidence ? 'Add other documents' : 'Upload Purchase Order',
         ],
         'ART_PREPARE_UPLOAD' => [
-            'title' => $hasExistingEvidence ? 'Upload Revised Artwork' : 'Upload Artwork',
+            'title' => $artworkRevisionActive ? 'Upload Revised Artwork' : ($hasExistingEvidence ? 'Upload Revised Artwork' : 'Upload Artwork'),
             'label' => $artworkRevisionActive ? 'Replacement artwork files' : ($hasExistingEvidence ? 'Revised artwork files' : 'Artwork files'),
             'copy' => $artworkRevisionActive
                 ? ($revisionCount > 0
-                    ? 'Upload only the '.($revisionCount === 1 ? 'artwork file selected' : $revisionCount.' artwork files selected').' for revision. Unselected artwork remains unchanged automatically.'
-                    : 'Select the artwork that needs revision, then upload one replacement for each selected file. Unselected artwork remains unchanged automatically.')
+                    ? 'Upload each replacement directly under the artwork it replaces. '.$revisionCount.' artwork file'.($revisionCount === 1 ? ' is' : 's are').' waiting for replacement. Unselected artwork remains unchanged automatically.'
+                    : 'Upload one replacement directly under each artwork selected in the revision request.')
                 : ($hasExistingEvidence
                     ? 'Upload up to 10 corrected artwork files as one revision. The previous version remains in Order history.'
                     : 'Upload up to 10 artwork files together for internal review.'),
             'hint' => $artworkRevisionActive
-                ? ($revisionCount > 0
-                    ? \App\Support\AttachmentUpload::helperText(20).' · Exactly '.$revisionCount.' replacement'.($revisionCount === 1 ? '' : 's').' required'
-                    : 'Select artwork above first · '.\App\Support\AttachmentUpload::helperText(20))
+                ? \App\Support\AttachmentUpload::helperText(20).' · '.$revisionCount.' replacement'.($revisionCount === 1 ? '' : 's').' required'
                 : \App\Support\AttachmentUpload::helperText(20).' · Up to 10 files',
-            'button' => $artworkRevisionActive ? 'Upload Selected Revision' : ($hasExistingEvidence ? 'Upload Revised Artwork' : 'Upload Artwork'),
+            'button' => $artworkRevisionActive ? 'Upload Revised Artwork' : ($hasExistingEvidence ? 'Upload Revised Artwork' : 'Upload Artwork'),
         ],
         'ART_SAMPLE_APPROVAL' => [
             'title' => 'Upload Sample Approval',
@@ -69,7 +74,8 @@
             'button' => 'Add document',
         ],
     };
-    $selectedUploads = collect(is_array($upload) ? $upload : ($upload ? [$upload] : []))->filter()->values();
+    $effectiveUpload = $artworkRevisionActive ? $revisionUpload : $upload;
+    $selectedUploads = collect(is_array($effectiveUpload) ? $effectiveUpload : ($effectiveUpload ? [$effectiveUpload] : []))->filter()->values();
     $selectedUploadCount = $selectedUploads->count();
     $selectedUploadDetails = $selectedUploads->map(function ($file) {
         $name = $file->getClientOriginalName();
@@ -119,38 +125,117 @@
                         <div class="ft-artwork-revision-upload-plan">
                             <div class="ft-artwork-revision-upload-plan-head">
                                 <div>
-                                    <strong>Select artwork that needs revision</strong>
-                                    <span>Choose only the artwork file or files you are replacing now. Unselected artwork remains unchanged in the next version.</span>
+                                    <strong>Artwork selected for revision</strong>
+                                    <span>Upload one replacement under each artwork below. Files not listed here remain unchanged.</span>
                                 </div>
-                                <em>{{ $revisionCount }} selected</em>
+                                <em>{{ $selectedUploadCount }} / {{ $revisionCount }} ready</em>
                             </div>
 
-                            <div class="ft-artwork-revision-upload-selector-list">
-                                @foreach($allRevisionCandidates as $revisionCandidate)
-                                    @php $candidateExtension = strtoupper(pathinfo((string) $revisionCandidate->name, PATHINFO_EXTENSION) ?: 'FILE'); @endphp
-                                    <label class="ft-artwork-revision-upload-selector-item">
-                                        <input type="checkbox" wire:model.live="overviewTaskRevisionDocumentIds" value="{{ $revisionCandidate->id }}">
-                                        <span class="ft-artwork-revision-selector-check" aria-hidden="true">✓</span>
-                                        <x-ui.file-type-badge :extension="$candidateExtension" size="sm" />
-                                        <span class="ft-artwork-revision-upload-selector-copy">
-                                            <b title="{{ $revisionCandidate->name }}">{{ $revisionCandidate->name }}</b>
-                                            <small>{{ $candidateExtension }} · Version {{ max(1, (int) $revisionCandidate->version) }}</small>
-                                        </span>
-                                        <a href="{{ route('documents.open', $revisionCandidate) }}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open</a>
-                                    </label>
+                            <div class="ft-artwork-revision-replacement-list">
+                                @foreach($revisionDocuments as $revisionCandidate)
+                                    @php
+                                        $revisionDocumentId = (int) $revisionCandidate->id;
+                                        $candidateExtension = strtoupper(pathinfo((string) $revisionCandidate->name, PATHINFO_EXTENSION) ?: 'FILE');
+                                        $revisionItem = (array) ($revisionItemsByDocumentId[$revisionDocumentId] ?? []);
+                                        $revisionInstruction = trim((string) data_get($revisionItem, 'comment', ''));
+                                        $replacementFile = $revisionUpload[$revisionDocumentId] ?? $revisionUpload[(string) $revisionDocumentId] ?? null;
+                                        $replacementDetail = null;
+                                        if ($replacementFile) {
+                                            $replacementName = $replacementFile->getClientOriginalName();
+                                            $replacementDetail = [
+                                                'name' => $replacementName,
+                                                'type' => strtoupper((string) pathinfo($replacementName, PATHINFO_EXTENSION)) ?: 'FILE',
+                                                'size' => $replacementFile->getSize() >= 1048576
+                                                    ? number_format($replacementFile->getSize() / 1048576, 1).' MB'
+                                                    : number_format(max(1, (int) ceil($replacementFile->getSize() / 1024))).' KB',
+                                            ];
+                                        }
+                                    @endphp
+                                    <div
+                                        class="ft-artwork-revision-replacement-item {{ $replacementDetail ? 'has-replacement' : '' }}"
+                                        wire:key="artwork-revision-replacement-{{ $task->id }}-{{ $revisionDocumentId }}"
+                                    >
+                                        <div class="ft-artwork-revision-replacement-summary">
+                                            <div class="ft-artwork-revision-replacement-source">
+                                                <span class="ft-artwork-revision-selector-check is-checked" aria-hidden="true">✓</span>
+                                                <x-ui.file-type-badge :extension="$candidateExtension" size="sm" />
+                                                <span class="ft-artwork-revision-upload-selector-copy">
+                                                    <b title="{{ $revisionCandidate->name }}">{{ $revisionCandidate->name }}</b>
+                                                    <small>{{ $candidateExtension }} · Version {{ max(1, (int) $revisionCandidate->version) }}</small>
+                                                </span>
+                                            </div>
+                                            <div class="ft-artwork-revision-replacement-actions">
+                                                @if($replacementDetail)
+                                                    <span>Ready</span>
+                                                @endif
+                                                <a href="{{ route('documents.open', $revisionCandidate) }}" target="_blank" rel="noopener">Open</a>
+                                            </div>
+                                        </div>
+
+                                        <div class="ft-artwork-revision-replacement-details">
+                                            @if($revisionInstruction !== '')
+                                                <div class="ft-artwork-revision-replacement-change">
+                                                    <strong>Required change</strong>
+                                                    <p>{{ $revisionInstruction }}</p>
+                                                </div>
+                                            @endif
+
+                                            <div class="ft-artwork-revision-replacement-upload">
+                                                <div class="ft-artwork-revision-replacement-upload-head">
+                                                    <div>
+                                                        <strong>Replacement artwork <b>*</b></strong>
+                                                        <small>Upload the corrected file for this artwork only.</small>
+                                                    </div>
+                                                </div>
+
+                                                @if($replacementDetail)
+                                                    <div class="ft-order-attachment-selected-file ft-artwork-revision-replacement-selected-file">
+                                                        <x-ui.file-type-badge :extension="$replacementDetail['type']" size="sm" />
+                                                        <span class="ft-order-attachment-selected-copy">
+                                                            <strong title="{{ $replacementDetail['name'] }}">{{ $replacementDetail['name'] }}</strong>
+                                                            <small>{{ $replacementDetail['type'] }} · {{ $replacementDetail['size'] }} · Ready to replace this artwork</small>
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            wire:click="removeOverviewTaskDocumentUpload({{ $revisionDocumentId }})"
+                                                            wire:loading.attr="disabled"
+                                                            wire:target="overviewTaskRevisionUpload.{{ $revisionDocumentId }},removeOverviewTaskDocumentUpload({{ $revisionDocumentId }})"
+                                                        >Remove</button>
+                                                    </div>
+                                                @endif
+
+                                                <label class="ft-order-task-document-dropzone ft-order-attachment-dropzone ft-artwork-revision-replacement-dropzone {{ $replacementDetail ? 'is-compact' : '' }}" data-file-dropzone>
+                                                    <input
+                                                        type="file"
+                                                        wire:model="overviewTaskRevisionUpload.{{ $revisionDocumentId }}"
+                                                        accept="{{ \App\Support\AttachmentUpload::accept() }}"
+                                                        aria-label="Choose replacement artwork for {{ $revisionCandidate->name }}"
+                                                        title="Choose replacement file"
+                                                    >
+                                                    <svg class="ft-order-attachment-upload-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 16l-4-4-4 4M12 12v9M20.4 17.5A5 5 0 0 0 18 8.2 7 7 0 0 0 4.3 10.8 4.5 4.5 0 0 0 5.5 19H7"/></svg>
+                                                    @if($replacementDetail)
+                                                        <strong>Choose a different replacement</strong>
+                                                        <b>Drag &amp; drop or <span>browse</span></b>
+                                                    @else
+                                                        <strong>Drag &amp; drop a file here</strong>
+                                                        <b>or choose from your computer</b>
+                                                        <span class="ft-order-attachment-browse">Browse file</span>
+                                                    @endif
+                                                    <small data-drop-status>{{ \App\Support\AttachmentUpload::helperText(20) }}</small>
+                                                </label>
+
+                                                <div class="ft-artwork-revision-replacement-uploading" wire:loading wire:target="overviewTaskRevisionUpload.{{ $revisionDocumentId }}">Uploading replacement…</div>
+                                                @error('overviewTaskRevisionUpload.'.$revisionDocumentId)<p class="validation-error">{{ $message }}</p>@enderror
+                                            </div>
+                                        </div>
+                                    </div>
                                 @endforeach
                             </div>
                             @error('overviewTaskRevisionDocumentIds')<p class="validation-error">{{ $message }}</p>@enderror
-
-                            @if(filled($artworkRevision['comment'] ?? null))
-                                <div class="ft-artwork-revision-upload-instruction">
-                                    <b>Revision instruction:</b>
-                                    <div class="ft-rich-text-content"><x-ui.mention-text :text="$artworkRevision['comment']" /></div>
-                                </div>
-                            @endif
                         </div>
                     @endif
 
+                    @unless($artworkRevisionActive)
                     @if($selectedUploads->isNotEmpty())
                         <div class="ft-order-attachment-selected-count">{{ $selectedUploadCount }} file{{ $selectedUploadCount === 1 ? '' : 's' }} selected{{ $artworkRevisionActive ? ' · '.$selectedUploadCount.' of '.$revisionCount.' replacements' : ($automationKey === 'ART_PREPARE_UPLOAD' ? ' · One artwork version' : '') }}</div>
                         @foreach($selectedUploadDetails as $index => $selectedUpload)
@@ -164,7 +249,7 @@
                                     <strong class="{{ $prototypeUpload ? 'ft-prototype-selected-file-name' : '' }}" title="{{ $selectedUpload['name'] }}">{{ $selectedUpload['name'] }}</strong>
                                     <small>{{ $selectedUpload['type'] }} · {{ $selectedUpload['size'] }} · Ready to upload</small>
                                 </span>
-                                <button type="button" wire:click="removeOverviewTaskDocumentUpload({{ $index }})" wire:loading.attr="disabled" wire:target="overviewTaskDocumentUpload,removeOverviewTaskDocumentUpload({{ $index }})">Remove</button>
+                                <button type="button" wire:click="removeOverviewTaskDocumentUpload({{ $index }})" wire:loading.attr="disabled" wire:target="overviewTaskDocumentUpload,overviewTaskRevisionUpload,removeOverviewTaskDocumentUpload({{ $index }})">Remove</button>
                             </div>
                         @endforeach
                     @else
@@ -172,7 +257,7 @@
                     @endif
 
                     <label class="ft-order-task-document-dropzone ft-order-attachment-dropzone {{ $selectedUploads->isNotEmpty() ? 'is-compact' : '' }}">
-                        <input type="file" wire:model="overviewTaskDocumentUpload" @if($inputAllowsMultiple) multiple @endif accept="{{ \App\Support\AttachmentUpload::accept() }}" aria-label="{{ $uploadCopyPlural ? 'Choose files to upload' : 'Choose a file to upload' }}" title="{{ $uploadCopyPlural ? 'Choose files' : 'Choose file' }}">
+                        <input type="file" wire:model="{{ $artworkRevisionActive ? 'overviewTaskRevisionUpload' : 'overviewTaskDocumentUpload' }}" @if($inputAllowsMultiple) multiple @endif accept="{{ \App\Support\AttachmentUpload::accept() }}" aria-label="{{ $uploadCopyPlural ? 'Choose files to upload' : 'Choose a file to upload' }}" title="{{ $uploadCopyPlural ? 'Choose files' : 'Choose file' }}">
                         <svg class="ft-order-attachment-upload-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 16l-4-4-4 4M12 12v9M20.4 17.5A5 5 0 0 0 18 8.2 7 7 0 0 0 4.3 10.8 4.5 4.5 0 0 0 5.5 19H7"/></svg>
                         @if($selectedUploads->isNotEmpty())
                             <strong>{{ $uploadCopyPlural ? 'Choose a different file set' : 'Choose a different file' }}</strong>
@@ -214,12 +299,18 @@
                         </div>
                     </div>
 
+                    @endunless
                     @error('overviewTaskDocumentUpload')
                         <p class="validation-error">
                             {{ $message }}
                         </p>
                     @enderror
                     @error('overviewTaskDocumentUpload.*')
+                        <p class="validation-error">
+                            {{ $message }}
+                        </p>
+                    @enderror
+                    @error('overviewTaskRevisionUpload')
                         <p class="validation-error">
                             {{ $message }}
                         </p>
@@ -241,8 +332,8 @@
                 class="primary"
                 wire:click="saveOverviewTaskDocument"
                 wire:loading.attr="disabled"
-                wire:target="saveOverviewTaskDocument,overviewTaskDocumentUpload"
-                @disabled($source === 'upload' ? ($selectedUploads->isEmpty() || ($artworkRevisionActive && $revisionCount < 1)) : !$existingDocumentId)
+                wire:target="saveOverviewTaskDocument,overviewTaskDocumentUpload,overviewTaskRevisionUpload"
+                @disabled($source === 'upload' ? ($artworkRevisionActive ? ($revisionCount < 1 || $selectedUploadCount !== $revisionCount) : $selectedUploads->isEmpty()) : !$existingDocumentId)
             >
                 <span
                     wire:loading.remove

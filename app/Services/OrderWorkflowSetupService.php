@@ -60,7 +60,7 @@ class OrderWorkflowSetupService
             [
                 'key' => 'new', 'name' => 'New Order', 'short' => 'New Order', 'color' => '#2d72d9',
                 'tasks' => [
-                    self::task('NEW_UPLOAD_PO', 'Upload Purchase Order', 'Order Team', 0, true, 'Purchase Order', true, false, "Upload the customer's purchase order."),
+                    self::task('NEW_UPLOAD_PO', 'Upload Purchase Order', 'Order Team', 0, true, 'Purchase Order', true, true, "Upload the customer's purchase order and any supporting documents."),
                     self::task('NEW_SEND_PO_ARTWORK', 'Send Purchase Order to Artwork Team', 'Order Team', 0),
                 ],
             ],

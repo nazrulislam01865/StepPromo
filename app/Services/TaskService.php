@@ -64,6 +64,45 @@ class TaskService
         return $task->refresh();
     }
 
+    /**
+     * Assign a downstream task as a workflow side effect without applying the
+     * manual assignee permission gate to the person sending the handoff.
+     */
+    public function assignFromWorkflowHandoff(Task $task, User $assignee, User $actor): Task
+    {
+        $task = Task::query()->findOrFail($task->id);
+        $previousAssigneeId = $task->assignee_id ? (int) $task->assignee_id : null;
+        if ($previousAssigneeId === (int) $assignee->id) return $task;
+
+        $previousAssigneeName = $previousAssigneeId
+            ? (User::query()->find($previousAssigneeId)?->name ?? 'Unassigned')
+            : 'Unassigned';
+
+        $task->update(['assignee_id' => $assignee->id]);
+        FlowJobMember::firstOrCreate(
+            ['flow_job_id' => $task->flow_job_id, 'user_id' => $assignee->id],
+            ['access_level' => 'member', 'can_manage_tasks' => false, 'can_upload_documents' => true, 'can_view_financials' => false],
+        );
+
+        $this->record(
+            $task,
+            $actor,
+            'task.assignee_auto_assigned',
+            $assignee->name.' was automatically assigned after the Purchase Order handoff.',
+            [
+                'field' => 'assignee_id',
+                'old' => $previousAssigneeName,
+                'new' => $assignee->name,
+                'old_assignee_id' => $previousAssigneeId,
+                'new_assignee_id' => (int) $assignee->id,
+                'automatic' => true,
+                'trigger' => 'purchase_order_handoff',
+            ],
+        );
+
+        return $task->refresh();
+    }
+
     public function visibleQuery(User $user): Builder
     {
         return app(AccessControlService::class)->applyTaskScope(Task::query(), $user);

@@ -4158,3 +4158,63 @@
         max-width: 100%;
     }
 }
+
+/* 2026-09-01: pair each Artwork revision comment with its own supporting files. */
+.ft-order-prototype-detail .ft-order-artwork-revision-item-list {
+    display: grid;
+    gap: 12px;
+    margin-top: 17px
+}
+
+.ft-order-prototype-detail .ft-order-artwork-revision-item {
+    border: 1px solid #f0dfe2;
+    border-radius: 9px;
+    background: rgba(255,255,255,.72);
+    padding: 11px
+}
+
+.ft-order-prototype-detail .ft-order-artwork-revision-item-artwork {
+    min-width: 0
+}
+
+.ft-order-prototype-detail .ft-order-artwork-revision-pair-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
+    margin-top: 11px
+}
+
+.ft-order-prototype-detail .ft-order-artwork-revision-pair-grid .ft-order-artwork-revision-supporting-field {
+    grid-column: auto
+}
+
+.ft-order-prototype-detail .ft-order-artwork-revision-pair-grid .ft-order-artwork-revision-change,
+.ft-order-prototype-detail .ft-order-artwork-revision-no-support,
+.ft-order-prototype-detail .ft-order-artwork-revision-pair-grid .ft-order-artwork-revision-reviewer-file-list {
+    min-height: 57px
+}
+
+.ft-order-prototype-detail .ft-order-artwork-revision-no-support {
+    display: flex;
+    align-items: center;
+    border: 1px solid #dfe4e9;
+    border-radius: 8px;
+    background: #fff;
+    padding: 10px 12px;
+    color: #8490a0;
+    font-size: .625rem
+}
+
+.ft-order-prototype-detail .ft-order-artwork-revision-empty-copy {
+    color: #8490a0
+}
+
+@media (max-width: 760px) {
+    .ft-order-prototype-detail .ft-order-artwork-revision-pair-grid {
+        grid-template-columns: 1fr
+    }
+}
+
+.ft-order-prototype-detail .ft-order-artwork-revision-pair-grid .ft-order-artwork-revision-reviewer-file-list {
+    grid-template-columns: 1fr
+}

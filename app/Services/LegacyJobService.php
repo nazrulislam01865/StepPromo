@@ -913,6 +913,9 @@ class LegacyJobService
             'shippingSourceAddress:id,client_id,label,recipient,address_line1,suite,city,state,zip,country,is_default,sort_order',
             'latestShipmentInformationActivity:activities.id,activities.subject_type,activities.subject_id,activities.event,activities.meta,activities.created_at',
             'latestCourierLabelActivity:activities.id,activities.subject_type,activities.subject_id,activities.event,activities.meta,activities.created_at',
+            'workflowEmailActivities:activities.id,activities.subject_type,activities.subject_id,activities.user_id,activities.event,activities.description,activities.meta,activities.created_at',
+            'workflowInvoiceActivities:activities.id,activities.subject_type,activities.subject_id,activities.user_id,activities.event,activities.description,activities.meta,activities.created_at',
+            'invoices',
             'tasks' => fn ($query) => app(AccessControlService::class)
                 ->applyTaskScope($query, $user)
                 ->with([
@@ -1053,6 +1056,28 @@ class LegacyJobService
             ->filter(fn ($document) => (int) ($document->task_id ?? 0) > 0)
             ->groupBy(fn ($document) => (int) $document->task_id);
 
+        $appliedRevisionActivityIds = $job->activities()
+            ->where('event', 'job.artwork_revision_applied')
+            ->latest('id')
+            ->limit(100)
+            ->get()
+            ->map(fn ($activity) => (int) data_get($activity->meta, 'revision_activity_id', 0))
+            ->filter()
+            ->unique()
+            ->values();
+
+        // The current Artwork set may contain mixed file versions after a
+        // selective revision. Attach it directly to the upload task so every
+        // Order-detail surface renders accepted files at their existing version
+        // and only replaced files at their incremented version.
+        foreach ($artworkUploadTasks as $artworkUploadTask) {
+            $taskDocuments = collect($documentsByTask->get((int) $artworkUploadTask->id, collect()))->values();
+            $artworkUploadTask->setRelation(
+                'currentArtworkDocuments',
+                app(DocumentService::class)->currentArtworkDocuments($artworkUploadTask, $taskDocuments),
+            );
+        }
+
         $notesByTask = [];
         foreach ($notes as $note) {
             $targetTaskId = (int) data_get($note->meta, 'target_task_id', 0);
@@ -1096,11 +1121,12 @@ class LegacyJobService
             // been answered and the panel must disappear from the task row.
             // The activity itself stays in Order history for audit purposes.
             $sourceArtworkVersion = max(0, (int) data_get($note->meta, 'source_artwork_version', 0));
-            $hasReplacementArtwork = $sourceArtworkVersion > 0
-                ? (int) ($taskDocuments->max('version') ?? 0) > $sourceArtworkVersion
-                : ($referenceDocument
-                    ? $taskDocuments->contains(fn ($document) => (int) $document->id > (int) $referenceDocument->id)
-                    : $taskDocuments->contains(fn ($document) => $document->created_at && $note->created_at && $document->created_at->gt($note->created_at)));
+            $hasReplacementArtwork = $appliedRevisionActivityIds->contains((int) $note->id)
+                || ($sourceArtworkVersion > 0
+                    ? (int) ($taskDocuments->max('version') ?? 0) > $sourceArtworkVersion
+                    : ($referenceDocument
+                        ? $taskDocuments->contains(fn ($document) => (int) $document->id > (int) $referenceDocument->id)
+                        : $taskDocuments->contains(fn ($document) => $document->created_at && $note->created_at && $document->created_at->gt($note->created_at))));
 
             if ($hasReplacementArtwork) {
                 continue;

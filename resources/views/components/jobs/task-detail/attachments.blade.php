@@ -3,24 +3,13 @@
                 $isArtworkUploadTask = $taskAutomationKey === 'ART_PREPARE_UPLOAD';
                 $taskAttachmentDocuments = $task->documents->sortByDesc('created_at')->values();
 
-                // Keep Task Details in parity with Order Details: show every file
-                // in the newest artwork revision and keep older revisions in history.
-                $artworkVersionDocuments = $isArtworkUploadTask
-                    ? $taskAttachmentDocuments
-                        ->sortBy(function ($document) {
-                            $version = (int) ($document->version ?? 0);
-
-                            return [
-                                $version > 0 ? $version : 999999,
-                                optional($document->created_at)->timestamp ?? 0,
-                                (int) $document->id,
-                            ];
-                        })
-                        ->values()
-                    : collect();
-                $latestArtworkVersion = max(0, (int) ($artworkVersionDocuments->max('version') ?? 0));
-                $latestArtworkDocuments = $latestArtworkVersion > 0
-                    ? $artworkVersionDocuments->where('version', $latestArtworkVersion)->sortBy('id')->values()
+                // Current Artwork can contain mixed versions after a selective
+                // revision. Accepted files keep their existing version; only the
+                // files actually replaced receive the next version number.
+                $latestArtworkDocuments = $isArtworkUploadTask
+                    ? ($task->relationLoaded('currentArtworkDocuments')
+                        ? collect($task->getRelation('currentArtworkDocuments'))->sortBy('id')->values()
+                        : app(\App\Services\DocumentService::class)->currentArtworkDocuments($task, $taskAttachmentDocuments))
                     : collect();
                 $visibleTaskDocuments = $isArtworkUploadTask
                     ? $latestArtworkDocuments

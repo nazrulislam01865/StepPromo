@@ -25,24 +25,13 @@
         ->filter()
         ->unique()
         ->values();
-    // Artwork files selected together share a version. Show the complete latest
-    // revision set while older revisions remain available from version history.
-    $artworkVersionDocuments = $isArtworkUploadTask
-        ? $taskDocuments
-            ->sortBy(function ($document) {
-                $version = (int) ($document->version ?? 0);
-
-                return [
-                    $version > 0 ? $version : 999999,
-                    optional($document->created_at)->timestamp ?? 0,
-                    (int) $document->id,
-                ];
-            })
-            ->values()
-        : collect();
-    $latestArtworkVersion = max(0, (int) ($artworkVersionDocuments->max('version') ?? 0));
-    $latestArtworkDocuments = $latestArtworkVersion > 0
-        ? $artworkVersionDocuments->where('version', $latestArtworkVersion)->sortBy('id')->values()
+    // Selective Artwork revision is file-specific: accepted files keep their
+    // previous version while only replaced files increment. Use the hydrated
+    // current set instead of assuming every current file shares max(version).
+    $latestArtworkDocuments = $isArtworkUploadTask
+        ? ($task->relationLoaded('currentArtworkDocuments')
+            ? collect($task->getRelation('currentArtworkDocuments'))->sortBy('id')->values()
+            : app(\App\Services\DocumentService::class)->currentArtworkDocuments($task, $taskDocuments))
         : collect();
     $latestArtworkDocument = $latestArtworkDocuments->last();
     $resourceDocuments = $isArtworkUploadTask
@@ -69,6 +58,30 @@
     $workflowAction = data_get($context, 'taskActions.'.(int) $task->id, []);
     $workflowActionLabel = (string) ($workflowAction['label'] ?? 'Take action');
     $workflowActionType = (string) ($workflowAction['type'] ?? 'workflow');
+    $workflowEmailStatus = (array) data_get($context, 'workflowEmailStatuses.'.(int) $task->id, []);
+    $workflowInvoice = (array) data_get($context, 'workflowInvoices.'.(int) $task->id, []);
+    $workflowInvoiceId = (int) ($workflowInvoice['id'] ?? 0);
+    $workflowInvoicePdfName = trim((string) ($workflowInvoice['pdf_name'] ?? ''));
+    $emailResendFeedback = (array) data_get($context, 'workflowEmailResendFeedback.'.(int) $task->id, []);
+    $emailResendFeedbackType = strtolower(trim((string) ($emailResendFeedback['type'] ?? '')));
+    $emailResendFeedbackMessage = trim((string) ($emailResendFeedback['message'] ?? ''));
+    $emailResendFeedbackStatus = strtolower(trim((string) ($emailResendFeedback['email_status'] ?? '')));
+    $isArtworkEmailTask = $automationKey === 'ART_SEND_ORDER_TEAM';
+    $isInvoiceEmailTask = $automationKey === 'BILL_SEND';
+    $isTrackedEmailTask = $isArtworkEmailTask || $isInvoiceEmailTask;
+    $emailDeliveryStatus = strtolower(trim((string) ($workflowEmailStatus['status'] ?? '')));
+    if (in_array($emailResendFeedbackStatus, ['sent', 'failed', 'not_sent'], true)) $emailDeliveryStatus = $emailResendFeedbackStatus;
+    // Completed legacy rows may predate delivery tracking. Show an explicit
+    // Not Sent state instead of silently hiding email status.
+    if ($isTrackedEmailTask && $mode === 'done' && $emailDeliveryStatus === '') $emailDeliveryStatus = 'not_sent';
+    $emailDeliveryFailed = $isTrackedEmailTask && $emailDeliveryStatus === 'failed';
+    $emailDeliverySent = $isTrackedEmailTask && $emailDeliveryStatus === 'sent';
+    $emailDeliveryNotSent = $isTrackedEmailTask && $emailDeliveryStatus === 'not_sent';
+    $emailCanResend = $isTrackedEmailTask
+        && $mode === 'done'
+        && $canEditTask
+        && (bool) ($workflowEmailStatus['resendable'] ?? ! empty($workflowEmailStatus['to_emails'] ?? []));
+    $emailResourceLabel = $isInvoiceEmailTask ? 'invoice' : 'artwork';
     $taskColor = \App\Support\MasterColor::normalize((string) ($task->setupTemplate?->color ?? $task->template?->color ?? ''))
         ?: \App\Support\MasterColor::normalize((string) ($task->phase?->color ?? ''))
         ?: '#2563EB';
@@ -144,7 +157,25 @@
 
     <div class="task-state ft-order-task-state">
         <span class="task-status ft-order-task-status {{ $statusClass }}">{{ $displayStatus }}</span>
-        @if($taskDocuments->isNotEmpty())
+        @if($isTrackedEmailTask && $mode === 'done')
+            @if($emailDeliverySent)
+                <span class="ft-order-task-email-status is-sent" title="The latest {{ $emailResourceLabel }} email was sent successfully.">Email Sent</span>
+            @elseif($emailDeliveryFailed)
+                <span class="ft-order-task-email-status is-failed" title="The {{ $emailResourceLabel }} email did not reach the selected recipients. The completed task can still resend it.">Email Failed</span>
+            @elseif($emailDeliveryNotSent)
+                <span class="ft-order-task-email-status is-not-sent" title="The task was completed without a successful {{ $emailResourceLabel }} email delivery.">Email Not Sent</span>
+            @endif
+            @if($emailResendFeedbackMessage !== '')
+                <div class="ft-order-task-email-feedback {{ $emailResendFeedbackType === 'success' ? 'is-success' : 'is-error' }}" role="status" aria-live="polite">{{ $emailResendFeedbackMessage }}</div>
+            @endif
+        @endif
+        @if($workflowInvoiceId > 0)
+            <div class="card-sub ft-order-task-invoice-file">
+                <span aria-hidden="true">📎</span>
+                <a href="{{ route('invoices.pdf.open', $workflowInvoiceId) }}" target="_blank" rel="noopener">{{ $workflowInvoicePdfName !== '' ? $workflowInvoicePdfName : (($workflowInvoice['invoice_number'] ?? 'Invoice').'.pdf') }}</a>
+                <a href="{{ route('invoices.pdf.download', $workflowInvoiceId) }}" class="ft-order-task-invoice-download">Download</a>
+            </div>
+        @elseif($taskDocuments->isNotEmpty())
             @php $latestTaskDocument = $isArtworkUploadTask ? $latestArtworkDocument : $taskDocuments->first(); @endphp
             <div class="card-sub">
                 📎 {{ $latestTaskDocument->name }}
@@ -176,7 +207,20 @@
                 @endif
             @endif
         @elseif($mode === 'done')
-            <button type="button" class="btn small" wire:click="viewTask({{ $task->id }})">View</button>
+            @if($automationKey === 'NEW_UPLOAD_PO' && $canEditTask && ($canUploadDocument || $canLinkDocument))
+                <button type="button" class="btn small" wire:click="openOverviewTaskDocumentModal({{ $task->id }})">Add other documents</button>
+            @elseif($isTrackedEmailTask && $canEditTask)
+                @if($emailCanResend)
+                    @php $resendMethod = $isInvoiceEmailTask ? 'resendCompletedInvoiceEmail' : 'resendCompletedArtworkEmail'; @endphp
+                    <button type="button" class="btn small primary ft-order-task-resend-email" wire:click="{{ $resendMethod }}({{ $task->id }})" wire:loading.attr="disabled" wire:target="{{ $resendMethod }}({{ $task->id }})">
+                        <span wire:loading.remove wire:target="{{ $resendMethod }}({{ $task->id }})">Resend</span>
+                        <span wire:loading wire:target="{{ $resendMethod }}({{ $task->id }})">Sending...</span>
+                    </button>
+                @endif
+                <button type="button" class="btn small" wire:click="viewTask({{ $task->id }})">View</button>
+            @else
+                <button type="button" class="btn small" wire:click="viewTask({{ $task->id }})">View</button>
+            @endif
         @endif
     </div>
 </article>

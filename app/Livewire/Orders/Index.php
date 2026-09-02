@@ -65,8 +65,12 @@ class Index extends Component
     public bool $showOrderWorkflowActionModal = false;
     public ?int $orderWorkflowActionTaskId = null;
     public string $orderWorkflowActionComment = '';
-    /** Optional reference files attached to an artwork revision request. */
-    public array $orderWorkflowActionAttachments = [];
+    /** Legacy single revision attachment state kept for non-revision compatibility. */
+    public $orderWorkflowActionAttachment = null;
+    /** Per-artwork required-change text keyed by source document id. */
+    public array $orderWorkflowActionRevisionComments = [];
+    /** Per-artwork supporting uploads keyed by source document id. */
+    public array $orderWorkflowActionRevisionAttachments = [];
     public string $orderWorkflowActionStep = 'main';
     /** @var array<string,mixed> */
     public array $orderWorkflowActionPayload = [];
@@ -79,6 +83,7 @@ class Index extends Component
     public string $overviewTaskDocumentSource = 'upload';
     /** Files selected in the Order workflow upload modal. */
     public array $overviewTaskDocumentUpload = [];
+    public array $overviewTaskRevisionUpload = [];
     /** Artwork files selected for replacement in an active revision upload. */
     public array $overviewTaskRevisionDocumentIds = [];
     public ?int $overviewTaskExistingDocumentId = null;
@@ -451,7 +456,9 @@ class Index extends Component
         $this->showOverviewTaskDocumentModal = false;
         $this->orderWorkflowActionTaskId = $taskId;
         $this->orderWorkflowActionComment = '';
-        $this->orderWorkflowActionAttachments = [];
+        $this->orderWorkflowActionAttachment = null;
+        $this->orderWorkflowActionRevisionComments = [];
+        $this->orderWorkflowActionRevisionAttachments = [];
         $this->orderWorkflowActionStep = 'main';
         $this->orderWorkflowActionPayload = $workflowActions->initialPayload($task, $task->job);
         $this->resetOrderWorkflowEmailFallbackState();
@@ -463,7 +470,7 @@ class Index extends Component
             }
         }
 
-        $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionAttachments', 'orderWorkflowActionAttachments.*', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
+        $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionAttachment', 'orderWorkflowActionRevisionComments', 'orderWorkflowActionRevisionAttachments', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
         $this->showOrderWorkflowActionModal = true;
     }
 
@@ -472,12 +479,14 @@ class Index extends Component
         $this->showOrderWorkflowActionModal = false;
         $this->orderWorkflowActionTaskId = null;
         $this->orderWorkflowActionComment = '';
-        $this->orderWorkflowActionAttachments = [];
+        $this->orderWorkflowActionAttachment = null;
+        $this->orderWorkflowActionRevisionComments = [];
+        $this->orderWorkflowActionRevisionAttachments = [];
         $this->orderWorkflowActionStep = 'main';
         $this->orderWorkflowActionPayload = [];
         $this->listActionOrderId = null;
         $this->resetOrderWorkflowEmailFallbackState();
-        $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionAttachments', 'orderWorkflowActionAttachments.*', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
+        $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionAttachment', 'orderWorkflowActionRevisionComments', 'orderWorkflowActionRevisionAttachments', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
     }
 
     public function submitOrderWorkflowAction(string $decision = 'confirm'): void
@@ -498,8 +507,12 @@ class Index extends Component
             && in_array($key, ['ART_INTERNAL_REVIEW', 'ART_CLIENT_ERP_DECISION'], true)) {
             $this->orderWorkflowActionStep = 'revision';
             $this->orderWorkflowActionComment = '';
-            $this->orderWorkflowActionAttachments = [];
-            $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionAttachments', 'orderWorkflowActionAttachments.*', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
+            $this->orderWorkflowActionAttachment = null;
+            $this->orderWorkflowActionRevisionComments = [];
+            $this->orderWorkflowActionRevisionAttachments = [];
+            $this->orderWorkflowActionPayload['revision_document_ids'] = [];
+            $this->orderWorkflowActionPayload['revision_items'] = [];
+            $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionAttachment', 'orderWorkflowActionRevisionComments', 'orderWorkflowActionRevisionAttachments', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
             return;
         }
 
@@ -530,14 +543,40 @@ class Index extends Component
         $isArtworkRevisionSubmission = $this->orderWorkflowActionStep === 'revision'
             && $decision === 'revise'
             && in_array($key, ['ART_INTERNAL_REVIEW', 'ART_CLIENT_ERP_DECISION'], true);
+        $revisionAttachments = [];
         if ($isArtworkRevisionSubmission) {
             $this->validate([
-                'orderWorkflowActionAttachments' => ['array', 'max:10'],
-                'orderWorkflowActionAttachments.*' => AttachmentUpload::itemRules(AttachmentUpload::DOCUMENTS_WITH_AI, 20480),
+                'orderWorkflowActionPayload.revision_document_ids' => ['required', 'array', 'min:1'],
+                'orderWorkflowActionPayload.revision_document_ids.*' => ['integer', 'distinct'],
             ], [
-                'orderWorkflowActionAttachments.max' => 'You can attach a maximum of 10 files.',
-                'orderWorkflowActionAttachments.*.max' => 'Each attachment must be 20 MB or smaller.',
+                'orderWorkflowActionPayload.revision_document_ids.required' => 'Select at least one artwork file that needs revision.',
+                'orderWorkflowActionPayload.revision_document_ids.min' => 'Select at least one artwork file that needs revision.',
             ]);
+
+            $revisionIds = collect($this->orderWorkflowActionPayload['revision_document_ids'] ?? [])
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn ($id) => $id > 0)
+                ->unique()
+                ->values();
+            $rules = [];
+            $messages = [];
+            foreach ($revisionIds as $documentId) {
+                $rules['orderWorkflowActionRevisionComments.'.$documentId] = ['required', 'string', 'max:10000'];
+                $rules['orderWorkflowActionRevisionAttachments.'.$documentId] = ['nullable', 'array', 'max:10'];
+                $rules['orderWorkflowActionRevisionAttachments.'.$documentId.'.*'] = AttachmentUpload::itemRules(AttachmentUpload::DOCUMENTS_WITH_AI, 20480);
+                $messages['orderWorkflowActionRevisionComments.'.$documentId.'.required'] = 'Describe the required change for this artwork.';
+                $messages['orderWorkflowActionRevisionAttachments.'.$documentId.'.max'] = 'You can attach a maximum of 10 supporting files to each artwork.';
+                $messages['orderWorkflowActionRevisionAttachments.'.$documentId.'.*.max'] = 'Each supporting file must be 20 MB or smaller.';
+            }
+            if ($rules !== []) $this->validate($rules, $messages);
+
+            $this->orderWorkflowActionPayload['revision_items'] = $revisionIds->map(fn ($documentId) => [
+                'document_id' => $documentId,
+                'comment' => (string) ($this->orderWorkflowActionRevisionComments[$documentId] ?? ''),
+            ])->all();
+            $revisionAttachments = $revisionIds->mapWithKeys(fn ($documentId) => [
+                $documentId => array_values(array_filter((array) ($this->orderWorkflowActionRevisionAttachments[$documentId] ?? []))),
+            ])->all();
         }
 
         try {
@@ -547,7 +586,7 @@ class Index extends Component
                 $decision,
                 $this->orderWorkflowActionComment,
                 $this->orderWorkflowActionPayload,
-                $isArtworkRevisionSubmission ? $this->orderWorkflowActionAttachments : [],
+                $isArtworkRevisionSubmission ? $revisionAttachments : [],
             );
         } catch (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $exception) {
             if (! $isArtworkRevisionSubmission || $exception->getStatusCode() !== 422) {
@@ -556,8 +595,8 @@ class Index extends Component
 
             $message = trim((string) $exception->getMessage());
             $this->addError(
-                'orderWorkflowActionAttachments',
-                $message !== '' ? $message : 'One of the attachments could not be verified. Re-export it and try again.',
+                'orderWorkflowActionRevisionAttachments',
+                $message !== '' ? $message : 'One of the supporting files could not be verified. Re-export it and try again.',
             );
             return;
         } catch (EmailDeliveryException $exception) {
@@ -565,11 +604,13 @@ class Index extends Component
                 throw $exception;
             }
 
-            $preview = app(OrderWorkflowEmailService::class)->preview($task, auth()->user());
+            $preview = app(OrderWorkflowEmailService::class)->preview($task, auth()->user(), $this->orderWorkflowActionPayload);
             $trackingId = '';
             if (preg_match('/Reference:\s*([A-Za-z0-9-]+)/', $exception->getMessage(), $matches) === 1) {
                 $trackingId = (string) ($matches[1] ?? '');
             }
+            $previewPrimary = collect($preview['recipients'] ?? [])->first();
+            $previewCc = collect($preview['cc_recipients'] ?? []);
             $failure = [
                 'task_id' => (int) $task->id,
                 'flow_job_id' => (int) $task->flow_job_id,
@@ -578,6 +619,29 @@ class Index extends Component
                 'document_name' => (string) ($preview['document_name'] ?? ''),
                 'attempts' => 3,
                 'tracking_id' => $trackingId,
+                'primary_recipient_user_id' => ($previewPrimary && ! ($previewPrimary['external'] ?? false))
+                    ? (int) ($previewPrimary['id'] ?? 0)
+                    : 0,
+                'assignment_user_id' => (int) ($preview['assignment_user_id'] ?? 0),
+                'external_primary_recipient' => ($previewPrimary && ($previewPrimary['external'] ?? false))
+                    ? [
+                        'name' => trim((string) ($previewPrimary['name'] ?? 'External recipient')),
+                        'email' => trim((string) ($previewPrimary['email'] ?? '')),
+                    ]
+                    : null,
+                'cc_recipient_user_ids' => $previewCc
+                    ->filter(fn ($recipient) => ! ($recipient['external'] ?? false))
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id)
+                    ->filter()
+                    ->values()
+                    ->all(),
+                'external_cc_emails' => $previewCc
+                    ->filter(fn ($recipient) => (bool) ($recipient['external'] ?? false))
+                    ->pluck('email')
+                    ->filter()
+                    ->values()
+                    ->implode(', '),
                 'failed_at' => now()->toIso8601String(),
             ];
             session()->put($this->orderWorkflowEmailFallbackSessionKey($task), $failure);
@@ -640,13 +704,24 @@ class Index extends Component
         $this->orderWorkflowEmailFallbackMessage = 'Due to some technical issue, the email could not be sent after '.$attempts.' attempts. Please download the '.$attachmentLabel.' and send it manually. After sending it manually, you can complete this task to continue the workflow.';
     }
 
-    public function removeOrderWorkflowActionAttachment(int $index): void
+    public function removeOrderWorkflowActionAttachment(): void
     {
-        if (! array_key_exists($index, $this->orderWorkflowActionAttachments)) return;
+        $this->orderWorkflowActionAttachment = null;
+        $this->resetValidation('orderWorkflowActionAttachment');
+    }
 
-        unset($this->orderWorkflowActionAttachments[$index]);
-        $this->orderWorkflowActionAttachments = array_values($this->orderWorkflowActionAttachments);
-        $this->resetValidation(['orderWorkflowActionAttachments', 'orderWorkflowActionAttachments.*']);
+    public function removeOrderWorkflowActionRevisionAttachment(int $documentId, int $index): void
+    {
+        if (! isset($this->orderWorkflowActionRevisionAttachments[$documentId][$index])) return;
+
+        unset($this->orderWorkflowActionRevisionAttachments[$documentId][$index]);
+        $this->orderWorkflowActionRevisionAttachments[$documentId] = array_values(
+            $this->orderWorkflowActionRevisionAttachments[$documentId],
+        );
+        $this->resetValidation([
+            'orderWorkflowActionRevisionAttachments.'.$documentId,
+            'orderWorkflowActionRevisionAttachments.'.$documentId.'.*',
+        ]);
     }
 
     /** @return array<string,mixed>|null */
@@ -685,6 +760,7 @@ class Index extends Component
         $this->overviewTaskDocumentModalTaskId = (int) $task->id;
         $this->overviewTaskDocumentSource = $canCreate ? 'upload' : 'existing';
         $this->overviewTaskDocumentUpload = [];
+        $this->overviewTaskRevisionUpload = [];
         $pendingArtworkRevision = app(OrderWorkflowActionService::class)->automationKey($task) === 'ART_PREPARE_UPLOAD'
             ? app(DocumentService::class)->pendingArtworkRevision($task)
             : ['active' => false, 'document_ids' => []];
@@ -695,6 +771,7 @@ class Index extends Component
         $this->overviewTaskDocumentNote = '';
         $this->resetValidation([
             'overviewTaskDocumentUpload',
+            'overviewTaskRevisionUpload',
             'overviewTaskRevisionDocumentIds',
             'overviewTaskExistingDocumentId',
             'overviewTaskDocumentNote',
@@ -708,12 +785,14 @@ class Index extends Component
         $this->overviewTaskDocumentModalTaskId = null;
         $this->overviewTaskDocumentSource = 'upload';
         $this->overviewTaskDocumentUpload = [];
+        $this->overviewTaskRevisionUpload = [];
         $this->overviewTaskRevisionDocumentIds = [];
         $this->overviewTaskExistingDocumentId = null;
         $this->overviewTaskDocumentNote = '';
         $this->listActionOrderId = null;
         $this->resetValidation([
             'overviewTaskDocumentUpload',
+            'overviewTaskRevisionUpload',
             'overviewTaskRevisionDocumentIds',
             'overviewTaskExistingDocumentId',
             'overviewTaskDocumentNote',
@@ -732,8 +811,9 @@ class Index extends Component
 
         $this->overviewTaskDocumentSource = $source;
         $this->overviewTaskDocumentUpload = [];
+        $this->overviewTaskRevisionUpload = [];
         $this->overviewTaskExistingDocumentId = null;
-        $this->resetValidation(['overviewTaskDocumentUpload', 'overviewTaskExistingDocumentId']);
+        $this->resetValidation(['overviewTaskDocumentUpload', 'overviewTaskRevisionUpload', 'overviewTaskExistingDocumentId']);
     }
 
     public function saveOverviewTaskDocument(): void
@@ -757,16 +837,34 @@ class Index extends Component
 
         if ($this->overviewTaskDocumentSource === 'upload') {
             abort_unless(auth()->user()->canModule('documents', 'create'), 403);
-            $isArtworkUpload = app(OrderWorkflowActionService::class)->automationKey($task) === 'ART_PREPARE_UPLOAD';
+            $automationKey = app(OrderWorkflowActionService::class)->automationKey($task);
+            $isArtworkUpload = $automationKey === 'ART_PREPARE_UPLOAD';
+            $isPurchaseOrderUpload = $automationKey === 'NEW_UPLOAD_PO';
             $artworkRevision = $isArtworkUpload ? $documentService->pendingArtworkRevision($task) : ['active' => false, 'documents' => collect()];
-            if ($isArtworkUpload && (bool) ($artworkRevision['active'] ?? false)) {
-                $this->validate([
+            $isArtworkRevision = $isArtworkUpload && (bool) ($artworkRevision['active'] ?? false);
+            if ($isArtworkRevision) {
+                $revisionDocuments = collect($artworkRevision['documents'] ?? [])->values();
+                $expectedRevisionCount = $revisionDocuments->count();
+                $revisionRules = [
                     'overviewTaskRevisionDocumentIds' => ['required', 'array', 'min:1'],
                     'overviewTaskRevisionDocumentIds.*' => ['integer', 'distinct'],
-                ], [
-                    'overviewTaskRevisionDocumentIds.required' => 'Select at least one artwork file that needs revision.',
-                    'overviewTaskRevisionDocumentIds.min' => 'Select at least one artwork file that needs revision.',
-                ]);
+                    'overviewTaskRevisionUpload' => ['required', 'array', 'size:'.$expectedRevisionCount],
+                ];
+                $revisionMessages = [
+                    'overviewTaskRevisionDocumentIds.required' => 'No artwork is selected for this revision.',
+                    'overviewTaskRevisionDocumentIds.min' => 'No artwork is selected for this revision.',
+                    'overviewTaskRevisionUpload.required' => 'Choose one replacement file under each artwork selected for revision.',
+                    'overviewTaskRevisionUpload.size' => 'Choose one replacement file under each of the '.$expectedRevisionCount.' selected artwork file'.($expectedRevisionCount === 1 ? '' : 's').'.',
+                ];
+
+                foreach ($revisionDocuments as $revisionDocument) {
+                    $revisionDocumentId = (int) $revisionDocument->id;
+                    $revisionRules['overviewTaskRevisionUpload.'.$revisionDocumentId] = AttachmentUpload::requiredRules(AttachmentUpload::DOCUMENTS_WITH_AI, 20480);
+                    $revisionMessages['overviewTaskRevisionUpload.'.$revisionDocumentId.'.required'] = 'Choose a replacement file for this artwork.';
+                    $revisionMessages['overviewTaskRevisionUpload.'.$revisionDocumentId.'.max'] = 'This replacement file must be 20 MB or smaller.';
+                }
+
+                $this->validate($revisionRules, $revisionMessages);
                 $artworkRevision = $documentService->updatePendingArtworkRevisionSelection(
                     $task,
                     $this->overviewTaskRevisionDocumentIds,
@@ -775,28 +873,24 @@ class Index extends Component
             $revisionFileCount = (bool) ($artworkRevision['active'] ?? false)
                 ? collect($artworkRevision['documents'] ?? [])->count()
                 : 0;
-            $allowsMultiple = $isArtworkUpload || (bool) ($task->setupTemplate?->allow_multiple_documents ?? false);
-            $uploadRules = ['required', 'array', 'min:1', 'max:'.($allowsMultiple ? 10 : 1)];
-            if ($revisionFileCount > 0) {
-                $uploadRules[] = 'size:'.$revisionFileCount;
+            $allowsMultiple = $isArtworkUpload || $isPurchaseOrderUpload || (bool) ($task->setupTemplate?->allow_multiple_documents ?? false);
+            $uploads = $isArtworkRevision ? $this->overviewTaskRevisionUpload : $this->overviewTaskDocumentUpload;
+            if (! $isArtworkRevision) {
+                $this->validate([
+                    'overviewTaskDocumentUpload' => ['required', 'array', 'min:1', 'max:'.($allowsMultiple ? 10 : 1)],
+                    'overviewTaskDocumentUpload.*' => AttachmentUpload::itemRules(AttachmentUpload::DOCUMENTS_WITH_AI, 20480),
+                ], [
+                    'overviewTaskDocumentUpload.max' => $allowsMultiple
+                        ? 'You can upload a maximum of 10 files at a time.'
+                        : 'Choose one file for this task.',
+                    'overviewTaskDocumentUpload.*.max' => 'Each file must be 20 MB or smaller.',
+                ]);
             }
-            $this->validate([
-                'overviewTaskDocumentUpload' => $uploadRules,
-                'overviewTaskDocumentUpload.*' => AttachmentUpload::itemRules(AttachmentUpload::DOCUMENTS_WITH_AI, 20480),
-            ], [
-                'overviewTaskDocumentUpload.max' => $allowsMultiple
-                    ? 'You can upload a maximum of 10 files at a time.'
-                    : 'Choose one file for this task.',
-                'overviewTaskDocumentUpload.size' => $revisionFileCount > 0
-                    ? 'Upload exactly '.$revisionFileCount.' revised file'.($revisionFileCount === 1 ? '' : 's').' — one for each artwork selected for revision.'
-                    : 'Choose the required file set.',
-                'overviewTaskDocumentUpload.*.max' => 'Each file must be 20 MB or smaller.',
-            ]);
 
             try {
                 if ($revisionFileCount > 0) {
                     $documentService->storeArtworkRevision(
-                        $this->overviewTaskDocumentUpload,
+                        $uploads,
                         $task,
                         auth()->user(),
                         $note,
@@ -815,7 +909,7 @@ class Index extends Component
                         $storeData['category'] = 'Task attachment';
                     }
 
-                    $documentService->storeMany($this->overviewTaskDocumentUpload, $storeData, auth()->user());
+                    $documentService->storeMany($uploads, $storeData, auth()->user());
                 }
             } catch (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $exception) {
                 if ($exception->getStatusCode() !== 422) {
@@ -824,7 +918,7 @@ class Index extends Component
 
                 $message = trim((string) $exception->getMessage());
                 $this->addError(
-                    'overviewTaskDocumentUpload',
+                    $isArtworkRevision ? 'overviewTaskRevisionUpload' : 'overviewTaskDocumentUpload',
                     $message !== '' ? $message : 'One of the selected files could not be verified. Re-export it and try again.',
                 );
                 return;
@@ -862,6 +956,12 @@ class Index extends Component
 
     public function removeOverviewTaskDocumentUpload(int $index): void
     {
+        if (array_key_exists($index, $this->overviewTaskRevisionUpload)) {
+            unset($this->overviewTaskRevisionUpload[$index]);
+            $this->resetValidation(['overviewTaskRevisionUpload', 'overviewTaskRevisionUpload.'.$index]);
+            return;
+        }
+
         if (! array_key_exists($index, $this->overviewTaskDocumentUpload)) return;
 
         unset($this->overviewTaskDocumentUpload[$index]);

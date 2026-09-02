@@ -585,7 +585,11 @@ trait BuildsOrderPageData
         }
 
         $shipmentUrgencyOptions = $master->active('shipment_urgency');
-        $orderDetailContext = app(OrderDetailViewService::class)->build($selected, $user, $shipmentUrgencyOptions);
+        $courierOptions = $this->detailTab === 'overview' && $orderDetailSectionsReady['workflow']
+            ? $master->active('courier')
+            : collect();
+        $orderDetailContext = app(OrderDetailViewService::class)->build($selected, $user, $shipmentUrgencyOptions, $courierOptions);
+        $orderDetailContext['workflowEmailResendFeedback'] = $this->orderWorkflowEmailResendFeedback;
         $orderRedoContext = $preloadedRedoContext
             ?? app(OrderRedoService::class)->context($selected, $user);
         $orderRedoForm = $this->redoFormState($selected);
@@ -712,6 +716,7 @@ trait BuildsOrderPageData
         $this->overviewTaskDocumentModalTaskId = null;
         $this->overviewTaskDocumentSource = 'upload';
         $this->overviewTaskDocumentUpload = [];
+        $this->overviewTaskRevisionUpload = [];
         $this->overviewTaskExistingDocumentId = null;
         $this->overviewTaskDocumentNote = '';
         $this->overviewTaskLinkFormTaskId = null;
