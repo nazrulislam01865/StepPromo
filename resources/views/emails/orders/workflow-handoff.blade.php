@@ -16,6 +16,13 @@
         @endif
     </p>
 
+    @if($handoffType === 'artwork' && filled($customerComment ?? ''))
+        <div style="margin:0 0 18px;padding:12px 14px;border:1px solid #dce5ee;border-radius:9px;background:#f8fafc">
+            <div style="margin-bottom:5px;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#718097">Comment to customer</div>
+            <div style="white-space:pre-line;color:#44566f;font-size:13px;line-height:1.55">{{ $customerComment }}</div>
+        </div>
+    @endif
+
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;margin:0 0 16px;background:#f8fafc;border:1px solid #e1e7ef;border-radius:9px">
         <tr>
             <td style="padding:12px 14px"><div style="font-size:10px;color:#718097;text-transform:uppercase;letter-spacing:.05em">Order</div><div style="margin-top:3px;font-size:13px;font-weight:700;color:#152238">{{ $orderNumber }}</div></td>

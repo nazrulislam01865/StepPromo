@@ -161,7 +161,7 @@
                                                 <x-ui.file-type-badge :extension="$candidateExtension" size="sm" />
                                                 <span class="ft-artwork-revision-upload-selector-copy">
                                                     <b title="{{ $revisionCandidate->name }}">{{ $revisionCandidate->name }}</b>
-                                                    <small>{{ $candidateExtension }} · Version {{ max(1, (int) $revisionCandidate->version) }}</small>
+                                                    <small>{{ $candidateExtension }} · Current artwork</small>
                                                 </span>
                                             </div>
                                             <div class="ft-artwork-revision-replacement-actions">

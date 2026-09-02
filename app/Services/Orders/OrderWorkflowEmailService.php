@@ -126,8 +126,11 @@ final class OrderWorkflowEmailService
         $document = $documents->last();
         $subject = $this->subject($job, $key);
         $brand = $this->companyBrand();
+        $customerComment = $key === self::ARTWORK_HANDOFF
+            ? $this->artworkCustomerComment($selection)
+            : '';
         $viewData = ($document && $actor)
-            ? $this->viewData($job, $key, $document, $documents, $actor, $brand)
+            ? $this->viewData($job, $key, $document, $documents, $actor, $brand, $customerComment)
             : [];
         if ($viewData !== [] && ($purchaseOrderSelection['external_to'] ?? null)) {
             $viewData['team'] = $purchaseOrderSelection['external_to']['name'];
@@ -156,6 +159,7 @@ final class OrderWorkflowEmailService
                     : 'Enter one or more valid email addresses in To. Active system users are suggested as you type.')
                 : '',
             'business_unit' => $key === self::ARTWORK_HANDOFF ? $this->orderBusinessUnit($job) : null,
+            'customer_comment' => $customerComment,
             'subject' => $subject,
             'document_id' => $document?->id,
             'document_name' => $document?->name,
@@ -199,6 +203,9 @@ final class OrderWorkflowEmailService
         $artworkSelection = $key === self::ARTWORK_HANDOFF
             ? $this->artworkRecipientSelection($recipientOptions, $selection, true)
             : null;
+        $customerComment = $key === self::ARTWORK_HANDOFF
+            ? $this->artworkCustomerComment($selection)
+            : '';
 
         $recipients = $purchaseOrderSelection
             ? $purchaseOrderSelection['to_users']
@@ -243,6 +250,7 @@ final class OrderWorkflowEmailService
                     'to_emails' => $toEmails->all(),
                     'cc_emails' => $ccEmails->all(),
                     'assignment_user_id' => $assignmentRecipient?->id,
+                    'customer_comment' => $customerComment !== '' ? $customerComment : null,
                 ],
             ]);
 
@@ -300,7 +308,7 @@ final class OrderWorkflowEmailService
         $team = $externalTo['name'] ?? $this->teamLabel($key);
         $subject = $this->subject($job, $key);
         $replyTo = filter_var((string) $actor->email, FILTER_VALIDATE_EMAIL) ? [(string) $actor->email] : [];
-        $viewData = $this->viewData($job, $key, $document, $documents, $actor, $brand);
+        $viewData = $this->viewData($job, $key, $document, $documents, $actor, $brand, $customerComment);
         $viewData['team'] = $team;
 
         $message = new EmailMessage(
@@ -324,6 +332,7 @@ final class OrderWorkflowEmailService
                 'assignment_user_id' => $assignmentRecipient?->id,
                 'cc_recipient_user_ids' => $ccRecipients->pluck('id')->map(fn ($id) => (int) $id)->all(),
                 'external_cc_emails' => $externalCc->pluck('email')->all(),
+                'customer_comment' => $customerComment !== '' ? $customerComment : null,
             ],
         );
 
@@ -381,6 +390,7 @@ final class OrderWorkflowEmailService
                     'cc_emails' => $ccEmails->values()->all(),
                     'tracking_id' => $trackingId,
                     'delivery_attempts' => $attemptsUsed,
+                    'customer_comment' => $customerComment !== '' ? $customerComment : null,
                     'failed_at' => now()->toIso8601String(),
                 ],
             ]);
@@ -415,6 +425,7 @@ final class OrderWorkflowEmailService
                 'cc_recipient_user_ids' => $ccRecipients->pluck('id')->map(fn ($id) => (int) $id)->all(),
                 'external_cc_emails' => $externalCc->pluck('email')->all(),
                 'business_unit' => $key === self::ARTWORK_HANDOFF ? $this->orderBusinessUnit($job) : null,
+                'customer_comment' => $customerComment !== '' ? $customerComment : null,
                 'tracking_id' => $trackingId,
                 'delivery_attempts' => $attemptsUsed,
             ],
@@ -429,17 +440,17 @@ final class OrderWorkflowEmailService
      * a task can be completed manually after an outage while its email remains
      * failed and therefore retryable.
      *
-     * @return array{status:?string,label:?string,to_emails:array<int,string>,attempts:int,tracking_id:string,resendable:bool}
+     * @return array{status:?string,label:?string,to_emails:array<int,string>,attempts:int,tracking_id:string,customer_comment:string,resendable:bool}
      */
     public function artworkHandoffDeliveryStatus(Task $handoffTask): array
     {
         if ($this->automationKey($handoffTask) !== self::ARTWORK_HANDOFF) {
-            return ['status' => null, 'label' => null, 'to_emails' => [], 'attempts' => 0, 'tracking_id' => '', 'resendable' => false];
+            return ['status' => null, 'label' => null, 'to_emails' => [], 'attempts' => 0, 'tracking_id' => '', 'customer_comment' => '', 'resendable' => false];
         }
 
         $job = $handoffTask->job ?: FlowJob::query()->find($handoffTask->flow_job_id);
         if (! $job) {
-            return ['status' => null, 'label' => null, 'to_emails' => [], 'attempts' => 0, 'tracking_id' => '', 'resendable' => false];
+            return ['status' => null, 'label' => null, 'to_emails' => [], 'attempts' => 0, 'tracking_id' => '', 'customer_comment' => '', 'resendable' => false];
         }
 
         $activities = $job->relationLoaded('workflowEmailActivities')
@@ -452,7 +463,7 @@ final class OrderWorkflowEmailService
             ->first();
 
         if (! $latest) {
-            return ['status' => null, 'label' => null, 'to_emails' => [], 'attempts' => 0, 'tracking_id' => '', 'resendable' => false];
+            return ['status' => null, 'label' => null, 'to_emails' => [], 'attempts' => 0, 'tracking_id' => '', 'customer_comment' => '', 'resendable' => false];
         }
 
         $event = (string) $latest->event;
@@ -488,6 +499,7 @@ final class OrderWorkflowEmailService
             'to_emails' => $toEmails,
             'attempts' => (int) data_get($latest->meta, 'delivery_attempts', 0),
             'tracking_id' => (string) data_get($latest->meta, 'tracking_id', ''),
+            'customer_comment' => trim((string) data_get($latest->meta, 'customer_comment', '')),
             'resendable' => $toEmails !== [],
         ];
     }
@@ -510,6 +522,7 @@ final class OrderWorkflowEmailService
 
         return $this->send($handoffTask, $actor, [
             'to_emails' => $toEmails->implode(', '),
+            'customer_comment' => (string) ($delivery['customer_comment'] ?? ''),
             'is_resend' => true,
         ]);
     }
@@ -646,6 +659,16 @@ final class OrderWorkflowEmailService
      *
      * @return array{to_users:Collection<int,User>,external_to:Collection<int,array{name:string,email:string,external:bool}>}
      */
+    private function artworkCustomerComment(array $selection): string
+    {
+        $comment = trim((string) ($selection['customer_comment'] ?? ''));
+
+        // The field is optional. The HTML maxlength keeps normal UI input
+        // bounded, and this server-side limit protects direct requests without
+        // turning an omitted comment into a validation requirement.
+        return mb_substr($comment, 0, 2000);
+    }
+
     private function artworkRecipientSelection(Collection $candidates, array $selection, bool $required): array
     {
         $candidateByEmail = $candidates->keyBy(
@@ -993,7 +1016,7 @@ final class OrderWorkflowEmailService
 
     /** @return array<string,mixed> */
     /** @param Collection<int,Document> $documents */
-    private function viewData(FlowJob $job, string $key, Document $document, Collection $documents, User $actor, array $brand): array
+    private function viewData(FlowJob $job, string $key, Document $document, Collection $documents, User $actor, array $brand, string $customerComment = ''): array
     {
         return [
             'brand' => $brand,
@@ -1005,6 +1028,7 @@ final class OrderWorkflowEmailService
             'sentBy' => $actor,
             'orderNumber' => $job->displayOrderNumber(),
             'productSummary' => $this->productSummary($job),
+            'customerComment' => $key === self::ARTWORK_HANDOFF ? $customerComment : '',
         ];
     }
 

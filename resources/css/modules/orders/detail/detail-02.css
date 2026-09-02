@@ -2972,6 +2972,50 @@
     margin-top: 12px;
 }
 
+/* Optional customer note for both the initial Artwork handoff and the same
+   handoff task after a revision cycle. Keep it visually aligned with the
+   existing recipient/preview stack without changing the modal structure. */
+.ft-order-prototype-detail .ft-artwork-handoff-comment {
+    display: grid;
+    gap: 6px;
+    margin-top: 12px;
+}
+
+.ft-order-prototype-detail .ft-artwork-handoff-comment > span {
+    color: #10213b;
+    font-size: .625rem;
+    font-weight: 800;
+}
+
+.ft-order-prototype-detail .ft-artwork-handoff-comment > span em {
+    color: #8291a5;
+    font-style: normal;
+    font-weight: 650;
+}
+
+.ft-order-prototype-detail .ft-artwork-handoff-comment textarea {
+    width: 100%;
+    min-height: 72px;
+    resize: vertical;
+    border: 1px solid #d8e2ec;
+    border-radius: 9px;
+    padding: 10px 12px;
+    background: #fff;
+    color: #10213b;
+    font: inherit;
+    line-height: 1.45;
+}
+
+.ft-order-prototype-detail .ft-artwork-handoff-comment textarea::placeholder {
+    color: #96a3b4;
+}
+
+.ft-order-prototype-detail .ft-artwork-handoff-comment textarea:focus {
+    outline: 0;
+    border-color: #71cdbf;
+    box-shadow: 0 0 0 2px rgba(0, 143, 127, .08);
+}
+
 .ft-order-prototype-detail .ft-po-mail-row>label,
 .ft-order-prototype-detail .ft-po-mail-row__label {
     color: #6f7f93;

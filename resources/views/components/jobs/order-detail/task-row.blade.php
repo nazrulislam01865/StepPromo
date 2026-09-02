@@ -180,7 +180,7 @@
             <div class="card-sub">
                 📎 {{ $latestTaskDocument->name }}
                 @if($isArtworkUploadTask)
-                    · Version {{ max(1, (int) $latestTaskDocument->version) }} · Latest
+                    · Latest
                     @if($latestArtworkDocuments->count() > 1)
                         · +{{ $latestArtworkDocuments->count() - 1 }} file{{ $latestArtworkDocuments->count() === 2 ? '' : 's' }}
                     @endif
@@ -249,12 +249,7 @@
             >
                 <x-ui.file-type-badge :name="$document->name" class="ft-order-file-icon" />
                 <span>
-                    <b>
-                        {{ $document->name }}
-                        @if($isArtworkUploadTask)
-                            · Version {{ max(1, (int) $document->version) }}
-                        @endif
-                    </b>
+                    <b>{{ $document->name }}</b>
                     <small>
                         {{ $document->uploader?->name ?? 'FlowTrack' }} · {{ \App\Support\UserLocalTime::format($document->created_at, 'M j, Y, g:i A') }}
                         @if($isArtworkUploadTask) · Latest revision @endif

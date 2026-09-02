@@ -270,6 +270,7 @@ class OrderWorkflowActionService
             'cc_user_ids' => [],
             'cc_emails' => '',
             'external_cc_emails' => '',
+            'customer_comment' => '',
             'qty_received' => $units ?: 1,
             'qty_inspected' => $inspected,
             'qty_accepted' => $inspected,

@@ -180,7 +180,7 @@
                                         <x-ui.file-type-badge :extension="$revisionExtension" size="sm" />
                                         <span class="ft-artwork-revision-selector-copy">
                                             <b title="{{ $revisionDocument->name }}">{{ $revisionDocument->name }}</b>
-                                            <small>Artwork V{{ max(1, (int) $revisionDocument->version) }}</small>
+                                            <small>Artwork</small>
                                         </span>
                                     </label>
                                     <a href="{{ route('documents.open', $revisionDocument) }}" target="_blank" rel="noopener">View</a>
@@ -462,7 +462,7 @@
                                     @if(in_array($previewExtension, ['jpg','jpeg','png','webp','gif'], true))
                                         <img src="{{ route('documents.open', $previewDocument) }}" alt="Artwork preview: {{ $previewDocument->name }}">
                                     @else
-                                        <div class="ft-prototype-artwork-file"><span>{{ strtoupper($previewExtension ?: 'FILE') }}</span><strong>{{ $previewDocument->name }} · Version {{ max(1, (int) $previewDocument->version) }}</strong><a href="{{ route('documents.open', $previewDocument) }}" target="_blank" rel="noopener">Open artwork</a></div>
+                                        <div class="ft-prototype-artwork-file"><span>{{ strtoupper($previewExtension ?: 'FILE') }}</span><strong>{{ $previewDocument->name }}</strong><a href="{{ route('documents.open', $previewDocument) }}" target="_blank" rel="noopener">Open artwork</a></div>
                                     @endif
                                 </div>
                             @endforeach
@@ -503,7 +503,7 @@
                                         <span class="ft-artwork-current-file-choice-type">{{ strtoupper(pathinfo((string) $doc->name, PATHINFO_EXTENSION) ?: 'FILE') }}</span>
                                         <span class="ft-artwork-current-file-choice-copy">
                                             <b title="{{ $doc->name }}">{{ $doc->name }}</b>
-                                            <small>Artwork V{{ max(1, (int) $doc->version) }}</small>
+                                            <small>Artwork</small>
                                         </span>
                                         <em x-text="selectedArtworkId === {{ (int) $doc->id }} ? 'Viewing' : 'Preview'">Preview</em>
                                     </button>
@@ -517,7 +517,7 @@
                                     @foreach($archivedArtworkDocuments as $index => $doc)
                                         <div>
                                             <span class="ft-prototype-version-file">
-                                                <strong>{{ $doc->name }} · Version {{ max(1, (int) $doc->version) }}</strong>
+                                                <strong>{{ $doc->name }}</strong>
                                                 <small>{{ \App\Support\UserLocalTime::format($doc->created_at, 'M j, Y, g:i A') }}</small>
                                             </span>
                                             <span class="ft-prototype-version-status">
@@ -604,6 +604,17 @@
                         </div>
                         @error('orderWorkflowActionPayload.to_emails')<p class="validation-error ft-po-mail-validation">{{ $message }}</p>@enderror
                     </section>
+
+                    <label class="ft-artwork-handoff-comment" for="artwork-customer-comment-{{ $task->id }}">
+                        <span>Comment to customer <em>(optional)</em></span>
+                        <textarea
+                            id="artwork-customer-comment-{{ $task->id }}"
+                            wire:model.live.debounce.300ms="orderWorkflowActionPayload.customer_comment"
+                            rows="3"
+                            maxlength="2000"
+                            placeholder="Write your message or any important note for the customer..."
+                        ></textarea>
+                    </label>
 
                     <x-email.handoff-preview
                         :preview="$emailHandoffPreview"

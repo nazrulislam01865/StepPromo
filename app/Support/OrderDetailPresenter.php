@@ -240,6 +240,93 @@ final class OrderDetailPresenter
         return (string) ($task->task_number ?: str_pad((string) $task->id, 3, '0', STR_PAD_LEFT));
     }
 
+    /**
+     * Artwork files that were actually replaced by a completed revision.
+     *
+     * This is intentionally event-driven rather than "all non-current files".
+     * A normal upload or an accepted/unselected artwork must never appear in the
+     * archive. A source document enters the archive only after the corresponding
+     * job.artwork_revision_applied activity exists. Both documents and applied
+     * activities are hydrated once by LegacyJobService, so this presenter is
+     * query-free and safe from N+1 queries.
+     *
+     * @param Collection<int,Task> $phaseTasks
+     * @return Collection<int,\App\Models\Document>
+     */
+    public static function archivedArtworkDocuments(FlowJob $job, Collection $phaseTasks): Collection
+    {
+        if (! $job->relationLoaded('documents')
+            || ! $job->relationLoaded('artworkRevisionAppliedActivities')
+            || $phaseTasks->isEmpty()) {
+            return collect();
+        }
+
+        $artworkTasks = $phaseTasks
+            ->filter(fn (Task $task): bool => $task->relationLoaded('currentArtworkDocuments'))
+            ->values();
+
+        if ($artworkTasks->isEmpty()) {
+            return collect();
+        }
+
+        $artworkTaskIds = $artworkTasks
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->flip();
+
+        $currentDocumentIds = $artworkTasks
+            ->flatMap(fn (Task $task) => collect($task->getRelation('currentArtworkDocuments'))->pluck('id'))
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->flip();
+
+        $replacedDocumentIds = collect($job->getRelation('artworkRevisionAppliedActivities'))
+            ->flatMap(function ($activity) use ($artworkTaskIds): Collection {
+                $meta = (array) ($activity->meta ?? []);
+                $targetTaskId = (int) data_get($meta, 'target_task_id', data_get($meta, 'task_id', 0));
+                if ($targetTaskId <= 0 || ! $artworkTaskIds->has($targetTaskId)) {
+                    return collect();
+                }
+
+                // Current selective revisions explicitly record only the source
+                // rows that received replacement uploads. replacement_document_map
+                // is a safe compatibility fallback for earlier selective events.
+                $ids = collect(data_get($meta, 'replaced_source_document_ids', []));
+                if ($ids->isEmpty()) {
+                    $ids = collect(array_keys((array) data_get($meta, 'replacement_document_map', [])));
+                }
+
+                // Very old revision-applied events predate selective replacement:
+                // every source file was re-uploaded, so the full source set was
+                // genuinely replaced and can be treated as archived.
+                if ($ids->isEmpty()) {
+                    $ids = collect(data_get($meta, 'source_document_ids', []));
+                }
+
+                return $ids;
+            })
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->flip();
+
+        if ($replacedDocumentIds->isEmpty()) {
+            return collect();
+        }
+
+        return $job->documents
+            ->filter(fn ($document): bool => $replacedDocumentIds->has((int) $document->id))
+            ->filter(fn ($document): bool => $artworkTaskIds->has((int) ($document->task_id ?? 0)))
+            ->reject(fn ($document): bool => $currentDocumentIds->has((int) $document->id))
+            ->unique(fn ($document) => (int) $document->id)
+            ->sortByDesc(fn ($document) => (int) $document->id)
+            ->sortByDesc(fn ($document) => max(1, (int) $document->version))
+            ->values();
+    }
+
     public static function activeItems(FlowJob $job): Collection
     {
         return JobDetailPresenter::products($job)
