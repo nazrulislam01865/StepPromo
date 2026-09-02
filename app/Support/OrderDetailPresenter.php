@@ -283,8 +283,9 @@ final class OrderDetailPresenter
             ->unique()
             ->flip();
 
+        $appliedBySourceDocumentId = collect();
         $replacedDocumentIds = collect($job->getRelation('artworkRevisionAppliedActivities'))
-            ->flatMap(function ($activity) use ($artworkTaskIds): Collection {
+            ->flatMap(function ($activity) use ($artworkTaskIds, $appliedBySourceDocumentId): Collection {
                 $meta = (array) ($activity->meta ?? []);
                 $targetTaskId = (int) data_get($meta, 'target_task_id', data_get($meta, 'task_id', 0));
                 if ($targetTaskId <= 0 || ! $artworkTaskIds->has($targetTaskId)) {
@@ -306,6 +307,13 @@ final class OrderDetailPresenter
                     $ids = collect(data_get($meta, 'source_document_ids', []));
                 }
 
+                $ids->each(function ($id) use ($activity, $appliedBySourceDocumentId): void {
+                    $documentId = (int) $id;
+                    if ($documentId > 0 && ! $appliedBySourceDocumentId->has($documentId)) {
+                        $appliedBySourceDocumentId->put($documentId, $activity);
+                    }
+                });
+
                 return $ids;
             })
             ->map(fn ($id) => (int) $id)
@@ -317,6 +325,12 @@ final class OrderDetailPresenter
             return collect();
         }
 
+        $revisionRequests = $job->relationLoaded('artworkRevisionRequestActivities')
+            ? collect($job->getRelation('artworkRevisionRequestActivities'))
+            : collect();
+        $revisionRequestsById = $revisionRequests->keyBy(fn ($activity) => (int) $activity->id);
+        $richText = app(\App\Services\RichTextService::class);
+
         return $job->documents
             ->filter(fn ($document): bool => $replacedDocumentIds->has((int) $document->id))
             ->filter(fn ($document): bool => $artworkTaskIds->has((int) ($document->task_id ?? 0)))
@@ -324,7 +338,42 @@ final class OrderDetailPresenter
             ->unique(fn ($document) => (int) $document->id)
             ->sortByDesc(fn ($document) => (int) $document->id)
             ->sortByDesc(fn ($document) => max(1, (int) $document->version))
-            ->values();
+            ->values()
+            ->each(function ($document) use ($appliedBySourceDocumentId, $revisionRequests, $revisionRequestsById, $richText): void {
+                $documentId = (int) $document->id;
+                $applied = $appliedBySourceDocumentId->get($documentId);
+                $revisionActivityId = (int) data_get($applied?->meta, 'revision_activity_id', 0);
+                $request = $revisionActivityId > 0 ? $revisionRequestsById->get($revisionActivityId) : null;
+
+                // Compatibility for older applied events that did not persist the
+                // originating revision activity id. Match against the exact source
+                // document entirely in memory; no per-row query is introduced.
+                if (! $request) {
+                    $request = $revisionRequests->first(function ($activity) use ($documentId): bool {
+                        $meta = (array) ($activity->meta ?? []);
+                        if ((int) data_get($meta, 'reference_document_id', 0) === $documentId) {
+                            return true;
+                        }
+                        if (collect(data_get($meta, 'revision_document_ids', []))->map(fn ($id) => (int) $id)->contains($documentId)) {
+                            return true;
+                        }
+                        return collect(data_get($meta, 'revision_items', []))
+                            ->contains(fn ($item) => (int) data_get($item, 'document_id', 0) === $documentId);
+                    });
+                }
+
+                $reason = '';
+                if ($request) {
+                    $item = collect(data_get($request->meta, 'revision_items', []))
+                        ->first(fn ($entry) => (int) data_get($entry, 'document_id', 0) === $documentId);
+                    $reason = trim((string) data_get($item, 'comment', ''));
+                    if ($reason === '') {
+                        $reason = trim((string) data_get($request->meta, 'revision_comment', ''));
+                    }
+                }
+
+                $document->setAttribute('artwork_revision_reason', $richText->plainText($reason));
+            });
     }
 
     public static function activeItems(FlowJob $job): Collection

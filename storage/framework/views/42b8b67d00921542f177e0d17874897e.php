@@ -86,7 +86,15 @@ unset($__defined_vars, $__key, $__value); ?>
 <?php $component = $__componentOriginal8cc2d9c978b2c497e659881c0713db1b; ?>
 <?php unset($__componentOriginal8cc2d9c978b2c497e659881c0713db1b); ?>
 <?php endif; ?>
-                                    <span title="<?php echo e($document->name); ?>"><?php echo e($document->name); ?></span>
+                                    <div class="ft-order-archived-artwork__file-copy">
+                                        <span class="ft-order-archived-artwork__filename" title="<?php echo e($document->name); ?>"><?php echo e($document->name); ?></span>
+                                        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(filled($document->artwork_revision_reason)): ?>
+                                            <div class="ft-order-archived-artwork__reason" title="<?php echo e($document->artwork_revision_reason); ?>">
+                                                <strong>Revision reason</strong>
+                                                <span><?php echo e(\Illuminate\Support\Str::limit($document->artwork_revision_reason, 120)); ?></span>
+                                            </div>
+                                        <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                                    </div>
                                 </div>
                             </td>
                             <td class="ft-order-archived-artwork__version">v<?php echo e(max(1, (int) $document->version)); ?></td>

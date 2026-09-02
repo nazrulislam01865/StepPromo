@@ -68,6 +68,22 @@
         ? $job->documents->firstWhere('id', $emailFallbackDocumentId)
         : null;
     $emailFallbackAttachmentLabel = $variant === 'artwork_email' ? 'Artwork' : 'Purchase Order';
+    $artworkHandoffCommentHistory = ($variant === 'artwork_email' && $job->relationLoaded('workflowEmailActivities'))
+        ? collect($job->getRelation('workflowEmailActivities'))
+            ->filter(fn ($activity) => (int) data_get($activity->meta, 'task_id', 0) === (int) $task->id)
+            ->filter(fn ($activity) => in_array((string) $activity->event, [
+                'job.artwork_emailed_to_order_team',
+                'job.workflow_email_skipped',
+            ], true))
+            ->sortByDesc('id')
+            ->map(fn ($activity) => [
+                'id' => (int) $activity->id,
+                'comment' => trim((string) data_get($activity->meta, 'customer_comment', '')),
+                'created_at' => $activity->created_at,
+            ])
+            ->filter(fn (array $entry) => $entry['comment'] !== '')
+            ->values()
+        : collect();
     $revisionMentionUsers = collect($mentionUsers)->values();
     $selectedRevisionDocumentIds = collect($payload['revision_document_ids'] ?? [])
         ->map(fn($id) => (int) $id)
@@ -199,7 +215,15 @@
                                         </label>
                                         @error('orderWorkflowActionRevisionComments.'.$revisionDocumentId)<p class="validation-error">{{ $message }}</p>@enderror
 
-                                        <div class="ft-artwork-revision-item-support">
+                                        <div
+                                            class="ft-artwork-revision-item-support"
+                                            x-data="{ uploading: false, progress: 0 }"
+                                            x-on:livewire-upload-start="uploading = true; progress = 0"
+                                            x-on:livewire-upload-progress="progress = Math.max(0, Math.min(100, Number($event.detail.progress) || 0))"
+                                            x-on:livewire-upload-finish="progress = 100; window.setTimeout(() => { uploading = false; progress = 0 }, 350)"
+                                            x-on:livewire-upload-error="uploading = false; progress = 0"
+                                            x-on:livewire-upload-cancel="uploading = false; progress = 0"
+                                        >
                                             <div class="ft-artwork-revision-item-support-head">
                                                 <div>
                                                     <strong>Supporting attachments <span>(optional)</span></strong>
@@ -250,7 +274,28 @@
                                                 <small data-drop-status>{{ \App\Support\AttachmentUpload::helperText(20) }} · Up to 10 files</small>
                                             </label>
 
-                                            <div class="ft-artwork-revision-evidence-uploading" wire:loading wire:target="orderWorkflowActionRevisionAttachments.{{ $revisionDocumentId }}">Uploading files…</div>
+                                            <div
+                                                class="ft-create-attachment-progress"
+                                                x-cloak
+                                                x-show="uploading"
+                                                x-transition.opacity.duration.120ms
+                                                aria-live="polite"
+                                            >
+                                                <div class="ft-create-attachment-progress-meta">
+                                                    <span>Uploading attachment{{ $documentAttachments->count() === 1 ? '' : 's' }}...</span>
+                                                    <b x-text="`${Math.round(progress)}%`">0%</b>
+                                                </div>
+                                                <div
+                                                    class="ft-create-attachment-progress-track"
+                                                    role="progressbar"
+                                                    aria-label="Supporting attachment upload progress"
+                                                    aria-valuemin="0"
+                                                    aria-valuemax="100"
+                                                    x-bind:aria-valuenow="Math.round(progress)"
+                                                >
+                                                    <span x-bind:style="`width: ${progress}%`"></span>
+                                                </div>
+                                            </div>
                                             @error('orderWorkflowActionRevisionAttachments.'.$revisionDocumentId)<p class="validation-error">{{ $message }}</p>@enderror
                                             @error('orderWorkflowActionRevisionAttachments.'.$revisionDocumentId.'.*')<p class="validation-error">{{ $message }}</p>@enderror
                                         </div>
@@ -604,6 +649,13 @@
                         </div>
                         @error('orderWorkflowActionPayload.to_emails')<p class="validation-error ft-po-mail-validation">{{ $message }}</p>@enderror
                     </section>
+
+                    @if($artworkHandoffCommentHistory->isNotEmpty())
+                        <x-jobs.order-detail.artwork-handoff-comment-history
+                            :history="$artworkHandoffCommentHistory"
+                            label="Previous customer comments"
+                        />
+                    @endif
 
                     <label class="ft-artwork-handoff-comment" for="artwork-customer-comment-{{ $task->id }}">
                         <span>Comment to customer <em>(optional)</em></span>

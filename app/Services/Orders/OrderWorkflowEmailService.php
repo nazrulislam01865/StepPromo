@@ -440,30 +440,45 @@ final class OrderWorkflowEmailService
      * a task can be completed manually after an outage while its email remains
      * failed and therefore retryable.
      *
-     * @return array{status:?string,label:?string,to_emails:array<int,string>,attempts:int,tracking_id:string,customer_comment:string,resendable:bool}
+     * @return array{status:?string,label:?string,to_emails:array<int,string>,attempts:int,tracking_id:string,customer_comment:string,comment_history:array<int,array{id:int,comment:string,created_at:mixed}>,resendable:bool}
      */
     public function artworkHandoffDeliveryStatus(Task $handoffTask): array
     {
         if ($this->automationKey($handoffTask) !== self::ARTWORK_HANDOFF) {
-            return ['status' => null, 'label' => null, 'to_emails' => [], 'attempts' => 0, 'tracking_id' => '', 'customer_comment' => '', 'resendable' => false];
+            return ['status' => null, 'label' => null, 'to_emails' => [], 'attempts' => 0, 'tracking_id' => '', 'customer_comment' => '', 'comment_history' => [], 'resendable' => false];
         }
 
         $job = $handoffTask->job ?: FlowJob::query()->find($handoffTask->flow_job_id);
         if (! $job) {
-            return ['status' => null, 'label' => null, 'to_emails' => [], 'attempts' => 0, 'tracking_id' => '', 'customer_comment' => '', 'resendable' => false];
+            return ['status' => null, 'label' => null, 'to_emails' => [], 'attempts' => 0, 'tracking_id' => '', 'customer_comment' => '', 'comment_history' => [], 'resendable' => false];
         }
 
         $activities = $job->relationLoaded('workflowEmailActivities')
             ? collect($job->getRelation('workflowEmailActivities'))
             : $job->workflowEmailActivities()->get();
 
-        $latest = $activities
+        $taskActivities = $activities
             ->filter(fn ($activity) => (int) data_get($activity->meta, 'task_id', 0) === (int) $handoffTask->id)
             ->sortByDesc('id')
-            ->first();
+            ->values();
+
+        $latest = $taskActivities->first();
+        $commentHistory = $taskActivities
+            ->filter(fn ($activity) => in_array((string) $activity->event, [
+                'job.artwork_emailed_to_order_team',
+                'job.workflow_email_skipped',
+            ], true))
+            ->map(fn ($activity) => [
+                'id' => (int) $activity->id,
+                'comment' => trim((string) data_get($activity->meta, 'customer_comment', '')),
+                'created_at' => $activity->created_at,
+            ])
+            ->filter(fn (array $entry) => $entry['comment'] !== '')
+            ->values()
+            ->all();
 
         if (! $latest) {
-            return ['status' => null, 'label' => null, 'to_emails' => [], 'attempts' => 0, 'tracking_id' => '', 'customer_comment' => '', 'resendable' => false];
+            return ['status' => null, 'label' => null, 'to_emails' => [], 'attempts' => 0, 'tracking_id' => '', 'customer_comment' => '', 'comment_history' => [], 'resendable' => false];
         }
 
         $event = (string) $latest->event;
@@ -500,6 +515,7 @@ final class OrderWorkflowEmailService
             'attempts' => (int) data_get($latest->meta, 'delivery_attempts', 0),
             'tracking_id' => (string) data_get($latest->meta, 'tracking_id', ''),
             'customer_comment' => trim((string) data_get($latest->meta, 'customer_comment', '')),
+            'comment_history' => $commentHistory,
             'resendable' => $toEmails !== [],
         ];
     }

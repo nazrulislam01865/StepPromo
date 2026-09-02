@@ -34,7 +34,15 @@
                             <td>
                                 <div class="ft-order-archived-artwork__file">
                                     <x-ui.file-type-badge :name="$document->name" size="sm" />
-                                    <span title="{{ $document->name }}">{{ $document->name }}</span>
+                                    <div class="ft-order-archived-artwork__file-copy">
+                                        <span class="ft-order-archived-artwork__filename" title="{{ $document->name }}">{{ $document->name }}</span>
+                                        @if(filled($document->artwork_revision_reason))
+                                            <div class="ft-order-archived-artwork__reason" title="{{ $document->artwork_revision_reason }}">
+                                                <strong>Revision reason</strong>
+                                                <span>{{ \Illuminate\Support\Str::limit($document->artwork_revision_reason, 120) }}</span>
+                                            </div>
+                                        @endif
+                                    </div>
                                 </div>
                             </td>
                             <td class="ft-order-archived-artwork__version">v{{ max(1, (int) $document->version) }}</td>

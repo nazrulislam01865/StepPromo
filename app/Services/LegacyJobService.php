@@ -1050,6 +1050,8 @@ class LegacyJobService
             ->orderByDesc('id')
             ->get();
 
+        $job->setRelation('artworkRevisionRequestActivities', $notes);
+
         $documents = $job->relationLoaded('documents') ? $job->documents : collect();
         $documentsById = $documents->keyBy(fn ($document) => (int) $document->id);
         $documentsByTask = $documents
@@ -1198,13 +1200,30 @@ class LegacyJobService
             : 'all';
         $perPage = max(1, min($perPage, 50));
 
+        $customerCommentEvents = [
+            'job.artwork_emailed_to_order_team',
+            'job.workflow_email_skipped',
+        ];
+
         $query = $job->activities()
             ->where(fn ($events) => $events->whereNull('event')->orWhere('event', '!=', 'job.health_updated'))
             ->with('user:id,name,profile_image_path')
-            ->when($activityTab === 'comments', fn ($activity) => $activity->where('event', 'job.comment'))
-            ->when($activityTab === 'history', fn ($activity) => $activity->where(fn ($events) => $events
-                ->whereNull('event')
-                ->orWhere('event', '!=', 'job.comment')));
+            ->when($activityTab === 'comments', fn ($activity) => $activity->where(function ($comments) use ($customerCommentEvents) {
+                $comments->where('event', 'job.comment')
+                    ->orWhere(function ($handoff) use ($customerCommentEvents) {
+                        $handoff->whereIn('event', $customerCommentEvents)
+                            ->whereNotNull('meta->customer_comment')
+                            ->where('meta->customer_comment', '!=', '');
+                    });
+            }))
+            ->when($activityTab === 'history', fn ($activity) => $activity
+                ->where(fn ($events) => $events->whereNull('event')->orWhere('event', '!=', 'job.comment'))
+                ->where(function ($events) use ($customerCommentEvents) {
+                    $events->whereNull('event')
+                        ->orWhereNotIn('event', $customerCommentEvents)
+                        ->orWhereNull('meta->customer_comment')
+                        ->orWhere('meta->customer_comment', '');
+                }));
 
         $total = (clone $query)->count();
         $pages = max(1, (int) ceil($total / $perPage));

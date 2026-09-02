@@ -24,6 +24,9 @@ class OrderArchivedArtworkSectionTest extends TestCase
         $this->assertStringContainsString('x-jobs.order-detail.archived-artwork', $workflow);
         $this->assertStringContainsString('Archived Artwork', $component);
         $this->assertStringContainsString('View previous versions of artwork that have been replaced.', $component);
+        $this->assertStringContainsString('Revision reason', $component);
+        $this->assertStringContainsString('artwork_revision_reason', $component);
+        $this->assertStringContainsString("setRelation('artworkRevisionRequestActivities'", $jobs);
         $this->assertStringContainsString('<th scope="col">Filename</th>', $component);
         $this->assertStringContainsString('<th scope="col">Version</th>', $component);
         $this->assertStringContainsString('<th scope="col">Uploaded by</th>', $component);
