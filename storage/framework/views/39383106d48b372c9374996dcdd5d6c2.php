@@ -202,14 +202,14 @@ unset($__defined_vars, $__key, $__value); ?>
         <div class="overview-side ft-order-overview-side">
             <?php if (isset($component)) { $__componentOriginal89b3f0d2b6e3055ded0e4d12dece9e5b = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal89b3f0d2b6e3055ded0e4d12dece9e5b = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.jobs.order-detail.planning','data' => ['job' => $job,'canEditJob' => $canEditJob,'canChangeOwner' => $canChangeOwner,'shipmentUrgencyOptions' => $shipmentUrgencyOptions,'context' => $orderDetailContext]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.jobs.order-detail.planning','data' => ['job' => $job,'canEditJob' => $canEditJob,'canChangeOwner' => $canChangeOwner,'shipmentUrgencyOptions' => $shipmentUrgencyOptions,'context' => $orderDetailContext,'remoteArea' => $orderDetailContext['remoteArea'] ?? null]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('jobs.order-detail.planning'); ?>
 <?php if ($component->shouldRender()): ?>
 <?php $__env->startComponent($component->resolveView(), $component->data()); ?>
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['job' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($job),'can-edit-job' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($canEditJob),'can-change-owner' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($canChangeOwner),'shipment-urgency-options' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($shipmentUrgencyOptions),'context' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($orderDetailContext)]); ?>
+<?php $component->withAttributes(['job' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($job),'can-edit-job' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($canEditJob),'can-change-owner' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($canChangeOwner),'shipment-urgency-options' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($shipmentUrgencyOptions),'context' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($orderDetailContext),'remote-area' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($orderDetailContext['remoteArea'] ?? null)]); ?>
 <?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::processComponentKey($component); ?>
 
 <?php echo $__env->renderComponent(); ?>

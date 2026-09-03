@@ -40,6 +40,10 @@ unset($__defined_vars, $__key, $__value); ?>
     $taskLinks = \App\Support\JobDetailPresenter::taskLinks($job, $task);
     $automationKey = app(\App\Services\OrderWorkflowActionService::class)->automationKey($task);
     $isArtworkUploadTask = $automationKey === 'ART_PREPARE_UPLOAD';
+    // Purchase Order upload tasks use the same document presentation style as
+    // artwork uploads: show the uploaded file card with uploader, timestamp,
+    // latest marker and document actions.
+    $isPurchaseOrderUploadTask = $automationKey === 'NEW_UPLOAD_PO';
     $isProductionEstimatedDeliveryTask = $automationKey === 'PROD_SET_ESTIMATED_DELIVERY';
     $artworkRevisionNotes = $task->relationLoaded('artworkRevisionNotes') ? $task->artworkRevisionNotes : collect();
     $revisionReferenceDocumentIds = $artworkRevisionNotes
@@ -405,9 +409,9 @@ unset($__errorArgs, $__bag); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendB
 <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($resourceDocuments->isNotEmpty() || $taskLinks->isNotEmpty()): ?>
     <div class="task-resources ft-order-task-resources">
         <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::openLoop(); ?><?php endif; ?><?php $__currentLoopData = $resourceDocuments; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $document): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::startLoopIteration(); ?><?php endif; ?>
-            <div
+<div
                 <?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::$currentLoop['key'] = 'order-task-document-'.e($document->id).''; ?>wire:key="order-task-document-<?php echo e($document->id); ?>"
-                class="ft-order-task-resource-row <?php echo e($isArtworkUploadTask ? 'is-latest-artwork' : ''); ?>"
+                class="ft-order-task-resource-row <?php echo e(($isArtworkUploadTask || $isPurchaseOrderUploadTask) ? 'is-latest-artwork' : ''); ?>"
             >
                 <?php if (isset($component)) { $__componentOriginal8cc2d9c978b2c497e659881c0713db1b = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal8cc2d9c978b2c497e659881c0713db1b = $attributes; } ?>
@@ -436,11 +440,11 @@ unset($__errorArgs, $__bag); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendB
                     <small>
                         <?php echo e($document->uploader?->name ?? 'FlowTrack'); ?> · <?php echo e(\App\Support\UserLocalTime::format($document->created_at, 'M j, Y, g:i A')); ?>
 
-                        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($isArtworkUploadTask): ?> · Latest revision <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($isArtworkUploadTask || $isPurchaseOrderUploadTask): ?> · Latest version <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                     </small>
                 </span>
                 <span class="ft-order-task-resource-actions">
-                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($isArtworkUploadTask): ?>
+                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($isArtworkUploadTask || $isPurchaseOrderUploadTask): ?>
                         <em class="ft-order-artwork-version-state is-latest">Latest</em>
                     <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                     <a href="<?php echo e(route('documents.open', $document)); ?>" target="_blank" rel="noopener">Open</a>
