@@ -43,6 +43,8 @@
     'overviewTaskDocumentSource'=>'upload',
     'overviewTaskDocumentUpload'=>null,
     'overviewTaskRevisionUpload'=>[],
+    'overviewTaskStagedUploads'=>[],
+    'overviewTaskStagedRevisionUploads'=>[],
     'overviewTaskExistingDocumentId'=>null,
     'overviewTaskArtworkRevision'=>[],
     'overviewTaskRevisionDocumentIds'=>[],
@@ -202,6 +204,8 @@
             :overview-task-document-source="$overviewTaskDocumentSource"
             :overview-task-document-upload="$overviewTaskDocumentUpload"
             :overview-task-revision-upload="$overviewTaskRevisionUpload"
+            :overview-task-staged-uploads="$overviewTaskStagedUploads"
+            :overview-task-staged-revision-uploads="$overviewTaskStagedRevisionUploads"
             :overview-task-existing-document-id="$overviewTaskExistingDocumentId"
             :overview-task-artwork-revision="$overviewTaskArtworkRevision"
             :overview-task-revision-document-ids="$overviewTaskRevisionDocumentIds"

@@ -93,9 +93,17 @@ class OrderArtworkSelectiveRevisionTest extends TestCase
         $overview = file_get_contents(resource_path('views/components/jobs/detail-overview.blade.php'));
 
         $this->assertStringContainsString(':overview-task-artwork-revision="$overviewTaskArtworkRevision ?? []"', $page);
+        $this->assertStringContainsString(':overview-task-staged-uploads="$overviewTaskStagedUploads"', $page);
+        $this->assertStringContainsString(':overview-task-staged-revision-uploads="$overviewTaskStagedRevisionUploads"', $page);
         $this->assertStringContainsString("'overviewTaskArtworkRevision'=>[]", $detail);
+        $this->assertStringContainsString("'overviewTaskStagedUploads'=>[]", $detail);
+        $this->assertStringContainsString("'overviewTaskStagedRevisionUploads'=>[]", $detail);
+        $this->assertStringContainsString(':overview-task-staged-uploads="$overviewTaskStagedUploads"', $detail);
+        $this->assertStringContainsString(':overview-task-staged-revision-uploads="$overviewTaskStagedRevisionUploads"', $detail);
         $this->assertStringContainsString(':overview-task-artwork-revision="$overviewTaskArtworkRevision"', $detail);
         $this->assertStringContainsString("'overviewTaskArtworkRevision' => []", $overview);
+        $this->assertStringContainsString("'overviewTaskStagedUploads' => []", $overview);
+        $this->assertStringContainsString("'overviewTaskStagedRevisionUploads' => []", $overview);
         $this->assertStringContainsString(':artwork-revision="$overviewTaskArtworkRevision"', $overview);
         $this->assertStringContainsString(':overview-task-revision-document-ids="$overviewTaskRevisionDocumentIds"', $detail);
         $this->assertStringContainsString(':revision-document-ids="$overviewTaskRevisionDocumentIds"', $overview);

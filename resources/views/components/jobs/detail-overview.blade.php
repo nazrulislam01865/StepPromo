@@ -41,6 +41,8 @@
     'overviewTaskDocumentSource' => 'upload',
     'overviewTaskDocumentUpload' => null,
     'overviewTaskRevisionUpload' => [],
+    'overviewTaskStagedUploads' => [],
+    'overviewTaskStagedRevisionUploads' => [],
     'overviewTaskExistingDocumentId' => null,
     'overviewTaskArtworkRevision' => [],
     'overviewTaskRevisionDocumentIds' => [],
