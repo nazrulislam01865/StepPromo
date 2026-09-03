@@ -66,8 +66,11 @@
     'selectedLinkInquiry'=>null,
     'showInquiryLinkConfirm'=>false,
     'showInquiryUnlinkConfirm'=>false,
+    'unlinkInquiryId'=>null,
     'canManageInquiryLink'=>false,
     'linkedInquiryCanOpen'=>false,
+    'canViewLinkedInquiryDocuments'=>false,
+    'canExportLinkedInquiryDocuments'=>false,
     'financeSummary'=>null,
     'financeContacts'=>null,
     'financeUsers'=>null,
@@ -224,8 +227,11 @@
             :selected-inquiry="$selectedLinkInquiry"
             :show-link-confirm="$showInquiryLinkConfirm"
             :show-unlink-confirm="$showInquiryUnlinkConfirm"
+            :unlink-inquiry-id="$unlinkInquiryId"
             :can-manage="$canManageInquiryLink"
             :linked-inquiry-can-open="$linkedInquiryCanOpen"
+            :can-view-linked-inquiry-documents="$canViewLinkedInquiryDocuments"
+            :can-export-linked-inquiry-documents="$canExportLinkedInquiryDocuments"
         />
     @elseif($detailTab==='redo' && (bool) ($orderRedoContext['hasRedo'] ?? false))
         <x-jobs.order-detail.redo-panel :job="$job" :context="$orderRedoContext" />
