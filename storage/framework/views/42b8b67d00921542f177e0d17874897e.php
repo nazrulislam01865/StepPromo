@@ -42,9 +42,9 @@ unset($__defined_vars, $__key, $__value); ?>
         <div class="ft-order-archived-artwork__head">
             <div class="ft-order-archived-artwork__title-row">
                 <h3 id="archived-artwork-title">Archived Artwork</h3>
-                <span class="ft-order-archived-artwork__count"><?php echo e($archivedDocuments->count()); ?> archived</span>
+                <span class="ft-order-archived-artwork__count"><?php echo e($archivedDocuments->count()); ?> in history</span>
             </div>
-            <p>View previous versions of artwork that have been replaced.</p>
+            <p>View previous versions of artwork that have been replaced. Cancelled artwork is retained here for audit history.</p>
         </div>
 
         <div class="ft-order-archived-artwork__table-scroll">
@@ -90,8 +90,14 @@ unset($__defined_vars, $__key, $__value); ?>
                                         <span class="ft-order-archived-artwork__filename" title="<?php echo e($document->name); ?>"><?php echo e($document->name); ?></span>
                                         <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(filled($document->artwork_revision_reason)): ?>
                                             <div class="ft-order-archived-artwork__reason" title="<?php echo e($document->artwork_revision_reason); ?>">
-                                                <strong>Revision reason</strong>
+                                                <strong><?php echo e($document->artwork_archive_reason_label ?: 'Revision reason'); ?></strong>
                                                 <span><?php echo e(\Illuminate\Support\Str::limit($document->artwork_revision_reason, 120)); ?></span>
+                                            </div>
+                                        <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                                        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(!empty($document->artwork_cancelled_product_names)): ?>
+                                            <div class="ft-order-archived-artwork__reason ft-order-archived-artwork__reason--products">
+                                                <strong>Removed product<?php echo e(count($document->artwork_cancelled_product_names) === 1 ? '' : 's'); ?></strong>
+                                                <span><?php echo e(implode(', ', $document->artwork_cancelled_product_names)); ?></span>
                                             </div>
                                         <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                                     </div>
@@ -100,7 +106,7 @@ unset($__defined_vars, $__key, $__value); ?>
                             <td class="ft-order-archived-artwork__version">v<?php echo e(max(1, (int) $document->version)); ?></td>
                             <td><?php echo e($document->relationLoaded('uploader') ? ($document->uploader?->name ?? 'FlowTrack') : 'FlowTrack'); ?></td>
                             <td><?php echo e(\App\Support\UserLocalTime::format($document->created_at, 'M j, Y \\a\\t g:i A')); ?></td>
-                            <td><span class="ft-order-archived-artwork__status">Archived</span></td>
+                            <td><span class="ft-order-archived-artwork__status <?php echo e((string) ($document->artwork_archive_status ?: 'Archived') === 'Cancelled' ? 'is-cancelled' : ''); ?>"><?php echo e($document->artwork_archive_status ?: 'Archived'); ?></span></td>
                             <td>
                                 <div class="ft-order-archived-artwork__actions">
                                     <a href="<?php echo e(route('documents.open', $document)); ?>" target="_blank" rel="noopener">Open</a>

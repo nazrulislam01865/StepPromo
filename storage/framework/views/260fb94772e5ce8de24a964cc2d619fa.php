@@ -7,6 +7,13 @@ $__propNames = \Illuminate\View\ComponentAttributeBag::extractPropNames(([
     'taskStatuses' => collect(),
     'context' => [],
     'overviewTaskLinkFormTaskId' => null,
+    'showShipmentModal' => false,
+    'shipmentModalTaskId' => null,
+    'shipmentEditingId' => null,
+    'shipmentModalMode' => 'same_address',
+    'shipmentForm' => [],
+    'showShipmentDetailsModal' => false,
+    'shipmentDetailsId' => null,
 ]));
 
 foreach ($attributes->all() as $__key => $__value) {
@@ -28,6 +35,13 @@ foreach (array_filter(([
     'taskStatuses' => collect(),
     'context' => [],
     'overviewTaskLinkFormTaskId' => null,
+    'showShipmentModal' => false,
+    'shipmentModalTaskId' => null,
+    'shipmentEditingId' => null,
+    'shipmentModalMode' => 'same_address',
+    'shipmentForm' => [],
+    'showShipmentDetailsModal' => false,
+    'shipmentDetailsId' => null,
 ]), 'is_string', ARRAY_FILTER_USE_KEY) as $__key => $__value) {
     $$__key = $$__key ?? $__value;
 }
@@ -147,6 +161,66 @@ unset($__defined_vars, $__key, $__value); ?>
 <?php $component = $__componentOriginal4b8a3bff262dd7a3dfecfbbe1a23bd37; ?>
 <?php unset($__componentOriginal4b8a3bff262dd7a3dfecfbbe1a23bd37); ?>
 <?php endif; ?>
+
+            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($showShipmentModal && $shipmentModalTaskId): ?>
+                <?php
+                    $shipmentModalTask = $job->tasks->firstWhere('id', (int) $shipmentModalTaskId);
+                ?>
+                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($shipmentModalTask): ?>
+                    <?php if (isset($component)) { $__componentOriginala9cab2264441b499cc280e878a99e9f6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala9cab2264441b499cc280e878a99e9f6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.jobs.order-detail.shipment.add-modal','data' => ['job' => $job,'task' => $shipmentModalTask,'presentation' => $shipmentPresentation,'editingId' => $shipmentEditingId,'mode' => $shipmentModalMode,'form' => $shipmentForm]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('jobs.order-detail.shipment.add-modal'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['job' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($job),'task' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($shipmentModalTask),'presentation' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($shipmentPresentation),'editing-id' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($shipmentEditingId),'mode' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($shipmentModalMode),'form' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($shipmentForm)]); ?>
+<?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::processComponentKey($component); ?>
+
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala9cab2264441b499cc280e878a99e9f6)): ?>
+<?php $attributes = $__attributesOriginala9cab2264441b499cc280e878a99e9f6; ?>
+<?php unset($__attributesOriginala9cab2264441b499cc280e878a99e9f6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala9cab2264441b499cc280e878a99e9f6)): ?>
+<?php $component = $__componentOriginala9cab2264441b499cc280e878a99e9f6; ?>
+<?php unset($__componentOriginala9cab2264441b499cc280e878a99e9f6); ?>
+<?php endif; ?>
+                <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+            <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+
+            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($showShipmentDetailsModal && $shipmentDetailsId): ?>
+                <?php
+                    $shipmentDetailsRow = collect($shipmentPresentation['shipments'] ?? [])->firstWhere('id', (int) $shipmentDetailsId);
+                ?>
+                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($shipmentDetailsRow): ?>
+                    <?php if (isset($component)) { $__componentOriginalb791aa0fb962ca5675a628b8d7901ae5 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginalb791aa0fb962ca5675a628b8d7901ae5 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.jobs.order-detail.shipment.details-modal','data' => ['shipment' => $shipmentDetailsRow]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('jobs.order-detail.shipment.details-modal'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['shipment' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($shipmentDetailsRow)]); ?>
+<?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::processComponentKey($component); ?>
+
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginalb791aa0fb962ca5675a628b8d7901ae5)): ?>
+<?php $attributes = $__attributesOriginalb791aa0fb962ca5675a628b8d7901ae5; ?>
+<?php unset($__attributesOriginalb791aa0fb962ca5675a628b8d7901ae5); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginalb791aa0fb962ca5675a628b8d7901ae5)): ?>
+<?php $component = $__componentOriginalb791aa0fb962ca5675a628b8d7901ae5; ?>
+<?php unset($__componentOriginalb791aa0fb962ca5675a628b8d7901ae5); ?>
+<?php endif; ?>
+                <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+            <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
         <?php else: ?>
             <section class="grid ft-order-workflow-layout ft-order-workflow-layout--full">
               <div class="card ft-order-task-panel">

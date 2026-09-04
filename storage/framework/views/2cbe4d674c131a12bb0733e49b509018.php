@@ -54,10 +54,22 @@ unset($__defined_vars, $__key, $__value); ?>
         ? 'V1'
         : $currentArtworkVersions->map(fn($version) => 'V'.$version)->implode(' · ');
     $currentArtworkDocumentIds = $latestArtworkDocuments->pluck('id')->map(fn($id) => (int) $id);
+    // Preserve the existing Previous Versions behavior: every non-current artwork
+    // stays visible here, including normal full re-uploads. Cancellation metadata
+    // only changes the status label; it must not narrow the historical list.
     $archivedArtworkDocuments = $artworkDocs
         ->reject(fn($document) => $currentArtworkDocumentIds->contains((int) $document->id))
         ->sortByDesc('id')
         ->values();
+    $cancelledArtworkDocumentIds = ($latestArtworkTask && $job->relationLoaded('artworkCancellationActivities'))
+        ? collect($job->getRelation('artworkCancellationActivities'))
+            ->filter(fn($activity) => (int) data_get($activity->meta, 'target_task_id', 0) === (int) $latestArtworkTask->id)
+            ->flatMap(fn($activity) => collect(data_get($activity->meta, 'document_ids', [])))
+            ->map(fn($id) => (int) $id)
+            ->filter(fn($id) => $id > 0)
+            ->unique()
+            ->values()
+        : collect();
     $activeItems = \App\Support\OrderDetailPresenter::activeItems($job);
     $firstItem = $activeItems->first();
     $productName = (string) ($firstItem?->product_name ?: $job->product ?: 'Order product');
@@ -83,6 +95,85 @@ unset($__defined_vars, $__key, $__value); ?>
     $workflowInvoice = $variant === 'invoice_send'
         ? $workflowActions->preparedWorkflowInvoice($job)
         : null;
+
+    // Keep all Billing preparation logic inside this single top-level PHP block.
+    // Avoid nested PHP directive blocks inside the long Blade branch chain so
+    // the template keeps one simple, balanced control structure during Livewire
+    // renders and no directive source can leak into the modal markup.
+    $workflowRemoteAreaCharge = max(0, (float) ($payload['remote_area_charge'] ?? 0));
+    $invoiceRecipientOptions = collect();
+    $invoiceToEmail = '';
+    $invoiceMatchedToUser = null;
+    $invoiceToQuery = '';
+    $invoiceToSuggestions = collect();
+    $invoiceToIsValidEmail = false;
+    $invoiceNoSystemMatch = false;
+    $invoiceCcEmails = '';
+    $invoiceCcParts = collect();
+    $invoiceCcQuery = '';
+    $invoiceCcPrefix = collect();
+    $invoiceCcExactMatch = false;
+    $invoiceCcSuggestions = collect();
+    $invoiceCcSuggestionValues = collect();
+
+    if ($variant === 'invoice_send') {
+        $invoiceRecipientOptions = collect($invoiceEmailPreview['recipient_options'] ?? []);
+        $invoiceToEmail = trim((string) ($payload['to_email'] ?? ''));
+        $invoiceMatchedToUser = $invoiceRecipientOptions->first(
+            fn ($option) => mb_strtolower(trim((string) ($option['email'] ?? ''))) === mb_strtolower($invoiceToEmail)
+        );
+        $invoiceToQuery = mb_strtolower($invoiceToEmail);
+        $invoiceToSuggestions = $invoiceToQuery === '' || $invoiceMatchedToUser
+            ? collect()
+            : $invoiceRecipientOptions
+                ->filter(function ($option) use ($invoiceToQuery) {
+                    return str_contains(mb_strtolower((string) ($option['name'] ?? '')), $invoiceToQuery)
+                        || str_contains(mb_strtolower((string) ($option['email'] ?? '')), $invoiceToQuery);
+                })
+                ->take(6)
+                ->values();
+        $invoiceToIsValidEmail = $invoiceToEmail !== '' && filter_var($invoiceToEmail, FILTER_VALIDATE_EMAIL);
+        $invoiceNoSystemMatch = $invoiceToQuery !== ''
+            && ! $invoiceMatchedToUser
+            && $invoiceToSuggestions->isEmpty()
+            && ! $invoiceToIsValidEmail;
+
+        $invoiceCcEmails = trim((string) ($payload['cc_emails'] ?? ''));
+        $invoiceCcParts = collect(preg_split('/[,;]+/', $invoiceCcEmails) ?: [])
+            ->map(fn ($value) => trim((string) $value));
+        $invoiceCcQuery = mb_strtolower((string) ($invoiceCcParts->last() ?? ''));
+        $invoiceCcPrefix = $invoiceCcParts
+            ->slice(0, max(0, $invoiceCcParts->count() - 1))
+            ->filter()
+            ->values();
+        $invoiceCcExactMatch = $invoiceRecipientOptions->contains(
+            fn ($option) => mb_strtolower(trim((string) ($option['email'] ?? ''))) === $invoiceCcQuery
+        );
+        $invoiceCcSuggestions = $invoiceCcQuery === '' || $invoiceCcExactMatch
+            ? collect()
+            : $invoiceRecipientOptions
+                ->reject(fn ($option) => $invoiceMatchedToUser && (int) $option['id'] === (int) $invoiceMatchedToUser['id'])
+                ->filter(function ($option) use ($invoiceCcQuery) {
+                    return str_contains(mb_strtolower((string) ($option['name'] ?? '')), $invoiceCcQuery)
+                        || str_contains(mb_strtolower((string) ($option['email'] ?? '')), $invoiceCcQuery);
+                })
+                ->reject(function ($option) use ($invoiceCcPrefix) {
+                    $email = mb_strtolower(trim((string) ($option['email'] ?? '')));
+                    return $invoiceCcPrefix->contains(fn ($value) => mb_strtolower((string) $value) === $email);
+                })
+                ->take(6)
+                ->values();
+
+        $invoiceCcSuggestionValues = $invoiceCcSuggestions->mapWithKeys(function ($option) use ($invoiceCcPrefix) {
+            $value = $invoiceCcPrefix
+                ->concat([(string) ($option['email'] ?? '')])
+                ->filter()
+                ->unique(fn ($email) => mb_strtolower(trim((string) $email)))
+                ->implode(', ');
+
+            return [(int) ($option['id'] ?? 0) => $value];
+        });
+    }
     $emailServiceEnabled = (bool) (($variant === 'invoice_send' ? $invoiceEmailPreview : $emailHandoffPreview)['email_service_enabled'] ?? true);
     if (! $emailServiceEnabled && in_array($variant, ['purchase_order_email', 'artwork_email'], true)) {
         $title = $variant === 'artwork_email' ? 'Complete Artwork Handoff' : 'Complete Purchase Order Handoff';
@@ -118,6 +209,19 @@ unset($__defined_vars, $__key, $__value); ?>
         ->filter(fn($id) => $id > 0)
         ->unique()
         ->values();
+    $selectedCancellationDocumentIds = collect($payload['cancel_artwork_document_ids'] ?? [])
+        ->map(fn($id) => (int) $id)
+        ->filter(fn($id) => $id > 0)
+        ->unique()
+        ->values();
+    $selectedCancellationProductIds = collect($payload['cancel_product_item_ids'] ?? [])
+        ->map(fn($id) => (int) $id)
+        ->filter(fn($id) => $id > 0)
+        ->unique()
+        ->values();
+    $cancellableItems = $activeItems
+        ->filter(fn($item) => (int) ($item->id ?? 0) > 0 && filled($item->product_name ?? null))
+        ->values();
 
 
     // Only the main Artwork preview/handoff screens need the large landscape
@@ -134,6 +238,7 @@ unset($__defined_vars, $__key, $__value); ?>
     // Every artwork revision dialog uses the same compact prototype shell.
     // The copy/labels still vary by task, but layout and controls stay consistent.
     $isArtworkRevisionRequest = $step === 'revision';
+    $isArtworkCancellationRequest = $step === 'cancel_artwork';
 
     if ($step === 'sample') {
         $title = 'Is a Sample or Swatch Required?';
@@ -143,6 +248,9 @@ unset($__defined_vars, $__key, $__value); ?>
         $copy = $automationKey === 'ART_INTERNAL_REVIEW'
             ? 'Select one or more artworks. Add the required change and any supporting files under each selected artwork.'
             : 'Select one or more artworks and record the client feedback for each file before restarting the approval cycle.';
+    } elseif ($step === 'cancel_artwork') {
+        $title = 'Cancel Artwork';
+        $copy = 'Select the artwork to remove from the active Order. You can also remove the related product at the same time.';
     } elseif ($step === 'issue') {
         $title = $automationKey === 'QC_CHECK' ? 'Report QC Issue' : 'Report Production Issue';
         $copy = 'Describe the issue before notifying the supplier and blocking progression.';
@@ -151,7 +259,7 @@ unset($__defined_vars, $__key, $__value); ?>
 
 <div class="ft-order-task-document-modal-backdrop" <?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::$currentLoop['key'] = 'order-workflow-action-modal-'.e($task->id).'-'.e($step).''; ?>wire:key="order-workflow-action-modal-<?php echo e($task->id); ?>-<?php echo e($step); ?>">
     <section
-        class="ft-order-task-document-modal ft-order-workflow-action-modal <?php echo e($isArtworkPreviewModal ? 'ft-order-workflow-action-modal--artwork-preview' : ($modalWide ? 'ft-order-workflow-action-modal--wide' : '')); ?> <?php echo e($usesStableFinanceValidation ? 'ft-order-workflow-action-modal--stable-finance-validation' : ''); ?> <?php echo e($isArtworkRevisionRequest ? 'ft-order-workflow-action-modal--artwork-revision-request' : ''); ?>"
+        class="ft-order-task-document-modal ft-order-workflow-action-modal <?php echo e($isArtworkPreviewModal ? 'ft-order-workflow-action-modal--artwork-preview' : ($modalWide ? 'ft-order-workflow-action-modal--wide' : '')); ?> <?php echo e($usesStableFinanceValidation ? 'ft-order-workflow-action-modal--stable-finance-validation' : ''); ?> <?php echo e(($isArtworkRevisionRequest || $isArtworkCancellationRequest) ? 'ft-order-workflow-action-modal--artwork-revision-request' : ''); ?> <?php echo e($isArtworkCancellationRequest ? 'ft-order-workflow-action-modal--artwork-cancellation-request' : ''); ?>"
         data-ft-feedback-scope="form"
         role="dialog"
         aria-modal="true"
@@ -175,6 +283,146 @@ unset($__defined_vars, $__key, $__value); ?>
                         <strong>Yes</strong>
                         <small>Activate Sample Approval</small>
                     </button>
+                </div>
+            <?php elseif($step === 'cancel_artwork'): ?>
+                <div class="ft-artwork-cancellation">
+                    <section class="ft-artwork-cancellation-section">
+                        <div class="ft-artwork-revision-selector-head">
+                            <div>
+                                <strong>Select artwork to cancel</strong>
+                                <span>The selected files will leave the current artwork set but remain in Order history. At least one current artwork must remain.</span>
+                            </div>
+                            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($selectedCancellationDocumentIds->isNotEmpty()): ?>
+                                <em><?php echo e($selectedCancellationDocumentIds->count()); ?> selected</em>
+                            <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                        </div>
+
+                        <div class="ft-artwork-revision-selector-list">
+                            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::openLoop(); ?><?php endif; ?><?php $__empty_1 = true; $__currentLoopData = $latestArtworkDocuments; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $cancelDocument): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::startLoopIteration(); ?><?php endif; ?>
+                                <div
+                                    class="ft-artwork-revision-selector-item <?php echo e($selectedCancellationDocumentIds->contains((int) $cancelDocument->id) ? 'is-selected' : ''); ?>"
+                                    <?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::$currentLoop['key'] = 'artwork-cancel-item-'.e($task->id).'-'.e((int) $cancelDocument->id).''; ?>wire:key="artwork-cancel-item-<?php echo e($task->id); ?>-<?php echo e((int) $cancelDocument->id); ?>"
+                                >
+                                    <div class="ft-artwork-revision-selector-summary">
+                                        <label class="ft-artwork-revision-selector-choice">
+                                            <input
+                                                type="checkbox"
+                                                wire:model.live="orderWorkflowActionPayload.cancel_artwork_document_ids"
+                                                value="<?php echo e((int) $cancelDocument->id); ?>"
+                                            >
+                                            <span class="ft-artwork-revision-selector-check" aria-hidden="true">✓</span>
+                                            <?php if (isset($component)) { $__componentOriginal8cc2d9c978b2c497e659881c0713db1b = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal8cc2d9c978b2c497e659881c0713db1b = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.file-type-badge','data' => ['extension' => strtoupper(pathinfo((string) $cancelDocument->name, PATHINFO_EXTENSION) ?: 'FILE'),'size' => 'sm']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.file-type-badge'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['extension' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(strtoupper(pathinfo((string) $cancelDocument->name, PATHINFO_EXTENSION) ?: 'FILE')),'size' => 'sm']); ?>
+<?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::processComponentKey($component); ?>
+
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal8cc2d9c978b2c497e659881c0713db1b)): ?>
+<?php $attributes = $__attributesOriginal8cc2d9c978b2c497e659881c0713db1b; ?>
+<?php unset($__attributesOriginal8cc2d9c978b2c497e659881c0713db1b); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal8cc2d9c978b2c497e659881c0713db1b)): ?>
+<?php $component = $__componentOriginal8cc2d9c978b2c497e659881c0713db1b; ?>
+<?php unset($__componentOriginal8cc2d9c978b2c497e659881c0713db1b); ?>
+<?php endif; ?>
+                                            <span class="ft-artwork-revision-selector-copy">
+                                                <b title="<?php echo e($cancelDocument->name); ?>"><?php echo e($cancelDocument->name); ?></b>
+                                                <small>Current artwork</small>
+                                            </span>
+                                        </label>
+                                        <a href="<?php echo e(route('documents.open', $cancelDocument)); ?>" target="_blank" rel="noopener">View</a>
+                                    </div>
+                                </div>
+                            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::endLoop(); ?><?php endif; ?><?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::closeLoop(); ?><?php endif; ?>
+                                <div class="ft-artwork-revision-selector-empty">No current artwork files are available to cancel.</div>
+                            <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                        </div>
+                        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php $__errorArgs = ['orderWorkflowActionPayload.cancel_artwork_document_ids'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?><p class="validation-error"><?php echo e($message); ?></p><?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                    </section>
+
+                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($selectedCancellationDocumentIds->isNotEmpty()): ?>
+                        <section class="ft-artwork-cancellation-section ft-artwork-cancellation-products">
+                            <div class="ft-artwork-cancellation-section-head">
+                                <div>
+                                    <strong>Remove product with artwork <span>(optional)</span></strong>
+                                    <small>Select only the Order product lines that should be removed with the cancelled artwork. At least one active Order product must remain.</small>
+                                </div>
+                                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($selectedCancellationProductIds->isNotEmpty()): ?>
+                                    <em><?php echo e($selectedCancellationProductIds->count()); ?> selected</em>
+                                <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                            </div>
+
+                            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($cancellableItems->isNotEmpty()): ?>
+                                <div class="ft-artwork-cancellation-product-list">
+                                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::openLoop(); ?><?php endif; ?><?php $__currentLoopData = $cancellableItems; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $cancelItem): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::startLoopIteration(); ?><?php endif; ?>
+                                        <label
+                                            class="ft-artwork-cancellation-product <?php echo e($selectedCancellationProductIds->contains((int) $cancelItem->id) ? 'is-selected' : ''); ?>"
+                                            <?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::$currentLoop['key'] = 'artwork-cancel-product-'.e($task->id).'-'.e((int) $cancelItem->id).''; ?>wire:key="artwork-cancel-product-<?php echo e($task->id); ?>-<?php echo e((int) $cancelItem->id); ?>"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                wire:model.live="orderWorkflowActionPayload.cancel_product_item_ids"
+                                                value="<?php echo e((int) $cancelItem->id); ?>"
+                                            >
+                                            <span class="ft-artwork-revision-selector-check" aria-hidden="true">✓</span>
+                                            <span class="ft-artwork-cancellation-product-copy">
+                                                <b><?php echo e($cancelItem->product_name ?: 'Order product'); ?></b>
+                                                <small><?php echo e(number_format((int) ($cancelItem->quantity ?? 0))); ?> units<?php echo e(filled($cancelItem->category_name ?? null) ? ' · '.trim((string) $cancelItem->category_name) : ''); ?></small>
+                                            </span>
+                                        </label>
+                                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::endLoop(); ?><?php endif; ?><?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::closeLoop(); ?><?php endif; ?>
+                                </div>
+                            <?php else: ?>
+                                <div class="ft-artwork-revision-selector-empty">No removable Order product lines are available.</div>
+                            <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php $__errorArgs = ['orderWorkflowActionPayload.cancel_product_item_ids'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?><p class="validation-error"><?php echo e($message); ?></p><?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                        </section>
+
+                        <label class="ft-artwork-cancellation-reason">
+                            <span>Cancellation reason <b>*</b></span>
+                            <textarea
+                                wire:model="orderWorkflowActionComment"
+                                rows="3"
+                                maxlength="2000"
+                                placeholder="Why is this artwork being removed from the Order?"
+                            ></textarea>
+                        </label>
+                        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php $__errorArgs = ['orderWorkflowActionComment'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?><p class="validation-error"><?php echo e($message); ?></p><?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+
+                        <div class="ft-artwork-cancellation-note">
+                            <span aria-hidden="true">i</span>
+                            <p>The artwork file and any selected products stay in history for audit. This action does not cancel the whole Order.</p>
+                        </div>
+                    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                 </div>
             <?php elseif($step === 'revision'): ?>
                 <div class="ft-artwork-revision-selector">
@@ -713,7 +961,7 @@ unset($__errorArgs, $__bag); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendB
                                                 <small><?php echo e(\App\Support\UserLocalTime::format($doc->created_at, 'M j, Y, g:i A')); ?></small>
                                             </span>
                                             <span class="ft-prototype-version-status">
-                                                <b>Archived</b>
+                                                <b><?php echo e($cancelledArtworkDocumentIds->contains((int) $doc->id) ? 'Cancelled' : 'Archived'); ?></b>
                                                 <a href="<?php echo e(route('documents.open', $doc)); ?>" target="_blank" rel="noopener">Open</a>
                                                 <a href="<?php echo e(route('documents.download', $doc)); ?>">Download</a>
                                             </span>
@@ -1134,57 +1382,15 @@ if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?></label>
                 </div>
-                <?php($workflowRemoteAreaCharge = max(0, (float) ($payload['remote_area_charge'] ?? 0)))
-                <div class="ft-prototype-email-preview"><b>Included order:</b> {{ $orderNumber }}<br><b>Client:</b> {{ $clientName }}@if($workflowRemoteAreaCharge > 0)<br><b>Remote area charge:</b> {{ $payload['invoice_currency'] ?? 'USD' }} {{ number_format($workflowRemoteAreaCharge, 2) }}@endif<br><b>Total:</b> {{ $payload['invoice_currency'] ?? 'USD' }} {{ number_format((float) ($payload['invoice_amount'] ?? $orderTotal) + $workflowRemoteAreaCharge, 2) }}</div>
-            @elseif($variant === 'invoice_send')
-                @php
-                    $invoiceRecipientOptions = collect($invoiceEmailPreview['recipient_options'] ?? []);
-                    $invoiceToEmail = trim((string) ($payload['to_email'] ?? ''));
-                    $invoiceMatchedToUser = $invoiceRecipientOptions->first(
-                        fn($option) => mb_strtolower(trim((string) ($option['email'] ?? ''))) === mb_strtolower($invoiceToEmail)
-                    );
-                    $invoiceToQuery = mb_strtolower($invoiceToEmail);
-                    $invoiceToSuggestions = $invoiceToQuery === '' || $invoiceMatchedToUser
-                        ? collect()
-                        : $invoiceRecipientOptions
-                            ->filter(function($option) use ($invoiceToQuery) {
-                                return str_contains(mb_strtolower((string) ($option['name'] ?? '')), $invoiceToQuery)
-                                    || str_contains(mb_strtolower((string) ($option['email'] ?? '')), $invoiceToQuery);
-                            })
-                            ->take(6)
-                            ->values();
-                    $invoiceToIsValidEmail = $invoiceToEmail !== '' && filter_var($invoiceToEmail, FILTER_VALIDATE_EMAIL);
-                    $invoiceNoSystemMatch = $invoiceToQuery !== ''
-                        && ! $invoiceMatchedToUser
-                        && $invoiceToSuggestions->isEmpty()
-                        && ! $invoiceToIsValidEmail;
-
-                    $invoiceCcEmails = trim((string) ($payload['cc_emails'] ?? ''));
-                    $invoiceCcParts = collect(preg_split('/[,;]+/', $invoiceCcEmails) ?: [])
-                        ->map(fn($value) => trim((string) $value));
-                    $invoiceCcQuery = mb_strtolower((string) ($invoiceCcParts->last() ?? ''));
-                    $invoiceCcPrefix = $invoiceCcParts
-                        ->slice(0, max(0, $invoiceCcParts->count() - 1))
-                        ->filter()
-                        ->values();
-                    $invoiceCcExactMatch = $invoiceRecipientOptions->contains(
-                        fn($option) => mb_strtolower(trim((string) ($option['email'] ?? ''))) === $invoiceCcQuery
-                    );
-                    $invoiceCcSuggestions = $invoiceCcQuery === '' || $invoiceCcExactMatch
-                        ? collect()
-                        : $invoiceRecipientOptions
-                            ->reject(fn($option) => $invoiceMatchedToUser && (int) $option['id'] === (int) $invoiceMatchedToUser['id'])
-                            ->filter(function($option) use ($invoiceCcQuery) {
-                                return str_contains(mb_strtolower((string) ($option['name'] ?? '')), $invoiceCcQuery)
-                                    || str_contains(mb_strtolower((string) ($option['email'] ?? '')), $invoiceCcQuery);
-                            })
-                            ->reject(function($option) use ($invoiceCcPrefix) {
-                                $email = mb_strtolower(trim((string) ($option['email'] ?? '')));
-                                return $invoiceCcPrefix->contains(fn($value) => mb_strtolower((string) $value) === $email);
-                            })
-                            ->take(6)
-                            ->values();
-                ?>
+                <div class="ft-prototype-email-preview">
+                    <div><b>Included order:</b> <?php echo e($orderNumber); ?></div>
+                    <div><b>Client:</b> <?php echo e($clientName); ?></div>
+                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($workflowRemoteAreaCharge > 0): ?>
+                        <div><b>Remote area charge:</b> <?php echo e($payload['invoice_currency'] ?? 'USD'); ?> <?php echo e(number_format($workflowRemoteAreaCharge, 2)); ?></div>
+                    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                    <div><b>Total:</b> <?php echo e($payload['invoice_currency'] ?? 'USD'); ?> <?php echo e(number_format((float) ($payload['invoice_amount'] ?? $orderTotal) + $workflowRemoteAreaCharge, 2)); ?></div>
+                </div>
+            <?php elseif($variant === 'invoice_send'): ?>
                 <div class="ft-invoice-send-workspace">
                     
                         <section
@@ -1308,16 +1514,10 @@ unset($__errorArgs, $__bag); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendB
                                         <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($invoiceCcSuggestions->isNotEmpty()): ?>
                                             <div class="ft-po-mail-suggestions" role="listbox" aria-label="System user CC suggestions">
                                                 <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::openLoop(); ?><?php endif; ?><?php $__currentLoopData = $invoiceCcSuggestions; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $option): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::startLoopIteration(); ?><?php endif; ?>
-                                                    <?php
-                                                        $nextInvoiceCcEmails = $invoiceCcPrefix
-                                                            ->concat([(string) $option['email']])
-                                                            ->unique(fn($email) => mb_strtolower(trim((string) $email)))
-                                                            ->implode(', ');
-                                                    ?>
                                                     <button
                                                         type="button"
                                                         <?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::$currentLoop['key'] = 'invoice-cc-suggestion-'.e($task->id).'-'.e((int) $option['id']).''; ?>wire:key="invoice-cc-suggestion-<?php echo e($task->id); ?>-<?php echo e((int) $option['id']); ?>"
-                                                        wire:click="$set('orderWorkflowActionPayload.cc_emails', <?php echo \Illuminate\Support\Js::from($nextInvoiceCcEmails)->toHtml() ?>)"
+                                                        wire:click="$set('orderWorkflowActionPayload.cc_emails', <?php echo \Illuminate\Support\Js::from($invoiceCcSuggestionValues->get((int) $option['id'], ''))->toHtml() ?>)"
                                                         class="ft-po-mail-suggestion"
                                                     >
                                                         <span class="ft-po-mail-suggestion__avatar"><?php echo e(mb_strtoupper(mb_substr((string) ($option['name'] ?? $option['email']), 0, 1))); ?></span>
@@ -1451,6 +1651,8 @@ unset($__errorArgs, $__bag); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendB
                 <button type="button" class="secondary" wire:click="closeOrderWorkflowAction">Cancel</button>
                 <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($step === 'revision'): ?>
                     <button type="button" class="danger ft-artwork-revision-submit" wire:click="submitOrderWorkflowAction('revise')" wire:loading.attr="disabled" wire:target="submitOrderWorkflowAction,orderWorkflowActionRevisionAttachments"><?php echo e($automationKey === 'ART_INTERNAL_REVIEW' ? 'Submit Revision' : 'Activate Revision Task'); ?></button>
+                <?php elseif($step === 'cancel_artwork'): ?>
+                    <button type="button" class="danger ft-artwork-cancellation-submit" wire:click="submitOrderWorkflowAction('cancel_artwork')" wire:loading.attr="disabled" wire:target="submitOrderWorkflowAction">Cancel Selected Artwork</button>
                 <?php elseif($step === 'issue'): ?>
                     <button type="button" class="danger" wire:click="submitOrderWorkflowAction('issue')" wire:loading.attr="disabled" wire:target="submitOrderWorkflowAction">Report Issue</button>
                 <?php elseif($emailFallback && $emailServiceEnabled && in_array($variant, ['purchase_order_email', 'artwork_email'], true)): ?>
@@ -1458,13 +1660,14 @@ unset($__errorArgs, $__bag); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendB
                     <button type="button" class="primary" wire:click="completeOrderWorkflowEmailTaskAfterFailure" wire:loading.attr="disabled" wire:target="completeOrderWorkflowEmailTaskAfterFailure">Complete task</button>
                 <?php else: ?>
                     <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::openLoop(); ?><?php endif; ?><?php $__currentLoopData = $choices; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $decision => $label): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::startLoopIteration(); ?><?php endif; ?>
+                        <?php if($decision === 'cancel_artwork' && $latestArtworkDocuments->count() <= 1): ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?><?php continue; ?><?php endif; ?>
                         <?php
                             $actionLabel = ! $emailServiceEnabled && in_array($variant, ['purchase_order_email', 'artwork_email', 'invoice_send'], true)
                                 ? 'Complete without email'
                                 : $label;
                             $actionDisabled = $variant === 'invoice_send' && ! $workflowInvoice;
                         ?>
-                        <button type="button" class="<?php echo e(in_array($decision, ['revise','issue'], true) ? 'danger' : 'primary'); ?>" wire:click="submitOrderWorkflowAction('<?php echo e($decision); ?>')" wire:loading.attr="disabled" wire:target="submitOrderWorkflowAction" <?php if($actionDisabled): echo 'disabled'; endif; ?>><?php echo e($actionLabel); ?></button>
+                        <button type="button" class="<?php echo e(in_array($decision, ['revise','cancel_artwork','issue'], true) ? 'danger' : 'primary'); ?>" wire:click="submitOrderWorkflowAction('<?php echo e($decision); ?>')" wire:loading.attr="disabled" wire:target="submitOrderWorkflowAction" <?php if($actionDisabled): echo 'disabled'; endif; ?>><?php echo e($actionLabel); ?></button>
                     <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::endLoop(); ?><?php endif; ?><?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::closeLoop(); ?><?php endif; ?>
                 <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
             </footer>

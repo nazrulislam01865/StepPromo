@@ -22,6 +22,7 @@ $__propNames = \Illuminate\View\ComponentAttributeBag::extractPropNames(([
     'supplierValue' => null,
     'supplierLabel' => '',
     'supplierLocked' => false,
+    'supplierSkipped' => false,
     'supplierRequired' => false,
     'currencySymbol' => '$',
     'closeMethod',
@@ -30,6 +31,7 @@ $__propNames = \Illuminate\View\ComponentAttributeBag::extractPropNames(([
     'quantityErrorKey',
     'unitPriceErrorKey',
     'supplierErrorKey' => null,
+    'missingSupplierMethod' => null,
     'showHeader' => true,
     'recordLabel' => 'Order',
 ]));
@@ -68,6 +70,7 @@ foreach (array_filter(([
     'supplierValue' => null,
     'supplierLabel' => '',
     'supplierLocked' => false,
+    'supplierSkipped' => false,
     'supplierRequired' => false,
     'currencySymbol' => '$',
     'closeMethod',
@@ -76,6 +79,7 @@ foreach (array_filter(([
     'quantityErrorKey',
     'unitPriceErrorKey',
     'supplierErrorKey' => null,
+    'missingSupplierMethod' => null,
     'showHeader' => true,
     'recordLabel' => 'Order',
 ]), 'is_string', ARRAY_FILTER_USE_KEY) as $__key => $__value) {
@@ -99,6 +103,8 @@ unset($__defined_vars, $__key, $__value); ?>
         ? trim((string) $supplierLabel)
         : trim((string) ($selectedSupplier?->name ?? ''));
     $selectedSupplierExists = filled($selectedSupplierName) || filled($supplierValue);
+    $supplierSkipped = (bool) $supplierSkipped;
+    $supplierResolved = $selectedSupplierExists || $supplierSkipped;
     $selectedSupplierIsDefault = $supplierRequired
         && $selectedSupplier
         && (int) $supplierValue === (int) $selectedSupplier->id;
@@ -226,10 +232,16 @@ unset($__defined_vars, $__key, $__value); ?>
                     <div class="ft-pq-selected-field ft-pq-selected-supplier" x-on:create-order-product-supplier-selected.window="changingSupplier = false">
                         <span>Supplier for this <?php echo e(strtolower($recordLabel)); ?></span>
                         <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($supplierRequired): ?>
-                            <div x-show="!changingSupplier" class="ft-pq-supplier-box <?php echo e(!$selectedSupplierExists ? 'is-missing' : ''); ?>">
-                                <strong><?php echo e($selectedSupplierName ?: 'No default supplier linked'); ?></strong>
+                            <div x-show="!changingSupplier" class="ft-pq-supplier-box <?php echo e(!$supplierResolved ? 'is-missing' : ''); ?>">
+                                <strong><?php echo e($selectedSupplierName ?: ($supplierSkipped ? 'Supplier skipped for now' : 'No default supplier linked')); ?></strong>
                                 <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($selectedSupplierExists): ?><i>&middot;</i><b><?php echo e($selectedSupplierIsDefault ? 'Default' : 'Selected'); ?></b><?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-                                <button type="button" x-on:click="changingSupplier = true">Change</button>
+                                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($supplierSkipped): ?><i>&middot;</i><b>Assign later</b><?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                                <span class="ft-pq-supplier-actions">
+                                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(!$selectedSupplierExists && $missingSupplierMethod): ?>
+                                        <button type="button" wire:click="<?php echo e($missingSupplierMethod); ?>">Create supplier</button>
+                                    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                                    <button type="button" x-on:click="changingSupplier = true">Change</button>
+                                </span>
                             </div>
                             <div x-cloak x-show="changingSupplier" class="ft-pq-supplier-picker">
                                 <?php if (isset($component)) { $__componentOriginal655167214ff7da69eb027810b956fa88 = $component; } ?>
@@ -261,6 +273,11 @@ unset($__defined_vars, $__key, $__value); ?>
                             <div class="ft-pq-supplier-box <?php echo e(!$selectedSupplierExists ? 'is-missing' : ''); ?>">
                                 <strong><?php echo e($selectedSupplierName ?: 'No default supplier linked'); ?></strong>
                                 <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($selectedSupplierExists): ?><i>&middot;</i><b>Default</b><?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(!$selectedSupplierExists && $missingSupplierMethod): ?>
+                                    <span class="ft-pq-supplier-actions">
+                                        <button type="button" wire:click="<?php echo e($missingSupplierMethod); ?>">Create supplier</button>
+                                    </span>
+                                <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                             </div>
                         <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                     </div>
@@ -293,7 +310,7 @@ unset($__defined_vars, $__key, $__value); ?>
 
     <div class="ft-detail-add-product__parity-actions">
         <button type="button" class="ft-detail-add-product__cancel" wire:click="<?php echo e($closeMethod); ?>">Cancel</button>
-        <button type="button" class="ft-detail-add-product__submit" wire:click="<?php echo e($saveMethod); ?>" wire:loading.attr="disabled" wire:target="<?php echo e($saveMethod); ?>" <?php if(!$selectedProduct || ($supplierRequired && !$supplierValue)): echo 'disabled'; endif; ?>>
+        <button type="button" class="ft-detail-add-product__submit" wire:click="<?php echo e($saveMethod); ?>" wire:loading.attr="disabled" wire:target="<?php echo e($saveMethod); ?>" <?php if(!$selectedProduct || ($supplierRequired && !$supplierResolved)): echo 'disabled'; endif; ?>>
             <span wire:loading.remove wire:target="<?php echo e($saveMethod); ?>">Add product</span>
             <span wire:loading wire:target="<?php echo e($saveMethod); ?>">Adding…</span>
         </button>

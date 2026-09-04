@@ -14,14 +14,15 @@ class SecureDocumentStorage
 {
     public function __construct(private readonly UploadSecurityService $security) {}
 
-    /** @return array{path:string,mime:string,size:int,scan_engine:string} */
+    /** @return array{path:string,mime:string,size:int,scan_engine:string,extension:string,extension_normalized:bool} */
     public function store(UploadedFile $file, string $directory, ?int $maxFileBytes = null): array
     {
         $directory = trim($directory, '/');
         abort_if($directory === '' || str_contains($directory, '..'), 500, 'Invalid secure storage directory.');
 
         $extension = strtolower(trim((string) $file->getClientOriginalExtension()));
-        $storedName = Str::uuid()->toString().($extension !== '' ? '.'.$extension : '');
+        $storedStem = Str::uuid()->toString();
+        $storedName = $storedStem.($extension !== '' ? '.'.$extension : '');
         $quarantinePath = 'pending/'.Str::uuid()->toString().'/'.$storedName;
         $quarantineDisk = Storage::disk((string) config('flowtrack.quarantine_disk', 'flowtrack_quarantine'));
 
@@ -38,7 +39,9 @@ class SecureDocumentStorage
                 }
             }
 
-            $targetPath = $directory.'/'.$storedName;
+            $verifiedExtension = strtolower(trim((string) ($scan['extension'] ?? $extension)));
+            $targetName = $storedStem.($verifiedExtension !== '' ? '.'.$verifiedExtension : '');
+            $targetPath = $directory.'/'.$targetName;
             $targetDisk = Storage::disk((string) config('flowtrack.document_disk', 'flowtrack_private'));
             $stream = $quarantineDisk->readStream($quarantinePath);
             abort_if($stream === false, 500, 'The quarantined upload could not be read.');
@@ -62,6 +65,8 @@ class SecureDocumentStorage
                 'mime' => (string) $scan['mime'],
                 'size' => (int) $scan['size'],
                 'scan_engine' => (string) $scan['engine'],
+                'extension' => $verifiedExtension,
+                'extension_normalized' => (bool) ($scan['extension_normalized'] ?? false),
             ];
         } catch (\Throwable $exception) {
             // A rejected or failed scan intentionally stays on the quarantine

@@ -3,18 +3,19 @@
 $__newAttributes = [];
 $__propNames = \Illuminate\View\ComponentAttributeBag::extractPropNames(([
     'clients','workflows','categories','priorities','clientId','workflowId','ownerId','jobItems','jobAttachments','purchaseOrderUpload'=>null,
-    'priority'=>'Medium','productionUrgencies'=>collect(),'shipmentUrgencies'=>collect(),'productionUrgencyIds'=>[],'shipmentUrgencyIds'=>[],'isRepeatedOrder'=>false,'repeatedOrderNumber'=>'',
+    'priority'=>'Medium','productionUrgencies'=>collect(),'shipmentMethods'=>collect(),'shipmentUrgencies'=>collect(),'productionUrgencyIds'=>[],'shipmentMethodIds'=>[],'shipmentUrgencyIds'=>[],'isRepeatedOrder'=>false,'repeatedOrderNumber'=>'',
     'clientFilterOptions'=>collect(),'ownerFilterOptions'=>collect(),'workflowFilterOptions'=>collect(),'categoryFilterOptions'=>collect(),
     'productCategories'=>collect(),'productSearchResults'=>collect(),'productSearchSuppliers'=>collect(),'selectedProductDetails'=>collect(),'selectedProductSuppliers'=>collect(),'createOrderSupplierSkipProductIds'=>[],'activeProductCount'=>0,'productResultTotal'=>0,
     'canUseOrderProductSelector'=>false,'canCreateCatalogProduct'=>false,'canViewProductCategories'=>false,'canCreateProductCategory'=>false,'duplicateProduct'=>null,'newProductCategoryMatches'=>collect(),'newProductSimilarCategories'=>collect(),
     'newProductSimilarProducts'=>collect(),'newProductSelectedCategory'=>null,'newProductHasExactCategory'=>false,'newProductImagePreview'=>null,'newProductSupplierOptions'=>collect(),
     'createProductSearch'=>'','createProductCategoryFilter'=>'','createProductShowAllResults'=>false,'showCreateOrderProductModal'=>false,
-    'showMissingProductSupplierModal'=>false,'missingProductSupplierName'=>'',
     'newProductCode'=>'','newProductCategoryId'=>null,'newProductCategorySearch'=>'','newProductCategoryName'=>'','newProductName'=>'','newProductSupplierId'=>null,
     'catalogReady'=>false,'assignmentReady'=>false,'workflowReady'=>false,'workflowSelectorVersion'=>0,'workflowPhaseId'=>null,'mentionUsers'=>collect(),
     'createInquiryFilterOptions'=>collect(),'selectedCreateInquiry'=>null,'selectedCreateInquiries'=>collect(),'createInquirySelectorVersion'=>0,'canLinkInquiryOnCreate'=>false,
-    'savedShippingAddresses'=>collect(),'savedDeliveryContacts'=>collect(),'showSavedShippingAddressPicker'=>false,'shippingSourceAddressId'=>null,
+    'referenceNumber'=>'',
+    'savedShippingAddresses'=>collect(),'savedDeliveryContacts'=>collect(),'showSavedShippingAddressPicker'=>false,'shippingSourceAddressId'=>null,'savedShippingAddressShipmentIndex'=>null,
     'phoneCountryCodeOptions'=>collect(),'shippingPhoneCountryCode'=>'+1','shippingPhone'=>'',
+    'createShipmentCountries'=>collect(),'createShipmentStatesByCountry'=>collect(),'createShipmentPhoneCodes'=>collect(),'createShipmentMode'=>'multiple_shipments','createShipments'=>[],
     'shippingContactType'=>'end_customer','shippingContactId'=>null,'shippingContactSelection'=>'','shippingContactName'=>'','shippingSaveContact'=>true,
 ]));
 
@@ -33,18 +34,19 @@ unset($__newAttributes);
 
 foreach (array_filter(([
     'clients','workflows','categories','priorities','clientId','workflowId','ownerId','jobItems','jobAttachments','purchaseOrderUpload'=>null,
-    'priority'=>'Medium','productionUrgencies'=>collect(),'shipmentUrgencies'=>collect(),'productionUrgencyIds'=>[],'shipmentUrgencyIds'=>[],'isRepeatedOrder'=>false,'repeatedOrderNumber'=>'',
+    'priority'=>'Medium','productionUrgencies'=>collect(),'shipmentMethods'=>collect(),'shipmentUrgencies'=>collect(),'productionUrgencyIds'=>[],'shipmentMethodIds'=>[],'shipmentUrgencyIds'=>[],'isRepeatedOrder'=>false,'repeatedOrderNumber'=>'',
     'clientFilterOptions'=>collect(),'ownerFilterOptions'=>collect(),'workflowFilterOptions'=>collect(),'categoryFilterOptions'=>collect(),
     'productCategories'=>collect(),'productSearchResults'=>collect(),'productSearchSuppliers'=>collect(),'selectedProductDetails'=>collect(),'selectedProductSuppliers'=>collect(),'createOrderSupplierSkipProductIds'=>[],'activeProductCount'=>0,'productResultTotal'=>0,
     'canUseOrderProductSelector'=>false,'canCreateCatalogProduct'=>false,'canViewProductCategories'=>false,'canCreateProductCategory'=>false,'duplicateProduct'=>null,'newProductCategoryMatches'=>collect(),'newProductSimilarCategories'=>collect(),
     'newProductSimilarProducts'=>collect(),'newProductSelectedCategory'=>null,'newProductHasExactCategory'=>false,'newProductImagePreview'=>null,'newProductSupplierOptions'=>collect(),
     'createProductSearch'=>'','createProductCategoryFilter'=>'','createProductShowAllResults'=>false,'showCreateOrderProductModal'=>false,
-    'showMissingProductSupplierModal'=>false,'missingProductSupplierName'=>'',
     'newProductCode'=>'','newProductCategoryId'=>null,'newProductCategorySearch'=>'','newProductCategoryName'=>'','newProductName'=>'','newProductSupplierId'=>null,
     'catalogReady'=>false,'assignmentReady'=>false,'workflowReady'=>false,'workflowSelectorVersion'=>0,'workflowPhaseId'=>null,'mentionUsers'=>collect(),
     'createInquiryFilterOptions'=>collect(),'selectedCreateInquiry'=>null,'selectedCreateInquiries'=>collect(),'createInquirySelectorVersion'=>0,'canLinkInquiryOnCreate'=>false,
-    'savedShippingAddresses'=>collect(),'savedDeliveryContacts'=>collect(),'showSavedShippingAddressPicker'=>false,'shippingSourceAddressId'=>null,
+    'referenceNumber'=>'',
+    'savedShippingAddresses'=>collect(),'savedDeliveryContacts'=>collect(),'showSavedShippingAddressPicker'=>false,'shippingSourceAddressId'=>null,'savedShippingAddressShipmentIndex'=>null,
     'phoneCountryCodeOptions'=>collect(),'shippingPhoneCountryCode'=>'+1','shippingPhone'=>'',
+    'createShipmentCountries'=>collect(),'createShipmentStatesByCountry'=>collect(),'createShipmentPhoneCodes'=>collect(),'createShipmentMode'=>'multiple_shipments','createShipments'=>[],
     'shippingContactType'=>'end_customer','shippingContactId'=>null,'shippingContactSelection'=>'','shippingContactName'=>'','shippingSaveContact'=>true,
 ]), 'is_string', ARRAY_FILTER_USE_KEY) as $__key => $__value) {
     $$__key = $$__key ?? $__value;
@@ -190,103 +192,30 @@ unset($__errorArgs, $__bag); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendB
             </div>
         </section>
 
-        <section class="ft-create-section ft-order-shipping-section" <?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::$currentLoop['key'] = 'create-order-shipping-address'; ?>wire:key="create-order-shipping-address">
-            <div class="ft-order-shipping-head">
-                <div class="ft-order-shipping-heading">
-                    <div class="ft-create-section-title ft-order-shipping-title">
-                        <span>2</span>
-                        <h2>Shipping address</h2>
-                    </div>
-                    <p>Add the delivery address for this Order.</p>
-                </div>
-                <button
-                    type="button"
-                    class="ft-order-saved-address-button"
-                    wire:click="openSavedShippingAddressPicker"
-                    <?php if(!$clientId || $savedShippingAddresses->isEmpty()): echo 'disabled'; endif; ?>
-                    title="<?php echo e(!$clientId ? 'Select a client first' : ($savedShippingAddresses->isEmpty() ? 'This client has no saved shipping addresses' : 'Choose from this client\'s saved shipping addresses')); ?>"
-                >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6.5 4.5h11v15l-5.5-3.3-5.5 3.3v-15Z"/></svg>
-                    <span>Use saved address</span>
-                </button>
-            </div>
-
-            <label class="ft-create-field ft-order-shipping-address-field">
-                <b>Shipping Address *</b>
-                <textarea wire:model="shippingAddress" rows="5" required aria-required="true" placeholder="Recipient name&#10;Street address&#10;City, State, Country"></textarea>
-                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php $__errorArgs = ['shippingAddress'];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?><small class="validation-error"><?php echo e($message); ?></small><?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-            </label>
-
-            <?php if (isset($component)) { $__componentOriginal3bdeca9f4e3c8ff46afbfa315bf4b6ef = $component; } ?>
-<?php if (isset($attributes)) { $__attributesOriginal3bdeca9f4e3c8ff46afbfa315bf4b6ef = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.jobs.create.shipping-contact','data' => ['selectedClient' => $selectedClient,'savedDeliveryContacts' => $savedDeliveryContacts,'phoneCountryCodeOptions' => $phoneCountryCodeOptions,'shippingPhoneCountryCode' => $shippingPhoneCountryCode,'shippingPhone' => $shippingPhone,'shippingContactType' => $shippingContactType,'shippingContactId' => $shippingContactId,'shippingContactSelection' => $shippingContactSelection,'shippingContactName' => $shippingContactName,'shippingSaveContact' => $shippingSaveContact]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
-<?php $component->withName('jobs.create.shipping-contact'); ?>
+        <?php if (isset($component)) { $__componentOriginalfad564098d922e377b755e81752b4e23 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginalfad564098d922e377b755e81752b4e23 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.jobs.create.shipping-setup','data' => ['shipments' => $createShipments,'mode' => $createShipmentMode,'shipmentMethods' => $shipmentMethods,'shipmentUrgencies' => $shipmentUrgencies,'countries' => $createShipmentCountries,'statesByCountry' => $createShipmentStatesByCountry,'phoneCodes' => $createShipmentPhoneCodes,'savedShippingAddresses' => $savedShippingAddresses,'showSavedShippingAddressPicker' => $showSavedShippingAddressPicker,'savedShippingAddressShipmentIndex' => $savedShippingAddressShipmentIndex,'referenceNumber' => $referenceNumber]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('jobs.create.shipping-setup'); ?>
 <?php if ($component->shouldRender()): ?>
 <?php $__env->startComponent($component->resolveView(), $component->data()); ?>
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['selected-client' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($selectedClient),'saved-delivery-contacts' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($savedDeliveryContacts),'phone-country-code-options' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($phoneCountryCodeOptions),'shipping-phone-country-code' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($shippingPhoneCountryCode),'shipping-phone' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($shippingPhone),'shipping-contact-type' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($shippingContactType),'shipping-contact-id' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($shippingContactId),'shipping-contact-selection' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($shippingContactSelection),'shipping-contact-name' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($shippingContactName),'shipping-save-contact' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($shippingSaveContact)]); ?>
+<?php $component->withAttributes(['shipments' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($createShipments),'mode' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($createShipmentMode),'shipment-methods' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($shipmentMethods),'shipment-urgencies' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($shipmentUrgencies),'countries' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($createShipmentCountries),'states-by-country' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($createShipmentStatesByCountry),'phone-codes' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($createShipmentPhoneCodes),'saved-shipping-addresses' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($savedShippingAddresses),'show-saved-shipping-address-picker' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($showSavedShippingAddressPicker),'saved-shipping-address-shipment-index' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($savedShippingAddressShipmentIndex),'reference-number' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($referenceNumber)]); ?>
 <?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::processComponentKey($component); ?>
 
 <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
-<?php if (isset($__attributesOriginal3bdeca9f4e3c8ff46afbfa315bf4b6ef)): ?>
-<?php $attributes = $__attributesOriginal3bdeca9f4e3c8ff46afbfa315bf4b6ef; ?>
-<?php unset($__attributesOriginal3bdeca9f4e3c8ff46afbfa315bf4b6ef); ?>
+<?php if (isset($__attributesOriginalfad564098d922e377b755e81752b4e23)): ?>
+<?php $attributes = $__attributesOriginalfad564098d922e377b755e81752b4e23; ?>
+<?php unset($__attributesOriginalfad564098d922e377b755e81752b4e23); ?>
 <?php endif; ?>
-<?php if (isset($__componentOriginal3bdeca9f4e3c8ff46afbfa315bf4b6ef)): ?>
-<?php $component = $__componentOriginal3bdeca9f4e3c8ff46afbfa315bf4b6ef; ?>
-<?php unset($__componentOriginal3bdeca9f4e3c8ff46afbfa315bf4b6ef); ?>
+<?php if (isset($__componentOriginalfad564098d922e377b755e81752b4e23)): ?>
+<?php $component = $__componentOriginalfad564098d922e377b755e81752b4e23; ?>
+<?php unset($__componentOriginalfad564098d922e377b755e81752b4e23); ?>
 <?php endif; ?>
-        </section>
 
-        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($showSavedShippingAddressPicker): ?>
-            <div class="overlay livewire-overlay ft-order-saved-address-overlay" wire:click.self="closeSavedShippingAddressPicker"></div>
-            <section class="modal livewire-modal ft-order-saved-address-modal" role="dialog" aria-modal="true" aria-labelledby="ft-saved-address-title" x-data x-on:keydown.escape.window="$wire.closeSavedShippingAddressPicker()">
-                <div class="ft-order-saved-address-modal-head">
-                    <div>
-                        <h3 id="ft-saved-address-title">Saved shipping addresses</h3>
-                        <p>Choose a saved delivery address for <?php echo e($selectedClient?->name ?? 'this client'); ?>.</p>
-                    </div>
-                    <button type="button" wire:click="closeSavedShippingAddressPicker" aria-label="Close saved address picker">&times;</button>
-                </div>
-                <div class="ft-order-saved-address-list">
-                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::openLoop(); ?><?php endif; ?><?php $__empty_1 = true; $__currentLoopData = $savedShippingAddresses; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $savedAddress): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::startLoopIteration(); ?><?php endif; ?>
-                        <button
-                            type="button"
-                            class="ft-order-saved-address-card <?php echo e((int) $shippingSourceAddressId === (int) $savedAddress->id ? 'is-selected' : ''); ?>"
-                            wire:click="useSavedShippingAddress(<?php echo e($savedAddress->id); ?>)"
-                            <?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::$currentLoop['key'] = 'create-order-saved-address-'.e($savedAddress->id).''; ?>wire:key="create-order-saved-address-<?php echo e($savedAddress->id); ?>"
-                        >
-                            <span class="ft-order-saved-address-card-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6.5 4.5h11v15l-5.5-3.3-5.5 3.3v-15Z"/></svg>
-                            </span>
-                            <span class="ft-order-saved-address-copy">
-                                <span class="ft-order-saved-address-label">
-                                    <strong><?php echo e($savedAddress->label ?: 'Shipping address'); ?></strong>
-                                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($savedAddress->is_default): ?><em>Default</em><?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-                                </span>
-                                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($savedAddress->recipient): ?><span><?php echo e($savedAddress->recipient); ?></span><?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-                                <span><?php echo e($savedAddress->address_line1); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($savedAddress->suite): ?>, <?php echo e($savedAddress->suite); ?><?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?></span>
-                                <span><?php echo e(collect([$savedAddress->city, $savedAddress->state, $savedAddress->zip])->filter()->implode(', ')); ?></span>
-                                <span><?php echo e($savedAddress->country); ?></span>
-                            </span>
-                            <span class="ft-order-saved-address-use">Use address</span>
-                        </button>
-                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::endLoop(); ?><?php endif; ?><?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::closeLoop(); ?><?php endif; ?>
-                        <div class="ft-order-saved-address-empty">No saved shipping addresses are available for this client.</div>
-                    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-                </div>
-            </section>
-        <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+        
 
         <?php echo $__env->make('components.jobs.create-products', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
@@ -322,43 +251,6 @@ if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                 </label>
-                <div class="ft-create-urgency-grid ft-create-urgency-grid--single">
-                    <div class="ft-create-field ft-create-urgency-field">
-                        <b>Select order shipment urgency</b>
-                        <div class="ft-create-urgency-control" role="radiogroup" aria-label="Select order shipment urgency">
-                            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::openLoop(); ?><?php endif; ?><?php $__empty_1 = true; $__currentLoopData = $shipmentUrgencies; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $urgency): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::startLoopIteration(); ?><?php endif; ?>
-                                <label class="ft-create-urgency-check" <?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::$currentLoop['key'] = 'shipment-urgency-'.e($urgency->id).''; ?>wire:key="shipment-urgency-<?php echo e($urgency->id); ?>">
-                                    <input
-                                        type="radio"
-                                        name="create-shipment-urgency"
-                                        value="<?php echo e($urgency->id); ?>"
-                                        <?php if((int) ($shipmentUrgencyIds[0] ?? 0) === (int) $urgency->id): echo 'checked'; endif; ?>
-                                        wire:click="selectCreateShipmentUrgency(<?php echo e($urgency->id); ?>)"
-                                    >
-                                    <span><?php echo e($urgency->name); ?></span>
-                                </label>
-                            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::endLoop(); ?><?php endif; ?><?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::closeLoop(); ?><?php endif; ?>
-                                <small>No active Shipment Urgency options in Master Data.</small>
-                            <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-                        </div>
-                        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php $__errorArgs = ['shipmentUrgencyIds'];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?><small class="validation-error"><?php echo e($message); ?></small><?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-                        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php $__errorArgs = ['shipmentUrgencyIds.*'];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?><small class="validation-error"><?php echo e($message); ?></small><?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-                    </div>
-                </div>
                 <div class="ft-create-field">
                     <?php if (isset($component)) { $__componentOriginal655167214ff7da69eb027810b956fa88 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal655167214ff7da69eb027810b956fa88 = $attributes; } ?>

@@ -28,7 +28,7 @@ class UploadSecurityService
         'html', 'htm', 'xhtml', 'svg', 'svgz', 'vbs', 'wsf', 'ps1', 'reg',
     ];
 
-    /** @return array{status:string,engine:string,reason:?string,mime:string,size:int} */
+    /** @return array{status:string,engine:string,reason:?string,mime:string,size:int,extension:string,extension_normalized:bool} */
     public function inspect(string $absolutePath, string $originalName, ?string $reportedMime = null, ?int $maxFileBytes = null): array
     {
         abort_unless(is_file($absolutePath), 422, 'The uploaded file could not be inspected.');
@@ -44,7 +44,14 @@ class UploadSecurityService
 
         $detectedMime = $this->detectMime($absolutePath, $reportedMime);
         $this->rejectExecutableSignature($absolutePath);
-        $this->validateKnownSignature($absolutePath, $extension, $detectedMime, $originalName);
+        $verifiedExtension = $this->validateKnownSignature($absolutePath, $extension, $detectedMime, $originalName);
+
+        // Browsers/design tools occasionally preserve an old raster-image file
+        // extension after conversion (for example JPEG bytes named *.PNG). The
+        // byte signature is authoritative for these passive image formats. Keep
+        // rejecting document/archive mismatches, but normalize verified raster
+        // images so they can be stored and served with their real content type.
+        $detectedMime = $this->verifiedImageMime($verifiedExtension) ?: $detectedMime;
 
         if ($extension === 'zip' || in_array($extension, ['docx', 'xlsx'], true)) {
             $this->inspectZipContainer($absolutePath);
@@ -61,6 +68,8 @@ class UploadSecurityService
             'reason' => null,
             'mime' => $detectedMime,
             'size' => $size,
+            'extension' => $verifiedExtension,
+            'extension_normalized' => $verifiedExtension !== $extension,
         ];
     }
 
@@ -96,10 +105,10 @@ class UploadSecurityService
         }
     }
 
-    private function validateKnownSignature(string $path, string $extension, string $mime, string $originalName): void
+    private function validateKnownSignature(string $path, string $extension, string $mime, string $originalName): string
     {
         if ($extension === '') {
-            return;
+            return $extension;
         }
 
         $signatureFlexible = in_array($extension, ['eps', 'esp', 'ai', 'cdr', 'txt', 'csv'], true);
@@ -124,9 +133,14 @@ class UploadSecurityService
             };
 
             if (! $ok) {
-                $safeName = basename($originalName);
-                $type = strtoupper($extension);
-                abort(422, 'The contents of "'.$safeName.'" do not match its '.$type.' file type. Re-export the file or choose the correct file format.');
+                $actualRasterExtension = $this->rasterImageExtension($prefix);
+                if ($this->isRasterImageExtension($extension) && $actualRasterExtension !== null) {
+                    $extension = $actualRasterExtension;
+                } else {
+                    $safeName = basename($originalName);
+                    $type = strtoupper($extension);
+                    abort(422, 'The contents of "'.$safeName.'" do not match its '.$type.' file type. Re-export the file or choose the correct file format.');
+                }
             }
         }
 
@@ -135,6 +149,34 @@ class UploadSecurityService
         if ($mime !== '' && str_starts_with($mime, 'text/html')) {
             abort(422, 'HTML content is not allowed in uploaded business documents.');
         }
+
+        return $extension;
+    }
+
+    private function isRasterImageExtension(string $extension): bool
+    {
+        return in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true);
+    }
+
+    private function rasterImageExtension(string $prefix): ?string
+    {
+        if (str_starts_with($prefix, "\xFF\xD8\xFF")) return 'jpg';
+        if (str_starts_with($prefix, "\x89PNG\r\n\x1A\n")) return 'png';
+        if (str_starts_with($prefix, 'GIF87a') || str_starts_with($prefix, 'GIF89a')) return 'gif';
+        if (str_starts_with($prefix, 'RIFF') && substr($prefix, 8, 4) === 'WEBP') return 'webp';
+
+        return null;
+    }
+
+    private function verifiedImageMime(string $extension): ?string
+    {
+        return match ($extension) {
+            'jpg', 'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            default => null,
+        };
     }
 
     private function hasPdfHeader(string $prefix): bool

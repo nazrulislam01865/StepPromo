@@ -80,6 +80,16 @@ final class StoredFileResponse
     public static function mimeType(string $filename, ?string $storedMimeType = null): string
     {
         $extension = strtolower((string) pathinfo($filename, PATHINFO_EXTENSION));
+        $storedMimeType = strtolower(trim((string) $storedMimeType));
+
+        // SecureDocumentStorage verifies raster signatures before persisting the
+        // MIME type. Prefer that verified value so a harmless converted image
+        // whose old filename extension was retained is served correctly under
+        // X-Content-Type-Options: nosniff.
+        if (in_array($storedMimeType, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true)) {
+            return $storedMimeType;
+        }
+
         $known = [
             'pdf' => 'application/pdf',
             'doc' => 'application/msword',
@@ -102,7 +112,7 @@ final class StoredFileResponse
         ];
 
         if ($extension !== '' && isset($known[$extension])) return $known[$extension];
-        return trim((string) $storedMimeType);
+        return $storedMimeType;
     }
 
     public static function mustDownload(string $filename): bool
