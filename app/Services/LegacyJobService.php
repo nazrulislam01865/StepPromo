@@ -2804,9 +2804,40 @@ class LegacyJobService
         return $progress;
     }
 
+    /**
+     * Load only the runtime graph required to decide whether the current Order
+     * phase may auto-advance. The previous implementation called findVisible(),
+     * which hydrates the complete Order detail graph (all workflow tasks,
+     * documents, comments/activity relationships, products, shipments, etc.)
+     * on every Order open. Auto-advance only needs the published phase metadata,
+     * current-phase Task Pack requirements, and current-phase task evidence.
+     */
+    private function findVisibleForAutoAdvance(User $actor, int $id): FlowJob
+    {
+        $job = $this->findVisibleBase($actor, $id);
+        $this->loadVisibleOverviewSummary($job, $actor);
+
+        $currentPhase = $job->workflow?->phases?->firstWhere('id', (int) $job->workflow_phase_id);
+        if ($currentPhase?->task_pack_id) {
+            // The overview summary intentionally loads only Task Pack item IDs.
+            // Blocker evaluation needs the requirement flags/category metadata,
+            // so upgrade only the current phase rather than every workflow phase.
+            $currentPhase->load(['taskPack.items.documentCategory']);
+        }
+
+        if ($job->relationLoaded('tasks') && $job->tasks->isNotEmpty()) {
+            // Document/link completion gates are evaluated only for the current
+            // phase. Loading these relations on the already-scoped task collection
+            // keeps the query set bounded and prevents presenter-side lazy loads.
+            $job->tasks->loadMissing(['documents', 'links']);
+        }
+
+        return $job;
+    }
+
     public function maybeAutoAdvance(FlowJob $job, User $actor): void
     {
-        $job = $this->findVisible($actor, $job->id);
+        $job = $this->findVisibleForAutoAdvance($actor, $job->id);
         if (app(\App\Services\Orders\OrderHoldService::class)->activeHold($job)) return;
 
         // The approved Order runtime stays sequential/automatic regardless of

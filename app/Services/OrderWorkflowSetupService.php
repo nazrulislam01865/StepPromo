@@ -141,6 +141,10 @@ class OrderWorkflowSetupService
 
         WorkflowPhase::query()
             ->where('workflow_template_id', $template->id)
+            ->where(function (Builder $query) use ($workflow): void {
+                $query->whereNull('workflow_id')
+                    ->orWhere('workflow_id', '!=', $workflow->id);
+            })
             ->update(['workflow_id' => $workflow->id]);
 
         return $workflow;

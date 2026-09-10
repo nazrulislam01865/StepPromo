@@ -947,10 +947,10 @@
     'slow_query_ms' => 150,
     'slow_query_total_ms' => 400,
     'slow_outgoing_ms' => 500,
-    'log_all_requests' => false,
-    'server_timing' => false,
+    'log_all_requests' => true,
+    'server_timing' => true,
     'include_query_sql' => false,
-    'query_fingerprints' => false,
+    'query_fingerprints' => true,
     'dashboard_cache_seconds' => 30,
     'detect_lazy_loading' => true,
     'budgets' => 

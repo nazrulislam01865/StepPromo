@@ -4,7 +4,9 @@ namespace App\Services;
 
 use App\Models\FlowJob;
 use App\Models\FlowJobPhaseHistory;
+use App\Models\Department;
 use App\Models\Task;
+use App\Models\User;
 use App\Models\Workflow;
 use App\Models\WorkflowPhase;
 use App\Support\OrderStageResolver;
@@ -94,7 +96,14 @@ class OrderWorkflowBindingService
             ->whereNull('deleted_at')
             ->whereNull('completed_at')
             ->whereNotIn('status', JobService::INACTIVE_STATUSES)
-            ->first(['id', 'workflow_id', 'source_workflow_id']);
+            ->first([
+                'id',
+                'workflow_id',
+                'source_workflow_id',
+                'workflow_phase_id',
+                'source_workflow_phase_id',
+                'status',
+            ]);
         if (! $job) return false;
 
         $workflowId = (int) ($job->source_workflow_id ?: $job->workflow_id);
@@ -108,8 +117,138 @@ class OrderWorkflowBindingService
 
         [$workflow, $phases] = $this->publishedWorkflow($workflowId);
         if ($phases->isEmpty()) return false;
+
+        // Order Details used to run the full workflow repair transaction every
+        // time an already-correct Order was viewed. That path walks every phase
+        // and generated task, performs firstOrCreate/update checks, synchronizes
+        // flags/statuses, and repairs history even when no setup change exists.
+        //
+        // Keep the repair behavior as the fallback, but first prove that the
+        // current runtime already matches the published definition. The check is
+        // deliberately strict: any missing/stale generated task, setup assignee,
+        // document requirement, phase binding, or active phase history falls
+        // through to the original syncOrder() implementation.
+        if ($this->runtimeMatchesPublishedDefinition($job, $workflow, $phases)) {
+            return false;
+        }
+
         $this->syncOrder($jobId, $workflow, $phases);
         return true;
+    }
+
+    /**
+     * Cheap, read-only fast path for an Order that already matches its
+     * published workflow. Returning false here is intentionally conservative:
+     * prepareSelectedJob() will still run the standalone artwork-evidence repair,
+     * preserving the existing historical-file self-healing behavior.
+     */
+    private function runtimeMatchesPublishedDefinition(FlowJob $job, Workflow $workflow, Collection $phases): bool
+    {
+        if ((int) $job->workflow_id !== (int) $workflow->id) return false;
+        if ((int) $job->source_workflow_id !== (int) $workflow->id) return false;
+
+        $phaseIds = $phases
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->values();
+
+        if ($phaseIds->isEmpty()) return false;
+        if (! $phaseIds->contains((int) $job->workflow_phase_id)) return false;
+        if ((int) ($job->source_workflow_phase_id ?: 0) !== (int) $job->workflow_phase_id) return false;
+
+        $templates = $phases
+            ->flatMap(fn (WorkflowPhase $phase) => $phase->taskPack?->items?->map(
+                fn ($item) => ['phase_id' => (int) $phase->id, 'item' => $item],
+            ) ?? collect())
+            ->values();
+
+        if ($templates->isEmpty()) return false;
+
+        $expectedPairs = $templates
+            ->map(fn (array $row) => $row['phase_id'].':'.(int) $row['item']->id)
+            ->sort()
+            ->values();
+
+        $runtimeTasks = Task::query()
+            ->where('flow_job_id', $job->id)
+            ->whereNotNull('task_pack_task_id')
+            ->get([
+                'id',
+                'workflow_phase_id',
+                'task_pack_task_id',
+                'assignee_id',
+                'setup_assignee_id',
+                'document_category_id',
+                'description',
+                'start_date',
+            ]);
+
+        $actualPairs = $runtimeTasks
+            ->map(fn (Task $task) => (int) $task->workflow_phase_id.':'.(int) $task->task_pack_task_id)
+            ->sort()
+            ->values();
+
+        if ($actualPairs->all() !== $expectedPairs->all()) return false;
+
+        $templatesById = $templates->keyBy(fn (array $row) => (int) $row['item']->id);
+
+        // Task Pack department fallbacks are resolved in two bounded queries,
+        // matching LegacyJobService::syncPhaseTaskPack(). This lets the fast
+        // path detect a changed setup assignee without running the full repair.
+        $departmentCodes = $templates
+            ->map(fn (array $row) => $row['item'])
+            ->filter(fn ($item) => ! $item->defaultAssignee && $item->defaultDepartment)
+            ->pluck('defaultDepartment.code')
+            ->filter()
+            ->unique()
+            ->values();
+
+        $departmentIdsByCode = $departmentCodes->isEmpty()
+            ? collect()
+            : Department::query()->whereIn('code', $departmentCodes)->pluck('id', 'code');
+
+        $departmentIds = $departmentIdsByCode->values()->filter()->unique()->values();
+        $fallbackUsersByDepartment = $departmentIds->isEmpty()
+            ? collect()
+            : User::query()
+                ->where('is_active', true)
+                ->whereIn('department_id', $departmentIds)
+                ->orderBy('id')
+                ->get(['id', 'department_id'])
+                ->unique('department_id')
+                ->keyBy('department_id');
+
+        foreach ($runtimeTasks as $task) {
+            $templateRow = $templatesById->get((int) $task->task_pack_task_id);
+            if (! $templateRow) return false;
+
+            $template = $templateRow['item'];
+            $expectedAssigneeId = $template->defaultAssignee?->id;
+            if (! $expectedAssigneeId && $template->defaultDepartment) {
+                $departmentId = (int) ($departmentIdsByCode->get($template->defaultDepartment->code) ?: 0);
+                $expectedAssigneeId = $departmentId
+                    ? $fallbackUsersByDepartment->get($departmentId)?->id
+                    : null;
+            }
+
+            if ((int) ($task->setup_assignee_id ?: 0) !== (int) ($expectedAssigneeId ?: 0)) return false;
+            if ((int) ($task->document_category_id ?: 0) !== (int) ($template->document_category_id ?: 0)) return false;
+
+            if (blank($task->description) && filled($template->description)) return false;
+
+            // syncPhaseTaskPack() guarantees a start date for generated tasks
+            // in the active phase. A missing value means the repair still has
+            // real work to do, so do not take the fast path.
+            if ((int) $task->workflow_phase_id === (int) $job->workflow_phase_id && ! $task->start_date) return false;
+        }
+
+        return FlowJobPhaseHistory::query()
+            ->where('flow_job_id', $job->id)
+            ->where('workflow_phase_id', $job->workflow_phase_id)
+            ->whereNull('completed_at')
+            ->where('status', 'active')
+            ->exists();
     }
 
     /** @return array{0:Workflow,1:Collection<int,WorkflowPhase>} */

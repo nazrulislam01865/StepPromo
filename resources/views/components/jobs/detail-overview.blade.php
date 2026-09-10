@@ -142,9 +142,12 @@
             key-prefix="order-detail"
             context-type="order"
             :context-id="$job->id"
+            queue-group="order-detail-{{ $job->id }}"
+            :queue-priority="10"
+            :settle-delay="180"
             :rows="4"
             message="Loading order products when needed…"
-            root-margin="360px 0px"
+            root-margin="160px 0px"
         />
     @endif
 
@@ -174,9 +177,12 @@
             key-prefix="order-detail"
             context-type="order"
             :context-id="$job->id"
+            queue-group="order-detail-{{ $job->id }}"
+            :queue-priority="20"
+            :settle-delay="180"
             :rows="5"
             message="Loading workflow and tasks when needed…"
-            root-margin="360px 0px"
+            root-margin="120px 0px"
         />
     @endif
 
@@ -189,9 +195,12 @@
             key-prefix="order-detail"
             context-type="order"
             :context-id="$job->id"
+            queue-group="order-detail-{{ $job->id }}"
+            :queue-priority="30"
+            :settle-delay="180"
             :rows="3"
             message="Loading attachments when needed…"
-            root-margin="300px 0px"
+            root-margin="80px 0px"
         />
     @endif
 
@@ -211,9 +220,12 @@
             key-prefix="order-detail"
             context-type="order"
             :context-id="$job->id"
+            queue-group="order-detail-{{ $job->id }}"
+            :queue-priority="40"
+            :settle-delay="180"
             :rows="4"
             message="Loading activity when needed…"
-            root-margin="300px 0px"
+            root-margin="40px 0px"
         />
     @endif
 

@@ -303,14 +303,14 @@ unset($__defined_vars, $__key, $__value); ?>
     <?php else: ?>
         <?php if (isset($component)) { $__componentOriginal07ce51f35701acdfae5fc6353e53cc20 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal07ce51f35701acdfae5fc6353e53cc20 = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.progressive-section-loader','data' => ['section' => 'products','method' => 'loadDetailSection','keyPrefix' => 'order-detail','contextType' => 'order','contextId' => $job->id,'rows' => 4,'message' => 'Loading order products when needed…','rootMargin' => '360px 0px']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.progressive-section-loader','data' => ['section' => 'products','method' => 'loadDetailSection','keyPrefix' => 'order-detail','contextType' => 'order','contextId' => $job->id,'queueGroup' => 'order-detail-'.e($job->id).'','queuePriority' => 10,'settleDelay' => 180,'rows' => 4,'message' => 'Loading order products when needed…','rootMargin' => '160px 0px']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('ui.progressive-section-loader'); ?>
 <?php if ($component->shouldRender()): ?>
 <?php $__env->startComponent($component->resolveView(), $component->data()); ?>
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['section' => 'products','method' => 'loadDetailSection','key-prefix' => 'order-detail','context-type' => 'order','context-id' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($job->id),'rows' => 4,'message' => 'Loading order products when needed…','root-margin' => '360px 0px']); ?>
+<?php $component->withAttributes(['section' => 'products','method' => 'loadDetailSection','key-prefix' => 'order-detail','context-type' => 'order','context-id' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($job->id),'queue-group' => 'order-detail-'.e($job->id).'','queue-priority' => 10,'settle-delay' => 180,'rows' => 4,'message' => 'Loading order products when needed…','root-margin' => '160px 0px']); ?>
 <?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::processComponentKey($component); ?>
 
 <?php echo $__env->renderComponent(); ?>
@@ -351,14 +351,14 @@ unset($__defined_vars, $__key, $__value); ?>
     <?php else: ?>
         <?php if (isset($component)) { $__componentOriginal07ce51f35701acdfae5fc6353e53cc20 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal07ce51f35701acdfae5fc6353e53cc20 = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.progressive-section-loader','data' => ['section' => 'workflow','method' => 'loadDetailSection','keyPrefix' => 'order-detail','contextType' => 'order','contextId' => $job->id,'rows' => 5,'message' => 'Loading workflow and tasks when needed…','rootMargin' => '360px 0px']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.progressive-section-loader','data' => ['section' => 'workflow','method' => 'loadDetailSection','keyPrefix' => 'order-detail','contextType' => 'order','contextId' => $job->id,'queueGroup' => 'order-detail-'.e($job->id).'','queuePriority' => 20,'settleDelay' => 180,'rows' => 5,'message' => 'Loading workflow and tasks when needed…','rootMargin' => '120px 0px']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('ui.progressive-section-loader'); ?>
 <?php if ($component->shouldRender()): ?>
 <?php $__env->startComponent($component->resolveView(), $component->data()); ?>
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['section' => 'workflow','method' => 'loadDetailSection','key-prefix' => 'order-detail','context-type' => 'order','context-id' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($job->id),'rows' => 5,'message' => 'Loading workflow and tasks when needed…','root-margin' => '360px 0px']); ?>
+<?php $component->withAttributes(['section' => 'workflow','method' => 'loadDetailSection','key-prefix' => 'order-detail','context-type' => 'order','context-id' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($job->id),'queue-group' => 'order-detail-'.e($job->id).'','queue-priority' => 20,'settle-delay' => 180,'rows' => 5,'message' => 'Loading workflow and tasks when needed…','root-margin' => '120px 0px']); ?>
 <?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::processComponentKey($component); ?>
 
 <?php echo $__env->renderComponent(); ?>
@@ -399,14 +399,14 @@ unset($__defined_vars, $__key, $__value); ?>
     <?php else: ?>
         <?php if (isset($component)) { $__componentOriginal07ce51f35701acdfae5fc6353e53cc20 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal07ce51f35701acdfae5fc6353e53cc20 = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.progressive-section-loader','data' => ['section' => 'attachments','method' => 'loadDetailSection','keyPrefix' => 'order-detail','contextType' => 'order','contextId' => $job->id,'rows' => 3,'message' => 'Loading attachments when needed…','rootMargin' => '300px 0px']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.progressive-section-loader','data' => ['section' => 'attachments','method' => 'loadDetailSection','keyPrefix' => 'order-detail','contextType' => 'order','contextId' => $job->id,'queueGroup' => 'order-detail-'.e($job->id).'','queuePriority' => 30,'settleDelay' => 180,'rows' => 3,'message' => 'Loading attachments when needed…','rootMargin' => '80px 0px']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('ui.progressive-section-loader'); ?>
 <?php if ($component->shouldRender()): ?>
 <?php $__env->startComponent($component->resolveView(), $component->data()); ?>
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['section' => 'attachments','method' => 'loadDetailSection','key-prefix' => 'order-detail','context-type' => 'order','context-id' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($job->id),'rows' => 3,'message' => 'Loading attachments when needed…','root-margin' => '300px 0px']); ?>
+<?php $component->withAttributes(['section' => 'attachments','method' => 'loadDetailSection','key-prefix' => 'order-detail','context-type' => 'order','context-id' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($job->id),'queue-group' => 'order-detail-'.e($job->id).'','queue-priority' => 30,'settle-delay' => 180,'rows' => 3,'message' => 'Loading attachments when needed…','root-margin' => '80px 0px']); ?>
 <?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::processComponentKey($component); ?>
 
 <?php echo $__env->renderComponent(); ?>
@@ -447,14 +447,14 @@ unset($__defined_vars, $__key, $__value); ?>
     <?php else: ?>
         <?php if (isset($component)) { $__componentOriginal07ce51f35701acdfae5fc6353e53cc20 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal07ce51f35701acdfae5fc6353e53cc20 = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.progressive-section-loader','data' => ['section' => 'activity','method' => 'loadDetailSection','keyPrefix' => 'order-detail','contextType' => 'order','contextId' => $job->id,'rows' => 4,'message' => 'Loading activity when needed…','rootMargin' => '300px 0px']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.progressive-section-loader','data' => ['section' => 'activity','method' => 'loadDetailSection','keyPrefix' => 'order-detail','contextType' => 'order','contextId' => $job->id,'queueGroup' => 'order-detail-'.e($job->id).'','queuePriority' => 40,'settleDelay' => 180,'rows' => 4,'message' => 'Loading activity when needed…','rootMargin' => '40px 0px']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('ui.progressive-section-loader'); ?>
 <?php if ($component->shouldRender()): ?>
 <?php $__env->startComponent($component->resolveView(), $component->data()); ?>
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['section' => 'activity','method' => 'loadDetailSection','key-prefix' => 'order-detail','context-type' => 'order','context-id' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($job->id),'rows' => 4,'message' => 'Loading activity when needed…','root-margin' => '300px 0px']); ?>
+<?php $component->withAttributes(['section' => 'activity','method' => 'loadDetailSection','key-prefix' => 'order-detail','context-type' => 'order','context-id' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($job->id),'queue-group' => 'order-detail-'.e($job->id).'','queue-priority' => 40,'settle-delay' => 180,'rows' => 4,'message' => 'Loading activity when needed…','root-margin' => '40px 0px']); ?>
 <?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::processComponentKey($component); ?>
 
 <?php echo $__env->renderComponent(); ?>
