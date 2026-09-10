@@ -125,6 +125,22 @@ final class OrderWorkflowSection extends Component
         $this->selectedJobId = $orderId;
     }
 
+    #[On('order-hold-runtime-changed')]
+    public function refreshOrderHoldRuntime(int $orderId, bool $held): void
+    {
+        if ($orderId !== $this->orderId) {
+            return;
+        }
+
+        // This listener intentionally performs no write and does not duplicate
+        // hold business logic. Receiving the targeted parent event is enough to
+        // rerender this isolated child; render() re-reads activeHold from the DB
+        // and rebuilds task permissions/actions from the existing services.
+        // The boolean is accepted as part of the event contract so hold and
+        // unhold share the exact same lightweight refresh path.
+        unset($held);
+    }
+
     public function loadWorkflowSection(string $section, ?string $contextType = null, ?int $contextId = null): void
     {
         if ($section !== 'workflow' || $contextType !== 'order' || (int) $contextId !== $this->orderId || $this->ready) {

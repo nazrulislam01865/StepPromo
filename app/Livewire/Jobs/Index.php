@@ -377,9 +377,11 @@ class Index extends Component
     #[On('order-runtime-refreshed')]
     public function refreshOrderRuntime(int $orderId): void
     {
-        // Workflow maintenance now runs inside the isolated Workflow child. A
-        // rare repair/auto-advance can change the current stage; refresh the
-        // lightweight shell only when that actually happened.
+        // Workflow maintenance and task actions run inside the isolated
+        // Workflow child. Handling this event intentionally performs no extra
+        // write/query work here; Livewire rerenders the lightweight parent shell
+        // so Overall progress and Next required action reflect the saved state
+        // immediately without a browser refresh.
         if ((int) ($this->selectedJobId ?: 0) !== $orderId) {
             return;
         }

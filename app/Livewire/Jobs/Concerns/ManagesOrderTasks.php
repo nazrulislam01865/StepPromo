@@ -165,6 +165,7 @@ trait ManagesOrderTasks
         }
 
         $this->cancelAddOrderTask();
+        $this->dispatchOrderRuntimeRefresh();
         session()->flash('success', 'Order task added.');
     }
 
@@ -200,6 +201,7 @@ trait ManagesOrderTasks
             $job = app(CompleteOrderPhase::class)->handle(app(VisibleOrderQuery::class)->detail(auth()->user(), $this->selectedJobId), auth()->user());
             $this->expandedPhaseIds = $job->phase ? [(int) $job->phase->id] : [];
             $this->syncOverviewWorkflowSelectionToCurrentPhase();
+            $this->dispatchOrderRuntimeRefresh();
             session()->flash('success', 'Phase completed and the next configured phase is active.');
         } catch (Throwable $e) {
             if (trim((string) $e->getMessage()) === \App\Services\Orders\OrderHoldService::BLOCKED_ACTIVITY_MESSAGE) {
@@ -256,6 +258,7 @@ trait ManagesOrderTasks
     {
         abort_unless($this->selectedJobId, 422);
         app(DeleteOrderTask::class)->handle(auth()->user(), $this->selectedJobId, $id);
+        $this->dispatchOrderRuntimeRefresh();
 
         if ((int) $this->selectedTaskId === $id) {
             $this->closeTask();
@@ -501,7 +504,21 @@ trait ManagesOrderTasks
             avatarUrl: $payload['avatarUrl'],
         );
 
+        // Workflow task actions run inside the isolated OrderWorkflowSection.
+        // The summary cards live in the parent Jobs component, so without this
+        // event their saved progress/next-action state stays stale until a full
+        // browser refresh. Reuse the existing runtime refresh contract instead
+        // of duplicating workflow/progress business logic in the UI.
+        $this->dispatchOrderRuntimeRefresh();
+
         return $payload;
+    }
+
+    private function dispatchOrderRuntimeRefresh(): void
+    {
+        if (! $this->selectedJobId) return;
+
+        $this->dispatch('order-runtime-refreshed', orderId: (int) $this->selectedJobId);
     }
 
     private function loadTaskForm(int $id): void

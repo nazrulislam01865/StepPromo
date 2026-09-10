@@ -18,6 +18,7 @@ use App\Services\MasterDataService;
 use App\Services\OrderFinanceService;
 use App\Services\OrderDetailViewService;
 use App\Services\OrderRedoService;
+use App\Services\Orders\OrderWorkflowSummaryService;
 use App\Services\OrderWorkflowSetupService;
 use App\Services\TaskService;
 use App\Services\WorkspaceSettingsService;
@@ -504,8 +505,10 @@ trait BuildsOrderPageData
         $orderDetailSectionsReady = $this->orderDetailSectionsReady;
 
         if ($this->detailTab === 'overview') {
-            $orderQuery->loadOverviewShell($selected, $user);
-
+            // The always-visible summary is now served by a tiny per-Order read
+            // model. Do not hydrate workflow phases/current tasks on every list
+            // -> detail click. The isolated Workflow child still owns the full
+            // authoritative runtime graph and reconciliation before task actions.
             $currentWorkflowPhaseId = (int) ($selected->workflow_phase_id ?: 0);
             if ($currentWorkflowPhaseId > 0) {
                 $this->lastOverviewWorkflowPhaseId = $currentWorkflowPhaseId;
@@ -634,6 +637,9 @@ trait BuildsOrderPageData
         }
 
         $shipmentUrgencyOptions = $master->active('shipment_urgency');
+        $workflowSummary = $this->detailTab === 'overview'
+            ? app(OrderWorkflowSummaryService::class)->forViewer($selected, $user)
+            : [];
         $shipmentMethodOptions = collect();
         $courierOptions = collect();
 
@@ -641,6 +647,8 @@ trait BuildsOrderPageData
         $shipmentStateOptions = collect();
 
         $orderDetailContext = app(OrderDetailViewService::class)->buildSummary($selected, $user, $shipmentUrgencyOptions);
+        $orderDetailContext['workflowSummary'] = $workflowSummary;
+        $orderDetailContext['workflowName'] = (string) ($workflowSummary['workflow_name'] ?? 'FlowTrack Order Workflow');
         $orderDetailContext['shipmentMethods'] = $shipmentMethodOptions;
         $orderDetailContext['shipmentUrgencies'] = $shipmentUrgencyOptions;
         $orderDetailContext['shipmentCouriers'] = $courierOptions;

@@ -374,6 +374,11 @@ class OrderWorkflowBindingService
                 ]);
             }
         }, 3);
+
+        // Rebinding can replace phase/task identities while preserving the
+        // workflow's business semantics. Invalidate only this Order's derived
+        // summary so the next read is rebuilt from the synchronized runtime.
+        app(\App\Services\Orders\OrderWorkflowSummaryService::class)->markStale($jobId);
     }
 
     private function targetSequence(FlowJob $job, int $stageCount): int

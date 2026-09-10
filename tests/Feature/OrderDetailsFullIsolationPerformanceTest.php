@@ -11,7 +11,12 @@ class OrderDetailsFullIsolationPerformanceTest extends TestCase
         $builder = file_get_contents(app_path('Livewire/Jobs/Concerns/BuildsOrderPageData.php'));
         $detail = file_get_contents(app_path('Livewire/Jobs/Concerns/ManagesOrderDetail.php'));
 
-        $this->assertStringContainsString('$orderQuery->loadOverviewShell($selected, $user);', $builder);
+        $jobPageStart = strpos($builder, 'private function jobPageData(User $user): array');
+        $jobPageEnd = strpos($builder, 'private function ', $jobPageStart + 20);
+        $jobPage = substr($builder, $jobPageStart, $jobPageEnd - $jobPageStart);
+
+        $this->assertStringContainsString('OrderWorkflowSummaryService::class)->forViewer($selected, $user)', $jobPage);
+        $this->assertStringNotContainsString('$orderQuery->loadOverviewShell($selected, $user);', $jobPage);
         $this->assertStringContainsString('->buildSummary($selected, $user, $shipmentUrgencyOptions)', $builder);
         $this->assertStringContainsString('->summaryContext($selected, $user)', $builder);
 

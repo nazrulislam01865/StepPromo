@@ -911,12 +911,46 @@ class LegacyJobService
      */
     public function loadVisibleOverviewShell(FlowJob $job, User $user): FlowJob
     {
+        $job->load(['workflow:id,name']);
+
+        if ($job->workflow) {
+            // The summary cards use OrderDetailPresenter::currentTasks(), which
+            // validates generated tasks against the current phase Task Pack.
+            // Keep this shell lightweight, but hydrate the authoritative phase
+            // ids + task_pack_id so configured tasks are not mistaken for stale
+            // rows and filtered out of "Next required action".
+            $phaseQuery = WorkflowPhase::query()
+                ->select([
+                    'id', 'workflow_id', 'workflow_template_id', 'task_pack_id',
+                    'sequence', 'name', 'short_name', 'is_active', 'color',
+                ])
+                ->where('is_active', true);
+
+            $published = ! $job->completed_at
+                && ! in_array((string) $job->status, self::INACTIVE_STATUSES, true)
+                && OrderWorkflowSetupService::orderWorkflowQuery()
+                    ->whereKey((int) $job->workflow_id)
+                    ->where('is_active', true)
+                    ->exists();
+
+            $phases = $published
+                ? $phaseQuery->where('workflow_template_id', (int) $job->workflow_id)->orderBy('sequence')->get()
+                : $phaseQuery->where('workflow_id', (int) $job->workflow_id)->orderBy('sequence')->get();
+
+            $job->workflow->setRelation('phases', $phases->values());
+
+            $currentPhase = $phases->firstWhere('id', (int) $job->workflow_phase_id);
+            if ($currentPhase) {
+                $job->setRelation('phase', $currentPhase);
+                if ($currentPhase->task_pack_id) {
+                    // Only the current pack's ids are required by the summary.
+                    // Do not hydrate every phase/task-pack graph on first paint.
+                    $currentPhase->load(['taskPack.items:id,task_pack_id']);
+                }
+            }
+        }
+
         $job->load([
-            'workflow:id,name',
-            'workflow.phases' => fn ($query) => $query
-                ->where('is_active', true)
-                ->select(['id', 'workflow_id', 'sequence', 'name', 'short_name', 'color', 'is_active'])
-                ->orderBy('sequence'),
             'tasks' => fn ($query) => app(AccessControlService::class)
                 ->applyTaskScope($query, $user)
                 ->where('workflow_phase_id', (int) $job->workflow_phase_id)
@@ -2805,12 +2839,14 @@ class LegacyJobService
         $job->loadMissing('workflow.phases.taskPack.items', 'tasks.setupTemplate', 'tasks.template');
         if ($job->completed_at || $job->status === 'Completed') {
             if ((int) $job->progress !== 100) $job->update(['progress' => 100]);
+            app(\App\Services\Orders\OrderWorkflowSummaryService::class)->markStale((int) $job->id);
             return 100;
         }
 
         $phases = $job->workflow->phases->sortBy('sequence')->values();
         if ($phases->isEmpty()) {
             $job->update(['progress' => 0]);
+            app(\App\Services\Orders\OrderWorkflowSummaryService::class)->markStale((int) $job->id);
             return 0;
         }
 
@@ -2832,6 +2868,7 @@ class LegacyJobService
 
         $progress = max(0, min(99, (int) round($score / $phases->count())));
         if ((int) $job->progress !== $progress) $job->update(['progress' => $progress]);
+        app(\App\Services\Orders\OrderWorkflowSummaryService::class)->markStale((int) $job->id);
         return $progress;
     }
 

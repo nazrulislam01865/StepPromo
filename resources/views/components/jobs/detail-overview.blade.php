@@ -74,14 +74,14 @@
     'shipmentDetailsId' => null,
 ])
 @php
-    // Presentation only: all relationships were eager-loaded in JobService.
-    $currentTasks = \App\Support\OrderDetailPresenter::currentTasks($job);
-    $nextTask = \App\Support\OrderDetailPresenter::nextTask($job);
+    // The parent shell uses the materialized workflow summary only. Full task
+    // relations are owned by the isolated Workflow child below.
+    $workflowSummary = (array) ($orderDetailContext['workflowSummary'] ?? []);
     $canEditJob = (bool) ($orderDetailContext['canEditJob'] ?? false);
     $canChangeOwner = (bool) ($orderDetailContext['canChangeOwner'] ?? false);
 @endphp
 <div class="ft-order-prototype-overview">
-    <x-jobs.order-detail.summary :job="$job" :next-task="$nextTask" :current-tasks="$currentTasks" />
+    <x-jobs.order-detail.summary :job="$job" :summary="$workflowSummary" />
 
     <div class="overview-grid ft-order-overview-grid">
         <x-jobs.order-detail.overview-card :job="$job" :can-edit-job="$canEditJob" :mention-users="$mentionUsers" />

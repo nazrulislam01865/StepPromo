@@ -176,23 +176,23 @@ foreach ($attributes->all() as $__key => $__value) {
 
 unset($__defined_vars, $__key, $__value); ?>
 <?php
-    // Presentation only: all relationships were eager-loaded in JobService.
-    $currentTasks = \App\Support\OrderDetailPresenter::currentTasks($job);
-    $nextTask = \App\Support\OrderDetailPresenter::nextTask($job);
+    // The parent shell uses the materialized workflow summary only. Full task
+    // relations are owned by the isolated Workflow child below.
+    $workflowSummary = (array) ($orderDetailContext['workflowSummary'] ?? []);
     $canEditJob = (bool) ($orderDetailContext['canEditJob'] ?? false);
     $canChangeOwner = (bool) ($orderDetailContext['canChangeOwner'] ?? false);
 ?>
 <div class="ft-order-prototype-overview">
     <?php if (isset($component)) { $__componentOriginalbdd3edd2059243a4a4f678d9dd440078 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginalbdd3edd2059243a4a4f678d9dd440078 = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.jobs.order-detail.summary','data' => ['job' => $job,'nextTask' => $nextTask,'currentTasks' => $currentTasks]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.jobs.order-detail.summary','data' => ['job' => $job,'summary' => $workflowSummary]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('jobs.order-detail.summary'); ?>
 <?php if ($component->shouldRender()): ?>
 <?php $__env->startComponent($component->resolveView(), $component->data()); ?>
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['job' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($job),'next-task' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($nextTask),'current-tasks' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($currentTasks)]); ?>
+<?php $component->withAttributes(['job' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($job),'summary' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($workflowSummary)]); ?>
 <?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::processComponentKey($component); ?>
 
 <?php echo $__env->renderComponent(); ?>

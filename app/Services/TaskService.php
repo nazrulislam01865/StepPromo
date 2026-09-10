@@ -62,7 +62,10 @@ class TaskService
             ],
         );
 
-        return $task->refresh();
+        $task = $task->refresh();
+        app(\App\Services\Orders\OrderWorkflowSummaryService::class)->updateNextTaskAssignee($task);
+
+        return $task;
     }
 
     /**
@@ -102,7 +105,10 @@ class TaskService
             ],
         );
 
-        return $task->refresh();
+        $task = $task->refresh();
+        app(\App\Services\Orders\OrderWorkflowSummaryService::class)->updateNextTaskAssignee($task);
+
+        return $task;
     }
 
     public function visibleQuery(User $user): Builder
@@ -184,6 +190,11 @@ class TaskService
             'url' => $url,
         ]);
 
+        // Evidence can activate a conditional optional task. Invalidate only
+        // this Order's tiny workflow read model; normal workflow/task business
+        // logic remains unchanged and no full Order graph is rebuilt here.
+        app(\App\Services\Orders\OrderWorkflowSummaryService::class)->markStale((int) $task->flow_job_id);
+
         // The link is already persisted and the next render reads document
         // evidence directly from task_links. Do not run the parent Order/phase
         // lifecycle from inside this resource-save request: doing so can change
@@ -203,6 +214,8 @@ class TaskService
         $this->record($task, $actor, 'task.link_removed', 'External link removed.', [
             'task_link_id' => $linkId,
         ]);
+
+        app(\App\Services\Orders\OrderWorkflowSummaryService::class)->markStale((int) $task->flow_job_id);
     }
 
     public function updateDueDate(Task $task, ?string $dueDate, User $actor): Task
@@ -490,6 +503,7 @@ class TaskService
         $done = $task->checklistItems()->where('is_completed', true)->count();
         $progress = (int) round(($done / $total) * 100);
         $task->update(['progress' => min(99, $progress)]);
+        app(\App\Services\Orders\OrderWorkflowSummaryService::class)->markStale((int) $task->flow_job_id);
     }
 
     private function refreshJobState(Task $task, User $actor): void
