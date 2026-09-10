@@ -9,10 +9,12 @@ class OrderDetailProgressiveLoadingPerformanceTest extends TestCase
     public function test_order_detail_heavy_sections_are_serialized_in_one_queue(): void
     {
         $overview = file_get_contents(resource_path('views/components/jobs/detail-overview.blade.php'));
+        $products = file_get_contents(resource_path('views/livewire/jobs/order-products-section.blade.php'));
         $loader = file_get_contents(resource_path('views/components/ui/progressive-section-loader.blade.php'));
 
-        $this->assertSame(4, substr_count($overview, 'queue-group="order-detail-{{ $job->id }}"'));
-        $this->assertStringContainsString(':queue-priority="10"', $overview);
+        $this->assertSame(3, substr_count($overview, 'queue-group="order-detail-{{ $job->id }}"'));
+        $this->assertSame(1, substr_count($products, 'queue-group="order-detail-{{ $orderId }}"'));
+        $this->assertStringContainsString(':queue-priority="10"', $products);
         $this->assertStringContainsString(':queue-priority="20"', $overview);
         $this->assertStringContainsString(':queue-priority="30"', $overview);
         $this->assertStringContainsString(':queue-priority="40"', $overview);
