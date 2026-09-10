@@ -374,6 +374,17 @@ class Index extends Component
         // Re-render open Job/Task details when another permitted user updates them.
     }
 
+    #[On('order-runtime-refreshed')]
+    public function refreshOrderRuntime(int $orderId): void
+    {
+        // Workflow maintenance now runs inside the isolated Workflow child. A
+        // rare repair/auto-advance can change the current stage; refresh the
+        // lightweight shell only when that actually happened.
+        if ((int) ($this->selectedJobId ?: 0) !== $orderId) {
+            return;
+        }
+    }
+
     public function render()
     {
         $user = auth()->user();

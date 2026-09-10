@@ -902,6 +902,37 @@ class LegacyJobService
 
 
     /**
+     * Fast first-paint read model for the always-visible Order Overview shell.
+     *
+     * Unlike loadVisibleOverviewSummary(), this method deliberately avoids
+     * published-workflow reconciliation checks and Task Pack document metadata.
+     * The isolated Workflow component performs that maintenance before exposing
+     * task actions. The shell needs only stage labels and current-stage tasks.
+     */
+    public function loadVisibleOverviewShell(FlowJob $job, User $user): FlowJob
+    {
+        $job->load([
+            'workflow:id,name',
+            'workflow.phases' => fn ($query) => $query
+                ->where('is_active', true)
+                ->select(['id', 'workflow_id', 'sequence', 'name', 'short_name', 'color', 'is_active'])
+                ->orderBy('sequence'),
+            'tasks' => fn ($query) => app(AccessControlService::class)
+                ->applyTaskScope($query, $user)
+                ->where('workflow_phase_id', (int) $job->workflow_phase_id)
+                ->with([
+                    'assignee:id,name,profile_image_path',
+                    'setupTemplate',
+                    'template',
+                    'documents:id,task_id',
+                    'links:id,task_id,url,created_at',
+                ]),
+        ]);
+
+        return $job;
+    }
+
+    /**
      * Hydrate only the small Order Overview summary graph.
      *
      * This is intentionally much smaller than loadVisibleDetailTab('overview'):

@@ -10,14 +10,31 @@ class OrderDetailProgressiveLoadingPerformanceTest extends TestCase
     {
         $overview = file_get_contents(resource_path('views/components/jobs/detail-overview.blade.php'));
         $products = file_get_contents(resource_path('views/livewire/jobs/order-products-section.blade.php'));
+        $workflow = file_get_contents(resource_path('views/livewire/jobs/order-workflow-section.blade.php'));
+        $attachments = file_get_contents(resource_path('views/livewire/jobs/order-attachments-section.blade.php'));
+        $activity = file_get_contents(resource_path('views/livewire/jobs/order-activity-section.blade.php'));
         $loader = file_get_contents(resource_path('views/components/ui/progressive-section-loader.blade.php'));
 
-        $this->assertSame(3, substr_count($overview, 'queue-group="order-detail-{{ $job->id }}"'));
-        $this->assertSame(1, substr_count($products, 'queue-group="order-detail-{{ $orderId }}"'));
-        $this->assertStringContainsString(':queue-priority="10"', $products);
-        $this->assertStringContainsString(':queue-priority="20"', $overview);
-        $this->assertStringContainsString(':queue-priority="30"', $overview);
-        $this->assertStringContainsString(':queue-priority="40"', $overview);
+        foreach ([
+            '<livewire:jobs.order-products-section',
+            '<livewire:jobs.order-workflow-section',
+            '<livewire:jobs.order-attachments-section',
+            '<livewire:jobs.order-activity-section',
+        ] as $component) {
+            $this->assertStringContainsString($component, $overview);
+        }
+
+        $this->assertStringNotContainsString('method="loadDetailSection"', $overview);
+
+        foreach ([
+            [$products, '10'],
+            [$workflow, '20'],
+            [$attachments, '30'],
+            [$activity, '40'],
+        ] as [$view, $priority]) {
+            $this->assertStringContainsString('queue-group="order-detail-{{ $orderId }}"', $view);
+            $this->assertStringContainsString(':queue-priority="'.$priority.'"', $view);
+        }
 
         $this->assertStringContainsString('FlowTrackProgressiveSectionQueue', $loader);
         $this->assertStringContainsString('state.running = true;', $loader);
