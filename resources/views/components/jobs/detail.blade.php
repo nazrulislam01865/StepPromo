@@ -56,6 +56,9 @@
     'focusComment'=>null,
     'showOrderAttentionModal'=>false,
     'orderAttentionReason'=>'',
+    'showOrderHoldModal'=>false,
+    'orderHoldFrom'=>'client',
+    'orderHoldReason'=>'',
     'showOrderCancelModal'=>false,
     'orderCancellationReason'=>'',
     'jobDocumentUploads'=>[],
@@ -118,6 +121,7 @@
     'orderWorkflowActionTaskId'=>null,
     'orderWorkflowActionStep'=>'main',
     'orderWorkflowActionPayload'=>[],
+    'orderWorkflowActionModalPreview'=>[],
     'orderWorkflowActionAttachment'=>null,
     'orderWorkflowActionRevisionComments'=>[],
     'orderWorkflowActionRevisionAttachments'=>[],
@@ -129,16 +133,27 @@
     'shipmentEditingId'=>null,
     'shipmentModalMode'=>'same_address',
     'shipmentForm'=>[],
+    'shipmentInlineTaskId'=>null,
+    'shipmentInlineEditingId'=>null,
+    'shipmentInlineAddressMode'=>\App\Services\OrderShipmentService::MODE_SAME_ADDRESS,
+    'shipmentInlineForm'=>[],
     'showShipmentDetailsModal'=>false,
     'shipmentDetailsId'=>null,
 ])
 @php
     $manualAttention = (bool) ($job->attention_requested ?? false);
+    $orderIsOnHold = (bool) ($orderDetailContext['isOnHold'] ?? false);
 @endphp
 <div
     {{ $attributes->class('ft-job-detail-page ft-order-prototype-detail ft-detail-products-scope') }}
-    x-data="{ redoNotice: '', redoNoticeOpen: false, showRedoNotice(message) { this.redoNotice = message; this.redoNoticeOpen = true; clearTimeout(this.__redoNoticeTimer); this.__redoNoticeTimer = setTimeout(() => this.redoNoticeOpen = false, 2600); } }"
+    x-data="Object.assign(window.FlowTrack.ui.orderHoldGuard({ held: @js($orderIsOnHold) }), { redoNotice: '', redoNoticeOpen: false, showRedoNotice(message) { this.redoNotice = message; this.redoNoticeOpen = true; clearTimeout(this.__redoNoticeTimer); this.__redoNoticeTimer = setTimeout(() => this.redoNoticeOpen = false, 2600); } })"
     x-on:order-redo-notice.window="showRedoNotice($event.detail.message ?? 'Redo update saved.')"
+    x-on:flowtrack:order-held-blocked.window="showHoldBlocked($event.detail?.action ?? '')"
+    x-on:flowtrack:order-hold-state.window="held = Boolean($event.detail?.held); if (!held) closeHoldBlocked()"
+    x-on:click.capture="guardInteraction($event)"
+    x-on:focusin.capture="guardInteraction($event)"
+    x-on:change.capture="guardInteraction($event)"
+    x-on:submit.capture="guardInteraction($event)"
 >
     <x-jobs.order-detail.header
         :job="$job"
@@ -225,6 +240,7 @@
             :order-workflow-action-task-id="$orderWorkflowActionTaskId"
             :order-workflow-action-step="$orderWorkflowActionStep"
             :order-workflow-action-payload="$orderWorkflowActionPayload"
+            :order-workflow-action-modal-preview="$orderWorkflowActionModalPreview"
             :order-workflow-action-attachment="$orderWorkflowActionAttachment"
             :order-workflow-action-revision-comments="$orderWorkflowActionRevisionComments"
             :order-workflow-action-revision-attachments="$orderWorkflowActionRevisionAttachments"
@@ -236,6 +252,10 @@
             :shipment-editing-id="$shipmentEditingId"
             :shipment-modal-mode="$shipmentModalMode"
             :shipment-form="$shipmentForm"
+            :shipment-inline-task-id="$shipmentInlineTaskId"
+            :shipment-inline-editing-id="$shipmentInlineEditingId"
+            :shipment-inline-address-mode="$shipmentInlineAddressMode"
+            :shipment-inline-form="$shipmentInlineForm"
             :show-shipment-details-modal="$showShipmentDetailsModal"
             :shipment-details-id="$shipmentDetailsId"
         />
@@ -318,6 +338,24 @@
 
 
     <x-jobs.order-detail.redo-modal :job="$job" :context="$orderRedoContext" :form="$orderRedoForm" :mention-users="$mentionUsers" />
+
+    @if($showOrderHoldModal)
+        <x-jobs.order-detail.hold-modal
+            :job="$job"
+            :hold-from="$orderHoldFrom"
+            :reason="$orderHoldReason"
+            :mention-users="$mentionUsers"
+        />
+    @endif
+
+    @if($orderIsOnHold)
+        <x-jobs.order-detail.hold-blocked-modal
+            :hold="$orderDetailContext['hold'] ?? null"
+            :can-release-hold="(bool) ($orderDetailContext['canReleaseHold'] ?? false)"
+            :order-id="$job->id"
+            :direct-release="true"
+        />
+    @endif
 
     <div class="ft-redo-toast" x-cloak x-show="redoNoticeOpen" x-transition x-text="redoNotice" role="status" aria-live="polite"></div>
 

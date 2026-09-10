@@ -39,6 +39,7 @@ class Index extends Component
     public string $client = '';
     public string $phase = '';
     public string $owner = '';
+    public bool $holdOn = false;
     #[Url(as: 'metric', history: true, except: '')]
     public string $metricFilter = '';
     public string $dateFrom = '';
@@ -75,6 +76,8 @@ class Index extends Component
     public string $orderWorkflowActionStep = 'main';
     /** @var array<string,mixed> */
     public array $orderWorkflowActionPayload = [];
+    /** Expensive workflow modal email/invoice preview snapshot; prepared outside Blade. */
+    public array $orderWorkflowActionModalPreview = [];
     public bool $orderWorkflowEmailFallback = false;
     public string $orderWorkflowEmailFallbackMessage = '';
     public int $orderWorkflowEmailFallbackAttempts = 0;
@@ -100,6 +103,7 @@ class Index extends Component
         $this->client = $this->numericFilterFromRequest('client');
         $this->phase = $this->numericFilterFromRequest('phase');
         $this->owner = $this->numericFilterFromRequest('owner');
+        $this->holdOn = (int) request('hold_on', 0) === 1;
         $this->metricFilter = trim((string) request('metric', $this->metricFilter));
         if (! in_array($this->metricFilter, ['', 'createdToday', 'notStarted', 'inProgress', 'dueThisWeek', 'completedThisWeek', 'attention', 'dashboardActive', 'dashboardAttention', 'dashboardOverdueTasks'], true)) {
             $this->metricFilter = '';
@@ -162,6 +166,13 @@ class Index extends Component
     public function updatedOwner(): void
     {
         $this->owner = $this->normalizeNumericFilter($this->owner);
+        $this->metricFilter = '';
+        $this->resetOrderSelection();
+        $this->resetPage();
+    }
+
+    public function updatedHoldOn(): void
+    {
         $this->metricFilter = '';
         $this->resetOrderSelection();
         $this->resetPage();
@@ -270,6 +281,7 @@ class Index extends Component
         $this->client = '';
         $this->phase = '';
         $this->owner = '';
+        $this->holdOn = false;
         $this->metricFilter = '';
         $this->dateFrom = '';
         $this->dateTo = '';
@@ -466,6 +478,8 @@ class Index extends Component
         $this->orderWorkflowActionRevisionAttachments = [];
         $this->orderWorkflowActionStep = 'main';
         $this->orderWorkflowActionPayload = $workflowActions->initialPayload($task, $task->job);
+        $this->orderWorkflowActionModalPreview = app(\App\Services\Orders\OrderWorkflowActionModalPreviewService::class)
+            ->snapshot($task, $this->orderWorkflowActionPayload, false);
         $this->resetOrderWorkflowEmailFallbackState();
 
         if (in_array($descriptor['key'] ?? null, ['NEW_SEND_PO_ARTWORK', 'ART_SEND_ORDER_TEAM'], true)) {
@@ -489,9 +503,42 @@ class Index extends Component
         $this->orderWorkflowActionRevisionAttachments = [];
         $this->orderWorkflowActionStep = 'main';
         $this->orderWorkflowActionPayload = [];
+        $this->orderWorkflowActionModalPreview = [];
         $this->listActionOrderId = null;
         $this->resetOrderWorkflowEmailFallbackState();
         $this->resetValidation(['orderWorkflowActionComment', 'orderWorkflowActionAttachment', 'orderWorkflowActionRevisionComments', 'orderWorkflowActionRevisionAttachments', 'orderWorkflowActionPayload', 'orderWorkflowActionEmail']);
+    }
+
+    /** Load the exact email body only after the list action modal shell is visible. */
+    public function loadOrderWorkflowActionEmailPreview(): void
+    {
+        if (! $this->showOrderWorkflowActionModal || ! $this->listActionOrderId || ! $this->orderWorkflowActionTaskId) {
+            return;
+        }
+
+        $previewService = app(\App\Services\Orders\OrderWorkflowActionModalPreviewService::class);
+        if (! $previewService->requiresEmailPreview($this->orderWorkflowActionModalPreview)) {
+            return;
+        }
+
+        $task = $this->editableListWorkflowTask(
+            (int) $this->listActionOrderId,
+            (int) $this->orderWorkflowActionTaskId,
+            ['setupTemplate', 'job.client', 'job.owner', 'job.coordinator', 'job.items'],
+        );
+
+        $this->orderWorkflowActionModalPreview = $previewService
+            ->snapshot($task, $this->orderWorkflowActionPayload, true);
+    }
+
+    /** Refresh only selection-dependent email previews, not every modal rerender. */
+    public function updatedOrderWorkflowActionPayload(mixed $value, mixed $key = null): void
+    {
+        if (! in_array((string) $key, ['to_email', 'cc_emails', 'to_emails', 'customer_comment'], true)) {
+            return;
+        }
+
+        $this->loadOrderWorkflowActionEmailPreview();
     }
 
     public function submitOrderWorkflowAction(string $decision = 'confirm'): void
@@ -1129,6 +1176,7 @@ class Index extends Component
             ->where('flow_job_id', $orderId)
             ->findOrFail($taskId);
 
+        app(\App\Services\Orders\OrderHoldService::class)->assertNotHeld((int) $task->flow_job_id);
         abort_unless(app(AccessControlService::class)->canEditTask(auth()->user(), $task), 403);
 
         return $task;
@@ -1139,7 +1187,15 @@ class Index extends Component
         $user = auth()->user();
         $options = app(FilterOptionService::class);
         $list = app(OrderListQuery::class);
-        $stages = $list->stages($user);
+        $stages = $this->dashboardScope === 1
+            ? $list->dashboardScopedStages(
+                $user,
+                $this->dateFrom,
+                $this->dateTo,
+                $this->filterId($this->client),
+                $this->filterId($this->dashboardTeam),
+            )
+            : $list->stages($user);
         $urgencies = $list->urgencyOptions();
 
         $jobs = $list->paginate($user, [
@@ -1147,6 +1203,7 @@ class Index extends Component
             'client_id' => $this->filterId($this->client),
             'phase_id' => $this->filterId($this->phase),
             'owner_id' => $this->filterId($this->owner),
+            'hold_on' => $this->holdOn,
             'metric' => $this->metricFilter,
             'date_from' => $this->dateFrom,
             'date_to' => $this->dateTo,
@@ -1277,6 +1334,9 @@ class Index extends Component
         if ($except !== 'owner') {
             $this->owner = '';
         }
+        if ($except !== 'holdOn') {
+            $this->holdOn = false;
+        }
         if ($except !== 'dateRange') {
             $this->dateFrom = '';
             $this->dateTo = '';
@@ -1298,6 +1358,7 @@ class Index extends Component
         $this->client = '';
         $this->phase = '';
         $this->owner = '';
+        $this->holdOn = false;
         $this->dateFrom = '';
         $this->dateTo = '';
         $this->dashboardScope = 0;

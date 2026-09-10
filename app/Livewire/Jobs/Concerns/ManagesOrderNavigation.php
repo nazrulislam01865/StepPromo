@@ -125,6 +125,7 @@ trait ManagesOrderNavigation
         $this->jobActivityTab = 'all';
         $this->jobActivityPage = 1;
         $this->closeOrderAttentionReason();
+        $this->closeOrderHoldModal();
         $this->closeEditOrderProductModal();
         $this->closeFinanceModals();
         $this->closeOrderWorkflowAction();
@@ -171,6 +172,7 @@ trait ManagesOrderNavigation
         $this->lastJobDocumentUploadId = null;
         $this->lastJobDocumentTaskId = null;
         $this->closeOrderAttentionReason();
+        $this->closeOrderHoldModal();
         $this->closeEditOrderProductModal();
         $this->closeFinanceModals();
         $this->closeRedoModal();
@@ -184,7 +186,10 @@ trait ManagesOrderNavigation
         abort_unless($this->selectedJobId && $this->detailTab === 'overview', 422);
         $user = auth()->user();
         $job = app(VisibleOrderQuery::class)->base($user, $this->selectedJobId);
-        app(VisibleOrderQuery::class)->loadTab($job, $user, 'overview');
+        // Phase selection only needs the workflow phase list/current phase. Loading
+        // the full overview here duplicates products, documents, shipments, tasks,
+        // and activity hydration that the progressive loaders handle separately.
+        app(VisibleOrderQuery::class)->loadOverviewSummary($job, $user);
 
         $phase = $job->workflow?->phases?->firstWhere('id', $phaseId);
         abort_unless($phase, 404);
@@ -224,6 +229,7 @@ trait ManagesOrderNavigation
             $this->cancelAddOrderTask(false);
             $this->resetOverviewTaskResourceUi();
             $this->closeOrderWorkflowAction();
+            $this->closeOrderHoldModal();
         }
         if ($tab !== 'finance') $this->closeFinanceModals();
         if ($tab !== 'redo') $this->closeRedoModal();

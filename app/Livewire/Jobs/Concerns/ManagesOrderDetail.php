@@ -96,7 +96,7 @@ trait ManagesOrderDetail
     #[Json]
     public function updateJobDeliveryDate(int $jobId, mixed $date): array
     {
-        return $this->persistInlineEdit('delivery date', function () use ($jobId, $date) {
+        return $this->persistInlineEdit('Hand Date', function () use ($jobId, $date) {
             app(UpdateOrderDeliveryDate::class)->handle(auth()->user(), $jobId, (string) $date);
         });
     }
@@ -182,13 +182,18 @@ trait ManagesOrderDetail
         // Active Orders are repaired to the dedicated seven-stage definition
         // before stage ids are cached for the UI. This removes old 5-stage
         // workflow snapshots immediately when an older Order is opened.
-        app(\App\Services\OrderWorkflowBindingService::class)->syncSingleActiveOrder($id);
+        $workflowWasSynced = app(\App\Services\OrderWorkflowBindingService::class)->syncSingleActiveOrder($id);
 
         // Artwork files can outlive a generated Task when an older workflow /
         // Task Pack publish replaced that runtime row. Rebind those historical
         // files to the current ART_PREPARE_UPLOAD task before detail relations
         // are hydrated so completed Artwork stages always show their evidence.
-        app(\App\Services\OrderArtworkEvidenceService::class)->repair($id);
+        // A successful workflow sync already calls OrderArtworkEvidenceService::repair().
+        // Only run the standalone repair when no workflow sync occurred, preventing
+        // the same maintenance pass from running twice during one Order open.
+        if (!$workflowWasSynced) {
+            app(\App\Services\OrderArtworkEvidenceService::class)->repair($id);
+        }
 
         // Heal Orders that were left on a completed stage by an older runtime
         // bug (notably Artwork after choosing "No" for Sample/Swatch). The

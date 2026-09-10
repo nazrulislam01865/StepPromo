@@ -54,6 +54,7 @@
     'orderWorkflowActionTaskId' => null,
     'orderWorkflowActionStep' => 'main',
     'orderWorkflowActionPayload' => [],
+    'orderWorkflowActionModalPreview' => [],
     'orderWorkflowActionAttachment' => null,
     'orderWorkflowActionRevisionComments' => [],
     'orderWorkflowActionRevisionAttachments' => [],
@@ -65,6 +66,10 @@
     'shipmentEditingId' => null,
     'shipmentModalMode' => 'same_address',
     'shipmentForm' => [],
+    'shipmentInlineTaskId' => null,
+    'shipmentInlineEditingId' => null,
+    'shipmentInlineAddressMode' => \App\Services\OrderShipmentService::MODE_SAME_ADDRESS,
+    'shipmentInlineForm' => [],
     'showShipmentDetailsModal' => false,
     'shipmentDetailsId' => null,
 ])
@@ -155,6 +160,10 @@
             :shipment-editing-id="$shipmentEditingId"
             :shipment-modal-mode="$shipmentModalMode"
             :shipment-form="$shipmentForm"
+            :shipment-inline-task-id="$shipmentInlineTaskId"
+            :shipment-inline-editing-id="$shipmentInlineEditingId"
+            :shipment-inline-address-mode="$shipmentInlineAddressMode"
+            :shipment-inline-form="$shipmentInlineForm"
             :show-shipment-details-modal="$showShipmentDetailsModal"
             :shipment-details-id="$shipmentDetailsId"
         />
@@ -220,6 +229,7 @@
                 :config="$workflowActionModal"
                 :step="$orderWorkflowActionStep"
                 :payload="$orderWorkflowActionPayload"
+                :modal-preview="$orderWorkflowActionModalPreview"
                 :attachment="$orderWorkflowActionAttachment"
                 :revision-comments="$orderWorkflowActionRevisionComments"
                 :revision-attachments="$orderWorkflowActionRevisionAttachments"

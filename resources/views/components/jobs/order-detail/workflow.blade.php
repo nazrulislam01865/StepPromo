@@ -9,6 +9,10 @@
     'shipmentEditingId' => null,
     'shipmentModalMode' => 'same_address',
     'shipmentForm' => [],
+    'shipmentInlineTaskId' => null,
+    'shipmentInlineEditingId' => null,
+    'shipmentInlineAddressMode' => \App\Services\OrderShipmentService::MODE_SAME_ADDRESS,
+    'shipmentInlineForm' => [],
     'showShipmentDetailsModal' => false,
     'shipmentDetailsId' => null,
 ])
@@ -30,8 +34,14 @@
     $selectedState = $selectedPhase
         ? \App\Support\OrderDetailPresenter::phaseState($job, $selectedPhase)
         : 'locked';
-    $completedTasks = \App\Support\OrderDetailPresenter::completedCount($selectedTasks);
-    $applicableTaskCount = $selectedTasks->count();
+    $requiredSelectedTasks = $selectedTasks
+        ->filter(fn ($task) => \App\Support\OrderTaskRequirement::isRequired($task))
+        ->values();
+    $requiredCompletedTasks = \App\Support\OrderDetailPresenter::completedCount($requiredSelectedTasks);
+    $requiredTaskCount = $requiredSelectedTasks->count();
+    $visibleOptionalTaskCount = $selectedTasks
+        ->filter(fn ($task) => \App\Support\OrderTaskRequirement::isRegularOptional($task))
+        ->count();
     $stageCount = $phases->count();
     $isShipmentPhase = \App\Support\OrderShipmentPresenter::isShipmentPhase($selectedPhase, $selectedTasks);
     $shipmentPresentation = $isShipmentPhase
@@ -86,6 +96,10 @@
                 :job="$job"
                 :phase="$selectedPhase"
                 :presentation="$shipmentPresentation"
+                :inline-editing-id="$shipmentInlineEditingId"
+                :inline-task-id="$shipmentInlineTaskId"
+                :inline-address-mode="$shipmentInlineAddressMode"
+                :inline-form="$shipmentInlineForm"
             />
 
             @if($showShipmentModal && $shipmentModalTaskId)
@@ -120,7 +134,12 @@
                         <div class="card-title">{{ $selectedPhase?->name ?? 'Workflow' }} tasks</div>
                         <div class="card-sub">{{ $taskPackSub }}</div>
                     </div>
-                    <div class="completion">{{ $completedTasks }} of {{ $applicableTaskCount }} complete</div>
+                    <div class="completion">
+                        {{ $requiredCompletedTasks }} of {{ $requiredTaskCount }} required complete
+                        @if($visibleOptionalTaskCount > 0)
+                            <span class="ft-order-optional-count">· {{ $visibleOptionalTaskCount }} optional</span>
+                        @endif
+                    </div>
                 </div>
 
                 <div class="task-columns ft-order-task-columns">

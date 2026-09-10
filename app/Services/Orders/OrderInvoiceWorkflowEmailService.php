@@ -82,6 +82,8 @@ final class OrderInvoiceWorkflowEmailService
     /** @param array<string,mixed> $payload */
     public function prepare(FlowJob $job, User $actor, array $payload): Invoice
     {
+        app(OrderHoldService::class)->assertNotHeld($job);
+
         $amount = round((float) ($payload['invoice_amount'] ?? 0), 2);
         if ($amount <= 0) {
             throw ValidationException::withMessages([
@@ -173,7 +175,7 @@ final class OrderInvoiceWorkflowEmailService
     }
 
     /** @param array<string,mixed> $selection @return array<string,mixed> */
-    public function preview(Task $task, ?User $actor = null, array $selection = []): array
+    public function preview(Task $task, ?User $actor = null, array $selection = [], bool $includeHtml = true): array
     {
         $job = $task->job ?: FlowJob::query()->find($task->flow_job_id);
         if (! $job) return [];
@@ -193,8 +195,12 @@ final class OrderInvoiceWorkflowEmailService
         );
         $subject = $this->subject($job, $invoice);
         $brand = $this->companyBrand();
-        $viewData = $this->viewData($job, $invoice, $actor, $brand);
-        $html = view('emails.orders.workflow-handoff', $viewData)->render();
+        $viewData = $includeHtml
+            ? $this->viewData($job, $invoice, $actor, $brand)
+            : [];
+        $html = $includeHtml
+            ? view('emails.orders.workflow-handoff', $viewData)->render()
+            : '';
         $emailServiceEnabled = $this->emailControl->orderEnabled();
 
         $recipients = [];
@@ -228,6 +234,18 @@ final class OrderInvoiceWorkflowEmailService
             'subject' => $subject,
             'invoice_id' => (int) $invoice->id,
             'invoice_number' => (string) $invoice->invoice_number,
+            'invoice' => [
+                'id' => (int) $invoice->id,
+                'invoice_number' => (string) $invoice->invoice_number,
+                'currency' => (string) $invoice->currency,
+                'total' => (float) $invoice->total,
+                'issue_date_label' => $invoice->issue_date?->format('M j, Y') ?: '—',
+                'due_date_label' => $invoice->due_date?->format('M j, Y') ?: '—',
+                'billing_contact_name' => (string) ($invoice->billing_contact_name ?: ''),
+                'pdf_name' => (string) ($invoice->pdf_name ?: $invoice->invoice_number.'.pdf'),
+                'open_url' => route('invoices.pdf.open', $invoice),
+                'download_url' => route('invoices.pdf.download', $invoice),
+            ],
             'document_name' => (string) ($invoice->pdf_name ?: $this->pdf->filename($invoice)),
             'documents' => [[
                 'id' => (int) $invoice->id,
@@ -245,6 +263,8 @@ final class OrderInvoiceWorkflowEmailService
     /** @param array<string,mixed> $selection */
     public function send(Task $task, User $actor, array $selection = []): string
     {
+        app(OrderHoldService::class)->assertNotHeld((int) $task->flow_job_id);
+
         $job = FlowJob::query()
             ->with(['client', 'owner', 'coordinator', 'items'])
             ->findOrFail($task->flow_job_id);

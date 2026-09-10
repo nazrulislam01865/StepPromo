@@ -21,6 +21,7 @@ class RequestPerformanceMonitor
     private int $cacheForgets = 0;
     private int $cacheFailovers = 0;
     private array $slowQueries = [];
+    private array $queryFingerprints = [];
     private array $outgoingRequests = [];
     private array $outgoingStartedAt = [];
     private bool $sampled = false;
@@ -40,6 +41,14 @@ class RequestPerformanceMonitor
 
         $this->queryCount++;
         $this->queryTimeMs += (float) $query->time;
+
+        if (config('performance.query_fingerprints', false)) {
+            $fingerprint = preg_replace('/\s+/', ' ', trim($query->sql)) ?: trim($query->sql);
+            $row = $this->queryFingerprints[$fingerprint] ?? ['count' => 0, 'time_ms' => 0.0];
+            $row['count']++;
+            $row['time_ms'] += (float) $query->time;
+            $this->queryFingerprints[$fingerprint] = $row;
+        }
 
         $threshold = (int) config('performance.slow_query_ms', 150);
         if ($query->time < $threshold || count($this->slowQueries) >= 10) return;
@@ -210,6 +219,21 @@ class RequestPerformanceMonitor
         ];
 
         if ($this->slowQueries) $payload['slow_queries'] = $this->slowQueries;
+        if ($this->queryFingerprints) {
+            $fingerprints = [];
+            foreach ($this->queryFingerprints as $sql => $stats) {
+                if (($stats['count'] ?? 0) < 2) continue;
+                $fingerprints[] = [
+                    'count' => (int) $stats['count'],
+                    'time_ms' => round((float) $stats['time_ms'], 2),
+                    'sql' => $sql,
+                ];
+            }
+            usort($fingerprints, static fn (array $a, array $b): int =>
+                [$b['count'], $b['time_ms']] <=> [$a['count'], $a['time_ms']]
+            );
+            if ($fingerprints) $payload['repeated_queries'] = array_slice($fingerprints, 0, 10);
+        }
         if ($this->outgoingRequests) $payload['outgoing_requests'] = $this->outgoingRequests;
 
         return $payload;
@@ -242,6 +266,7 @@ class RequestPerformanceMonitor
         $this->cacheForgets = 0;
         $this->cacheFailovers = 0;
         $this->slowQueries = [];
+        $this->queryFingerprints = [];
         $this->outgoingRequests = [];
         $this->outgoingStartedAt = [];
         $this->sampled = false;

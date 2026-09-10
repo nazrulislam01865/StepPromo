@@ -27,6 +27,39 @@ final class OrderShipmentService
     public const MODE_SAME_ADDRESS = 'same_address';
     public const MODE_MULTIPLE_ADDRESS = 'multiple_address';
 
+    /**
+     * Resolve the Order-level shipping choice used as the default for Shipment 1
+     * and newly-added shipments.
+     *
+     * Older Orders can have a Shipment Urgency without the newer
+     * shipment_method_ids field. In that case the urgency belongs to Standard
+     * Express Shipping, so infer the active Express method instead of silently
+     * falling back to "Normal" or leaving the method empty.
+     *
+     * @return array{shipment_method_id:?int,shipment_urgency_id:?int}
+     */
+    public function orderDefaultShippingSelection(FlowJob $job): array
+    {
+        $methodId = $this->firstValidMasterId((array) ($job->shipment_method_ids ?? []), 'shipment_method');
+        $urgencyId = $this->firstValidMasterId((array) ($job->shipment_urgency_ids ?? []), 'shipment_urgency');
+
+        if (! $methodId && $urgencyId) {
+            $expressMethod = MasterRecord::query()
+                ->forWorkspace(app(MasterDataService::class)->workspaceId())
+                ->ofType('shipment_method')
+                ->active()
+                ->get()
+                ->first(fn (MasterRecord $method): bool => CreateOrderShippingMethodPresenter::methodKind($method) === 'express');
+
+            $methodId = $expressMethod?->id ? (int) $expressMethod->id : null;
+        }
+
+        return [
+            'shipment_method_id' => $methodId,
+            'shipment_urgency_id' => $this->normalizeUrgencyForMethod($methodId, $urgencyId),
+        ];
+    }
+
     public function seedPrimaryShipment(FlowJob $job, ?User $actor = null): OrderShipment
     {
         return DB::transaction(function () use ($job, $actor): OrderShipment {
@@ -59,8 +92,9 @@ final class OrderShipmentService
                 ->latest('id')
                 ->first(['created_at']);
 
-            $methodId = $this->firstValidMasterId((array) ($lockedJob->shipment_method_ids ?? []), 'shipment_method');
-            $urgencyId = $this->firstValidMasterId((array) ($lockedJob->shipment_urgency_ids ?? []), 'shipment_urgency');
+            $shippingSelection = $this->orderDefaultShippingSelection($lockedJob);
+            $methodId = $shippingSelection['shipment_method_id'];
+            $urgencyId = $shippingSelection['shipment_urgency_id'];
 
             return OrderShipment::create([
                 'flow_job_id' => $lockedJob->id,
@@ -76,7 +110,7 @@ final class OrderShipmentService
                 'country' => $this->nullableString($latestShipmentMeta['country'] ?? $sourceAddress?->country),
                 'shipping_source_address_id' => $sourceAddress?->id,
                 'shipment_method_id' => $methodId,
-                'shipment_urgency_id' => $this->normalizeUrgencyForMethod($methodId, $urgencyId),
+                'shipment_urgency_id' => $urgencyId,
                 'courier_id' => $this->resolveCourierIdByName($latestTrackingMeta['carrier'] ?? null),
                 'tracking_number' => $this->nullableString($latestTrackingMeta['tracking_number'] ?? null),
                 'dispatched_at' => $latestDispatchActivity?->created_at,
@@ -170,6 +204,7 @@ final class OrderShipmentService
 
     public function confirmSetup(Task $task, User $actor): Task
     {
+        app(\App\Services\Orders\OrderHoldService::class)->assertNotHeld((int) $task->flow_job_id);
         $this->assertShipmentTask($task, 'SHIP_CONFIRM_INFO');
         $job = FlowJob::query()->findOrFail($task->flow_job_id);
         $shipments = $job->shipments()->get();
@@ -202,6 +237,7 @@ final class OrderShipmentService
     /** @param array<string,mixed> $payload */
     public function addShipment(Task $task, User $actor, array $payload): OrderShipment
     {
+        app(\App\Services\Orders\OrderHoldService::class)->assertNotHeld((int) $task->flow_job_id);
         $this->assertShipmentTask($task, 'SHIP_CONFIRM_INFO');
 
         return DB::transaction(function () use ($task, $actor, $payload): OrderShipment {
@@ -251,6 +287,7 @@ final class OrderShipmentService
     /** @param array<string,mixed> $payload */
     public function updateShipment(Task $task, OrderShipment $shipment, User $actor, array $payload): OrderShipment
     {
+        app(\App\Services\Orders\OrderHoldService::class)->assertNotHeld((int) $task->flow_job_id);
         $this->assertShipmentTask($task, 'SHIP_CONFIRM_INFO');
         $this->assertBelongsToTask($task, $shipment);
 
@@ -307,6 +344,7 @@ final class OrderShipmentService
 
     public function removeShipment(Task $task, OrderShipment $shipment, User $actor): void
     {
+        app(\App\Services\Orders\OrderHoldService::class)->assertNotHeld((int) $task->flow_job_id);
         $this->assertShipmentTask($task, 'SHIP_CONFIRM_INFO');
         $this->assertBelongsToTask($task, $shipment);
         abort_if($shipment->is_primary, 422, 'The primary shipment cannot be removed.');
@@ -329,6 +367,7 @@ final class OrderShipmentService
 
     public function updateShippingMethod(Task $task, OrderShipment $shipment, User $actor, int $methodId, ?int $urgencyId): OrderShipment
     {
+        app(\App\Services\Orders\OrderHoldService::class)->assertNotHeld((int) $task->flow_job_id);
         $this->assertShipmentTask($task, 'SHIP_CONFIRM_INFO');
         $this->assertBelongsToTask($task, $shipment);
 
@@ -365,6 +404,7 @@ final class OrderShipmentService
 
     public function saveTracking(Task $task, OrderShipment $shipment, User $actor, int $courierId, string $trackingNumber): OrderShipment
     {
+        app(\App\Services\Orders\OrderHoldService::class)->assertNotHeld((int) $task->flow_job_id);
         $this->assertShipmentTask($task, 'SHIP_LABEL');
         $this->assertBelongsToTask($task, $shipment);
         $courier = $this->validatedCourier($courierId);
@@ -401,6 +441,7 @@ final class OrderShipmentService
 
     public function markLabelPrinted(Task $task, OrderShipment $shipment, User $actor): OrderShipment
     {
+        app(\App\Services\Orders\OrderHoldService::class)->assertNotHeld((int) $task->flow_job_id);
         $this->assertShipmentTask($task, 'SHIP_LABEL');
         $this->assertBelongsToTask($task, $shipment);
         abort_if(blank($shipment->tracking_number), 422, 'Add a tracking number before printing the label.');
@@ -417,6 +458,7 @@ final class OrderShipmentService
 
     public function dispatch(Task $task, OrderShipment $shipment, User $actor): OrderShipment
     {
+        app(\App\Services\Orders\OrderHoldService::class)->assertNotHeld((int) $task->flow_job_id);
         $this->assertShipmentTask($task, 'SHIP_PACKAGE');
         $this->assertBelongsToTask($task, $shipment);
         abort_if(! $shipment->courier_id, 422, 'Select a courier before dispatching this shipment.');
@@ -619,9 +661,8 @@ final class OrderShipmentService
 
         $errors = [];
         foreach ([
-            'recipient' => 'Recipient is required.',
+            'recipient' => 'Contact person is required.',
             'address' => 'Address is required.',
-            'city' => 'City is required.',
             'postal_code' => 'Postal code is required.',
             'country' => 'Country is required.',
         ] as $field => $message) {
